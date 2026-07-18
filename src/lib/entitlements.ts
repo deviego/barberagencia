@@ -20,7 +20,8 @@ export type NumericLimitKey = "clients.limit" | "reports.retentionDays";
 
 interface PlanConfig {
   label: string;
-  priceBRL: number;
+  priceBRL: number; // mensalidade
+  setupBRL: number; // adesão
   features: Record<FeatureKey, boolean>;
   limits: Record<NumericLimitKey, number>; // -1 = ilimitado
 }
@@ -30,7 +31,8 @@ const UNLIMITED = -1;
 export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   essencial: {
     label: "Essencial",
-    priceBRL: 99,
+    priceBRL: 65,
+    setupBRL: 139.9,
     features: {
       "site.subdomain": false,
       "site.customDomain": false,
@@ -46,7 +48,8 @@ export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   },
   profissional: {
     label: "Profissional",
-    priceBRL: 199,
+    priceBRL: 85,
+    setupBRL: 199,
     features: {
       "site.subdomain": true,
       "site.customDomain": false,
@@ -62,7 +65,8 @@ export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   },
   advanced: {
     label: "Advanced",
-    priceBRL: 349,
+    priceBRL: 99,
+    setupBRL: 259,
     features: {
       "site.subdomain": true,
       "site.customDomain": true,

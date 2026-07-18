@@ -4,61 +4,61 @@ import { cn } from "@/lib/utils";
 const PLANS_UI = [
   {
     name: "Essencial",
-    price: "R$ 99",
+    setup: "R$ 139,90",
+    monthly: "R$ 65",
     desc: "Para começar a organizar a barbearia.",
     highlight: false,
     features: [
-      { ok: true, text: "Até 100 clientes cadastrados" },
-      { ok: true, text: "Relatório financeiro básico — últimos 30 dias" },
-      { ok: true, text: "Agendamento" },
-      { ok: true, text: "Disparo de WhatsApp manual, um a um" },
-      { ok: false, text: "Site de agendamento para o cliente" },
-      { ok: false, text: "Plataforma de atendimento (chat/suporte)" },
-      { ok: false, text: "Automação de WhatsApp e marketing" },
+      { ok: true, text: "Cadastrar até 100 clientes na plataforma" },
+      { ok: true, text: "Relatório — últimos 30 dias" },
+      { ok: true, text: "Atendimento personalizado: agendamentos + notificações push (WhatsApp, e-mail, SMS)" },
+      { ok: false, text: "Criação de site para ofertas" },
+      { ok: false, text: "Plataforma de atendimento 24h para clientes" },
+      { ok: false, text: "Automação: chatbot, campanhas via e-mkt, integração de redes sociais" },
     ],
   },
   {
     name: "Profissional",
-    price: "R$ 199",
-    desc: "Para quem quer agenda cheia no automático.",
+    setup: "R$ 199",
+    monthly: "R$ 85",
+    desc: "Para quem quer agenda cheia e presença online.",
     highlight: true,
     badge: "Mais popular",
     features: [
-      { ok: true, text: "Até 500 clientes cadastrados" },
-      { ok: true, text: "Relatório financeiro completo — 12 meses" },
-      { ok: true, text: "Agendamento automatizado" },
-      { ok: true, text: "Site do cliente incluído (subdomínio)" },
-      { ok: true, text: "Plataforma de atendimento (chat + suporte)" },
-      { ok: true, text: "Automação de WhatsApp: lembretes e confirmações" },
-      { ok: true, text: "Marketing básico — campanhas por segmento" },
+      { ok: true, text: "Cadastrar até 500 clientes na plataforma" },
+      { ok: true, text: "Relatório — últimos 12 meses" },
+      { ok: true, text: "Atendimento personalizado: agendamentos + notificações push (WhatsApp, e-mail, SMS)" },
+      { ok: true, text: "Criação de site para ofertas" },
+      { ok: true, text: "Plataforma de atendimento 24h para clientes" },
+      { ok: false, text: "Automação: chatbot, campanhas via e-mkt, integração de redes sociais" },
     ],
   },
   {
     name: "Advanced",
-    price: "R$ 349",
+    setup: "R$ 259",
+    monthly: "R$ 99",
     desc: "Para redes e franquias em escala.",
     highlight: false,
     features: [
-      { ok: true, text: "Clientes ilimitados" },
-      { ok: true, text: "Relatório financeiro ilimitado + exportação" },
-      { ok: true, text: "Agendamento automatizado + recorrência" },
-      { ok: true, text: "Site do cliente com domínio próprio" },
-      { ok: true, text: "Atendimento com chatbot e filas" },
-      { ok: true, text: "Automação total de WhatsApp + campanhas segmentadas" },
-      { ok: true, text: "Marketing avançado + consolidado multi-unidades" },
+      { ok: true, text: "Clientes ilimitados na plataforma" },
+      { ok: true, text: "Relatório ilimitado + exportação" },
+      { ok: true, text: "Atendimento personalizado: agendamentos + notificações push (WhatsApp, e-mail, SMS)" },
+      { ok: true, text: "Criação de site para ofertas" },
+      { ok: true, text: "Plataforma de atendimento 24h para clientes" },
+      { ok: true, text: "Automação completa: chatbot + campanhas via e-mkt + integração de redes sociais" },
     ],
   },
 ];
 
 const PLAN_TABLE = [
   { label: "Clientes cadastrados", a: "100", b: "500", c: "Ilimitado" },
-  { label: "Relatório financeiro", a: "Básico · 30 dias", b: "Completo · 12 meses", c: "Ilimitado + exportação" },
-  { label: "Agendamento", a: "Manual", b: "Automatizado", c: "Automatizado + recorrência" },
-  { label: "Site para o cliente", a: "—", b: "Subdomínio", c: "Domínio próprio" },
-  { label: "Plataforma de atendimento", a: "—", b: "Chat + suporte", c: "Chatbot + filas" },
-  { label: "Disparo de WhatsApp", a: "Manual", b: "Automação (lembretes)", c: "Automação + campanhas" },
-  { label: "Marketing", a: "—", b: "Básico (segmentos)", c: "Avançado (jornadas)" },
-  { label: "Unidades", a: "1", b: "1", c: "Até 5 + visão de rede" },
+  { label: "Relatório financeiro", a: "30 dias", b: "12 meses", c: "Ilimitado + exportação" },
+  { label: "Agendamentos + notificações push", a: "Sim", b: "Sim", c: "Sim" },
+  { label: "Site para ofertas", a: "—", b: "Sim", c: "Sim" },
+  { label: "Atendimento 24h ao cliente", a: "—", b: "Sim", c: "Sim" },
+  { label: "Automação (chatbot / e-mkt / redes)", a: "—", b: "—", c: "Sim" },
+  { label: "Adesão", a: "R$ 139,90", b: "R$ 199", c: "R$ 259" },
+  { label: "Mensalidade", a: "R$ 65", b: "R$ 85", c: "R$ 99" },
 ];
 
 export default function PlanosSaasPage() {
@@ -67,7 +67,8 @@ export default function PlanosSaasPage() {
       <div>
         <h1 className="font-display text-h2 uppercase text-text">Planos da plataforma</h1>
         <p className="text-caption text-text-2">
-          O que cada barbearia contrata — limites e recursos por plano. Cobrança mensal, sem fidelidade.
+          O que cada barbearia contrata — limites e recursos por plano. Valores válidos por 6 meses;
+          após esse período, sujeitos a reajuste.
         </p>
       </div>
 
@@ -91,9 +92,12 @@ export default function PlanosSaasPage() {
             </div>
             <div className="flex items-baseline gap-1.5">
               <span className="font-display text-[40px] font-black leading-none text-accent">
-                {pl.price}
+                {pl.monthly}
               </span>
-              <span className="text-caption text-text-muted">/mês por unidade</span>
+              <span className="text-caption text-text-muted">/mês</span>
+            </div>
+            <div className="text-caption text-text-2">
+              Adesão <span className="font-semibold text-text">{pl.setup}</span> · válido por 6 meses
             </div>
             <p className="text-caption text-text-2">{pl.desc}</p>
             <div className="h-px bg-border-subtle" />
@@ -112,9 +116,7 @@ export default function PlanosSaasPage() {
             <button
               className={cn(
                 "rounded-md py-3 text-body font-bold transition-opacity hover:opacity-90",
-                pl.highlight
-                  ? "bg-accent text-text-inverse"
-                  : "border border-accent text-accent"
+                pl.highlight ? "bg-accent text-text-inverse" : "border border-accent text-accent"
               )}
             >
               Escolher {pl.name}

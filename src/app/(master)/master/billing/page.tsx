@@ -17,9 +17,9 @@ export default function BillingPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="MRR" value={formatBRL(BILLING.mrr)} accent />
-        <KpiCard label="Tenants" value={String(BILLING.tenants)} />
-        <KpiCard label="Inadimplência" value={String(BILLING.overdue)} />
-        <KpiCard label="Churn" value={`${BILLING.churnPct}%`} />
+        <KpiCard label="Tenants ativos" value={String(BILLING.tenants)} />
+        <KpiCard label="Inadimplência" value={String(BILLING.overdue)} tone="danger" />
+        <KpiCard label="Churn (90d)" value={`${BILLING.churnPct}%`} />
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">
@@ -28,7 +28,7 @@ export default function BillingPage() {
             <tr className="border-b border-border bg-surface text-left text-caption uppercase text-text-muted">
               <th className="px-4 py-3 font-semibold">Barbearia</th>
               <th className="px-4 py-3 font-semibold">Plano</th>
-              <th className="px-4 py-3 font-semibold">Valor</th>
+              <th className="px-4 py-3 font-semibold">Fatura jul/26</th>
               <th className="px-4 py-3 font-semibold">Vencimento</th>
               <th className="px-4 py-3 font-semibold">Status</th>
             </tr>

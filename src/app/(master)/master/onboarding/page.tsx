@@ -11,6 +11,7 @@ import { formatBRL, cn } from "@/lib/utils";
 
 const STEPS = ["Dados", "Domínio", "Tema", "Plano"];
 const PLAN_ORDER: SaasPlanKey[] = ["essencial", "profissional", "advanced"];
+const PRESET_COLORS = ["#C9A24B", "#5556EE", "#08D48B", "#FF385C"];
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
@@ -95,13 +96,27 @@ export default function OnboardingPage() {
               <div className="flex flex-col gap-1.5">
                 <Label>Cor primária (acento)</Label>
                 <div className="flex items-center gap-2">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setAccent(c)}
+                      aria-label={`Cor ${c}`}
+                      className={cn(
+                        "h-9 w-9 rounded-md border-2 transition-transform hover:scale-105",
+                        accent.toLowerCase() === c.toLowerCase() ? "border-text" : "border-transparent"
+                      )}
+                      style={{ background: c }}
+                    />
+                  ))}
+                  <span className="mx-1 h-6 w-px bg-border" />
                   <input
                     type="color"
                     value={accent}
                     onChange={(e) => setAccent(e.target.value)}
-                    className="h-10 w-14 cursor-pointer rounded border border-border bg-transparent"
+                    className="h-9 w-10 cursor-pointer rounded border border-border bg-transparent"
                   />
-                  <Input value={accent} onChange={(e) => setAccent(e.target.value)} className="w-32" />
+                  <Input value={accent} onChange={(e) => setAccent(e.target.value)} className="w-28" />
                 </div>
               </div>
               <p className="text-caption text-text-muted">
@@ -136,7 +151,7 @@ export default function OnboardingPage() {
           Voltar
         </Button>
         {step < STEPS.length - 1 ? (
-          <Button onClick={() => setStep((s) => s + 1)}>Próximo</Button>
+          <Button onClick={() => setStep((s) => s + 1)}>Continuar</Button>
         ) : (
           <Button>Criar barbearia</Button>
         )}

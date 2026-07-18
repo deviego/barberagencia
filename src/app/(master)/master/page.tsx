@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Palette, Plus } from "lucide-react";
+import { EllipsisVertical, Palette, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PLANS } from "@/lib/entitlements";
@@ -32,10 +32,10 @@ export default function BarbeariasPage() {
             <tr className="border-b border-border bg-surface text-left text-caption uppercase text-text-muted">
               <th className="px-4 py-3 font-semibold">Barbearia</th>
               <th className="px-4 py-3 font-semibold">Domínio</th>
-              <th className="px-4 py-3 font-semibold">Plano</th>
+              <th className="px-4 py-3 font-semibold">Plano SaaS</th>
               <th className="px-4 py-3 font-semibold">Unidades</th>
               <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 text-right font-semibold">Tema</th>
+              <th className="px-4 py-3 text-right font-semibold">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -44,8 +44,8 @@ export default function BarbeariasPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span
-                      className="flex h-8 w-8 items-center justify-center rounded-md font-display text-caption font-black text-white"
-                      style={{ background: t.color }}
+                      className="flex h-8 w-8 items-center justify-center rounded-md font-display text-caption font-black"
+                      style={{ background: t.color, color: t.logoFg }}
                     >
                       {t.logo}
                     </span>
@@ -61,14 +61,20 @@ export default function BarbeariasPage() {
                   <Badge variant={STATUS[t.status].variant}>{STATUS[t.status].label}</Badge>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-1">
                     <Link
                       href="/master/temas"
-                      className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-inset hover:text-accent"
+                      className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-accent-wash hover:text-accent"
                       aria-label="Editar tema"
                     >
                       <Palette size={16} />
                     </Link>
+                    <button
+                      className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-accent-wash hover:text-accent"
+                      aria-label="Mais ações"
+                    >
+                      <EllipsisVertical size={16} />
+                    </button>
                   </div>
                 </td>
               </tr>
