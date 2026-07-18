@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { CrudTable } from "@/features/admin/components/crud-table";
 import { CLIENTS } from "@/features/admin/mock-data";
