@@ -59,7 +59,7 @@ function NotifCard({
 }) {
   return (
     <div
-      className="rounded-lg border p-3 text-left"
+      className="rounded-lg border border-border bg-surface p-3 text-left"
       style={green ? { borderColor: "#25D366", background: "rgba(37,211,102,0.08)" } : undefined}
     >
       <div className="mb-1.5 flex items-center gap-1.5 text-overline uppercase text-text-muted">

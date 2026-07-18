@@ -30,6 +30,11 @@
   --bb-text: #F5F1E8; --bb-text-2: #B9B2A4; --bb-text-muted: #7A756B; --bb-text-inverse: #171717;
   --bb-accent: #C9A24B; --bb-accent-hover: #DDB86A; --bb-accent-down: #A8842F; --bb-accent-wash: rgba(201,162,75,0.12);
   --bb-focus: #DDB86A;
+  /* Washes semânticos do tema DARK (sobrescrevem os solids claros do bloco fixo) */
+  --bb-success-bg: rgba(8,212,139,0.14);
+  --bb-warning-bg: rgba(255,200,57,0.14);
+  --bb-danger-bg: rgba(255,56,92,0.14);
+  --bb-info-bg: rgba(85,86,238,0.16);
   --bb-n50:#FAFAF7; --bb-n100:#F0EEE8; --bb-n200:#DCD8CE; --bb-n300:#B9B2A4; --bb-n400:#948D7F; --bb-n500:#7A756B; --bb-n600:#565248; --bb-n700:#3B382F; --bb-n800:#242219; --bb-n900:#14130E;
 }
 
