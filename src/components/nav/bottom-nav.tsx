@@ -1,0 +1,31 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { CLIENT_NAV } from "@/features/client/nav";
+import { cn } from "@/lib/utils";
+
+/** Navegação inferior (mobile) do app do cliente. */
+export function BottomNav() {
+  const pathname = usePathname();
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-sticky flex items-center justify-around border-t border-border bg-surface px-2 py-1.5 md:hidden">
+      {CLIENT_NAV.map(({ href, label, icon: Icon }) => {
+        const active = pathname === href;
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex flex-1 flex-col items-center gap-0.5 rounded-md py-1.5 text-caption transition-colors",
+              active ? "text-accent" : "text-text-muted hover:text-text-2"
+            )}
+          >
+            <Icon size={20} />
+            <span className="text-[11px]">{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
