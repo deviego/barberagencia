@@ -65,7 +65,7 @@ export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   },
   advanced: {
     label: "Advanced",
-    priceBRL: 99,
+    priceBRL: 105,
     setupBRL: 259,
     features: {
       "site.subdomain": true,

@@ -9,6 +9,8 @@ const PLANS_UI = [
     desc: "Para começar a organizar a barbearia.",
     highlight: false,
     features: [
+      { ok: true, text: "Plataforma personalizada para administradores" },
+      { ok: true, text: "Cadastro personalizado para clientes" },
       { ok: true, text: "Cadastrar até 100 clientes na plataforma" },
       { ok: true, text: "Relatório — últimos 30 dias" },
       { ok: true, text: "Atendimento personalizado: agendamentos + notificações push (WhatsApp, e-mail, SMS)" },
@@ -25,6 +27,8 @@ const PLANS_UI = [
     highlight: true,
     badge: "Mais popular",
     features: [
+      { ok: true, text: "Plataforma personalizada para administradores" },
+      { ok: true, text: "Cadastro personalizado para clientes" },
       { ok: true, text: "Cadastrar até 500 clientes na plataforma" },
       { ok: true, text: "Relatório — últimos 12 meses" },
       { ok: true, text: "Atendimento personalizado: agendamentos + notificações push (WhatsApp, e-mail, SMS)" },
@@ -36,10 +40,12 @@ const PLANS_UI = [
   {
     name: "Advanced",
     setup: "R$ 259",
-    monthly: "R$ 99",
+    monthly: "R$ 105",
     desc: "Para redes e franquias em escala.",
     highlight: false,
     features: [
+      { ok: true, text: "Plataforma personalizada para administradores" },
+      { ok: true, text: "Cadastro personalizado para clientes" },
       { ok: true, text: "Clientes ilimitados na plataforma" },
       { ok: true, text: "Relatório ilimitado + exportação" },
       { ok: true, text: "Atendimento personalizado: agendamentos + notificações push (WhatsApp, e-mail, SMS)" },
@@ -58,7 +64,7 @@ const PLAN_TABLE = [
   { label: "Atendimento 24h ao cliente", a: "—", b: "Sim", c: "Sim" },
   { label: "Automação (chatbot / e-mkt / redes)", a: "—", b: "—", c: "Sim" },
   { label: "Adesão", a: "R$ 139,90", b: "R$ 199", c: "R$ 259" },
-  { label: "Mensalidade", a: "R$ 65", b: "R$ 85", c: "R$ 99" },
+  { label: "Mensalidade", a: "R$ 65", b: "R$ 85", c: "R$ 105" },
 ];
 
 export default function PlanosSaasPage() {
