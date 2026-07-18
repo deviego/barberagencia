@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Bell, Check } from "lucide-react";
+import { Bell, Check, Plus } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PosButton } from "@/features/admin/components/pos-drawer";
 import { formatBRL } from "@/lib/utils";
 import { KPIS, PAYMENT_QUEUE, REQUESTS, REVENUE_6M, TODAY_AGENDA } from "@/features/admin/mock-data";
 
@@ -16,7 +17,23 @@ export default function AdminDashboard() {
   const max = Math.max(...REVENUE_6M.map((m) => m.value));
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-h3 font-bold text-text">Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-h3 font-bold text-text">Dashboard</h1>
+          <p className="text-caption text-text-muted">
+            Sexta, 17 de julho — {KPIS.appointmentsToday} agendamentos hoje
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <PosButton variant="outline" />
+          <Link href="/admin/agenda">
+            <Button>
+              <Plus size={16} />
+              Novo agendamento
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       {/* Banner de solicitações pendentes */}
       {REQUESTS.length > 0 && (
@@ -37,9 +54,9 @@ export default function AdminDashboard() {
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Faturamento" value={formatBRL(KPIS.revenue)} delta={`+${KPIS.revenueDelta}% vs mês anterior`} accent />
-        <KpiCard label="Agendamentos hoje" value={String(KPIS.appointmentsToday)} />
-        <KpiCard label="Assinantes ativos" value={String(KPIS.subscribers)} />
-        <KpiCard label="Ocupação" value={`${KPIS.occupancy}%`} />
+        <KpiCard label="Agendamentos hoje" value={String(KPIS.appointmentsToday)} delta="2 aguardando confirmação" />
+        <KpiCard label="Assinantes ativos" value={String(KPIS.subscribers)} delta="+4 este mês" />
+        <KpiCard label="Ocupação" value={`${KPIS.occupancy}%`} delta="-3% vs. semana passada" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

@@ -43,28 +43,56 @@ export default async function MarketingPage() {
         </Button>
       </div>
 
-      {/* Criador rápido */}
-      <div className="rounded-lg border border-border bg-surface p-5">
-        <div className="mb-3 text-overline uppercase text-text-muted">
-          Segmentação {canSegmented ? "" : "(básica)"}
+      {/* Criar campanha */}
+      <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
+        <div className="text-overline uppercase text-text-muted">Criar campanha</div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-caption font-semibold text-text-2">Nome da campanha</span>
+          <input
+            placeholder="Ex.: Sentimos sua falta!"
+            className="h-10 rounded-md border border-border bg-inset px-3 text-body text-text placeholder:text-text-muted focus-visible:border-focus focus-visible:outline-none"
+          />
         </div>
-        <div className="flex flex-wrap gap-2">
-          {SEGMENTS.map((s, i) => {
-            const locked = !canSegmented && i > 1;
-            return (
-              <span
-                key={s}
-                className={`flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption ${
-                  locked
-                    ? "border-border-subtle text-text-muted"
-                    : "border-border text-text-2 hover:border-accent"
-                }`}
-              >
-                {locked && <Lock size={12} />}
-                {s}
-              </span>
-            );
-          })}
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-caption font-semibold text-text-2">
+            Segmento {canSegmented ? "" : "(básico)"}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {SEGMENTS.map((s, i) => {
+              const locked = !canSegmented && i > 1;
+              return (
+                <span
+                  key={s}
+                  className={`flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-caption ${
+                    locked
+                      ? "border-border-subtle text-text-muted"
+                      : "border-border text-text-2 hover:border-accent"
+                  }`}
+                >
+                  {locked && <Lock size={12} />}
+                  {s}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-caption font-semibold text-text-2">Mensagem</span>
+          <textarea
+            rows={3}
+            defaultValue="Sentimos sua falta! Que tal agendar seu próximo corte com 10% off? 💈"
+            className="rounded-md border border-border bg-inset p-3 text-body text-text placeholder:text-text-muted focus-visible:border-focus focus-visible:outline-none"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-caption text-text-muted">
+            Alcance estimado: <strong className="text-text">37 clientes</strong> · WhatsApp + e-mail
+          </span>
+          <Button>Enviar campanha</Button>
         </div>
       </div>
 

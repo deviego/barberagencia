@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Building2, ChevronDown, LogOut, Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { FabWhatsApp } from "@/components/nav/fab-whatsapp";
 import { Badge } from "@/components/ui/badge";
 import { ADMIN_NAV } from "@/features/admin/nav";
 import { hasEntitlement } from "@/lib/entitlements";
@@ -121,6 +122,7 @@ export function AdminShell({
 
         <main className="flex-1 overflow-x-hidden p-6">{children}</main>
       </div>
+      <FabWhatsApp href="https://wa.me/5521990883359" />
     </div>
   );
 }

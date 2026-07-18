@@ -65,8 +65,20 @@ export default async function ConfigPage() {
           <div className="flex flex-col gap-1.5">
             <Label>Cor de acento</Label>
             <div className="flex items-center gap-2">
-              <span className="h-9 w-9 rounded-md border border-border bg-accent" />
-              <Input defaultValue="#C9A24B" className="w-32" />
+              {[
+                { c: "#C9A24B", sel: true },
+                { c: "#5556EE", sel: false },
+                { c: "#08D48B", sel: false },
+                { c: "#FF385C", sel: false },
+              ].map(({ c, sel }) => (
+                <span
+                  key={c}
+                  className={`h-9 w-9 rounded-md border-2 ${sel ? "border-text" : "border-transparent"}`}
+                  style={{ background: c }}
+                />
+              ))}
+              <span className="mx-1 h-6 w-px bg-border" />
+              <Input defaultValue="#C9A24B" className="w-28" />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">

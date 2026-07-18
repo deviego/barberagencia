@@ -28,7 +28,16 @@ export function KpiCard({
     <div className="rounded-lg border border-border bg-surface p-5">
       <div className="text-overline uppercase text-text-muted">{label}</div>
       <div className={cn("mt-1 text-h2 tabular", TONE[resolved])}>{value}</div>
-      {delta && <div className="mt-1 text-caption text-success-strong">{delta}</div>}
+      {delta && (
+        <div
+          className={cn(
+            "mt-1 text-caption",
+            delta.trim().startsWith("-") ? "text-danger" : "text-success-strong"
+          )}
+        >
+          {delta}
+        </div>
+      )}
     </div>
   );
 }
