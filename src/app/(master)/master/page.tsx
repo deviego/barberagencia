@@ -1,0 +1,81 @@
+import Link from "next/link";
+import { Palette, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PLANS } from "@/lib/entitlements";
+import type { SaasPlanKey } from "@/lib/tenant/types";
+import { TENANTS } from "@/features/platform/mock-data";
+
+const STATUS: Record<string, { label: string; variant: React.ComponentProps<typeof Badge>["variant"] }> = {
+  ACTIVE: { label: "Ativa", variant: "success" },
+  PAYMENT_PENDING: { label: "Pagamento pendente", variant: "warning" },
+  ONBOARDING: { label: "Onboarding", variant: "info" },
+  SUSPENDED: { label: "Suspensa", variant: "danger" },
+};
+
+export default function BarbeariasPage() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-h3 font-bold text-text">Barbearias</h1>
+        <Link href="/master/onboarding">
+          <Button>
+            <Plus size={16} />
+            Nova barbearia
+          </Button>
+        </Link>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-body">
+          <thead>
+            <tr className="border-b border-border bg-surface text-left text-caption uppercase text-text-muted">
+              <th className="px-4 py-3 font-semibold">Barbearia</th>
+              <th className="px-4 py-3 font-semibold">Domínio</th>
+              <th className="px-4 py-3 font-semibold">Plano</th>
+              <th className="px-4 py-3 font-semibold">Unidades</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 text-right font-semibold">Tema</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TENANTS.map((t) => (
+              <tr key={t.id} className="border-b border-border-subtle transition-colors hover:bg-accent-wash">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="flex h-8 w-8 items-center justify-center rounded-md font-display text-caption font-black text-white"
+                      style={{ background: t.color }}
+                    >
+                      {t.logo}
+                    </span>
+                    <span className="text-text">{t.name}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-text-2">{t.domain}</td>
+                <td className="px-4 py-3">
+                  <Badge variant="accent">{PLANS[t.plan as SaasPlanKey].label}</Badge>
+                </td>
+                <td className="px-4 py-3 text-text tabular">{t.units}</td>
+                <td className="px-4 py-3">
+                  <Badge variant={STATUS[t.status].variant}>{STATUS[t.status].label}</Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex justify-end">
+                    <Link
+                      href="/master/temas"
+                      className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-inset hover:text-accent"
+                      aria-label="Editar tema"
+                    >
+                      <Palette size={16} />
+                    </Link>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
