@@ -20,6 +20,15 @@ export default function PagamentoPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-h3 font-bold text-text">Pagamento</h1>
 
+      {/* Resumo */}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3">
+        <div>
+          <div className="text-body font-semibold text-text">William Santos</div>
+          <div className="text-caption text-text-muted">{CURRENT_CLIENT.plan.name}</div>
+        </div>
+        <span className="text-h4 font-bold text-accent tabular">{formatBRL(total)}</span>
+      </div>
+
       <div className="flex gap-2">
         <TabBtn active={tab === "card"} onClick={() => setTab("card")} icon={<CreditCard size={16} />}>
           Cartão
@@ -53,6 +62,15 @@ export default function PagamentoPage() {
                 <Input placeholder="123" inputMode="numeric" />
               </div>
             </div>
+            <label className="flex items-center gap-2 text-caption text-text-2">
+              <input
+                type="checkbox"
+                defaultChecked
+                className="h-4 w-4"
+                style={{ accentColor: "var(--bb-accent)" }}
+              />
+              Salvar cartão para as próximas cobranças
+            </label>
             <p className="text-caption text-text-muted">
               Assinatura recorrente — cobramos {formatBRL(total)} todo dia 05. Cancele quando quiser.
             </p>

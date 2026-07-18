@@ -1,17 +1,22 @@
 import Link from "next/link";
-import { CalendarClock, CreditCard, Headphones, ShoppingBag } from "lucide-react";
+import { CalendarClock, CreditCard, Headphones, Scissors, ShoppingBag } from "lucide-react";
 import { CutMeter } from "@/components/cut-meter";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { AppointmentActions } from "@/features/client/components/appointment-actions";
 import { CURRENT_CLIENT } from "@/features/client/mock-data";
 
 export default function ClientHome() {
   const c = CURRENT_CLIENT;
   const appt = c.nextAppointment;
+  const barberInitial = appt.barber.charAt(0);
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-h3 font-bold text-text">Olá, {c.name} 👋</h1>
+      <div>
+        <h1 className="font-display text-h2 uppercase leading-none text-text">Olá, {c.name}</h1>
+        <p className="mt-1 text-body text-text-muted">Sábado, 19 de julho</p>
+      </div>
 
       {/* Próximo agendamento */}
       <div className="relative overflow-hidden rounded-lg border-2 border-accent bg-surface p-5 shadow-md">
@@ -27,16 +32,16 @@ export default function ClientHome() {
           <StatusBadge status={appt.status} />
         </div>
         <div className="text-h4 font-semibold text-text">{appt.service}</div>
-        <div className="mt-1 text-body text-text-2 tabular">
-          {appt.dateLabel} · {appt.timeLabel} · com {appt.barber}
+        <div className="mt-2 flex items-center gap-2 text-body text-text-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-text-inverse">
+            {barberInitial}
+          </span>
+          <span className="tabular">
+            com {appt.barber} · {appt.dateLabel} · {appt.timeLabel}
+          </span>
         </div>
-        <div className="mt-4 flex gap-3">
-          <Button variant="outline" size="sm">
-            Reagendar
-          </Button>
-          <Button variant="ghost" size="sm">
-            Cancelar
-          </Button>
+        <div className="mt-4">
+          <AppointmentActions isPlan />
         </div>
       </div>
 
@@ -49,11 +54,17 @@ export default function ClientHome() {
             {c.cutsRemaining} de {c.cutsTotal} cortes neste mês · renova dia {c.billingDay}
           </div>
         </div>
+        <Link href="/meu-plano">
+          <Button variant="outline" size="sm">
+            Ver meu plano
+          </Button>
+        </Link>
       </div>
 
       {/* CTA AGENDAR */}
-      <Link href="/agendar">
-        <button className="flex h-16 w-full items-center justify-center rounded-lg bg-accent font-display text-h2 uppercase text-text-inverse shadow-md transition-colors hover:bg-accent-hover">
+      <Link href="/servicos">
+        <button className="flex h-16 w-full items-center justify-center gap-3 rounded-lg bg-accent font-display text-h2 uppercase text-text-inverse shadow-md transition-colors hover:bg-accent-hover">
+          <Scissors size={26} />
           Agendar
         </button>
       </Link>
@@ -62,7 +73,7 @@ export default function ClientHome() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Shortcut href="/meu-plano" icon={<CreditCard size={22} />} label="Meu plano" />
         <Shortcut href="/agendamentos" icon={<CalendarClock size={22} />} label="Agendamentos" />
-        <Shortcut href="/servicos" icon={<ShoppingBag size={22} />} label="Serviços" />
+        <Shortcut href="/produtos" icon={<ShoppingBag size={22} />} label="Produtos" />
         <Shortcut href="/suporte" icon={<Headphones size={22} />} label="Suporte" />
       </div>
     </div>

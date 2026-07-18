@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Bell } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { CLIENT_NAV } from "@/features/client/nav";
@@ -35,7 +36,23 @@ export function ClientHeader({ logoText, name }: { logoText: string; name: strin
         })}
       </nav>
 
-      <ThemeToggle />
+      <div className="flex items-center gap-2">
+        <button
+          className="relative flex rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
+          aria-label="Notificações"
+        >
+          <Bell size={18} />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-surface bg-danger" />
+        </button>
+        <ThemeToggle />
+        <Link
+          href="/perfil"
+          aria-label="Perfil"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-caption font-bold text-text-inverse"
+        >
+          W
+        </Link>
+      </div>
     </header>
   );
 }

@@ -44,6 +44,15 @@ export const BARBERS = [
   { id: "any", name: "Sem preferência" },
 ];
 
+export const CLIENT_PRODUCTS = [
+  { id: "pomada", name: "Pomada Modeladora", priceBRL: 45 },
+  { id: "oleo", name: "Óleo para Barba", priceBRL: 38 },
+  { id: "shampoo", name: "Shampoo Anticaspa", priceBRL: 29 },
+  { id: "balm", name: "Balm Pós-Barba", priceBRL: 42 },
+  { id: "cera", name: "Cera Fixadora", priceBRL: 39 },
+  { id: "kit", name: "Kit Barbearia Completo", priceBRL: 150 },
+];
+
 export const CURRENT_CLIENT = {
   name: "William",
   plan: COMBOS[2], // Combo Mensal 02

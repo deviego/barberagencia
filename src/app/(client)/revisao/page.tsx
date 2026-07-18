@@ -11,6 +11,8 @@ export default function RevisaoPage() {
 
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
         <Row label="Cliente" value={c.name} />
+        <Row label="E-mail" value="william@email.com" />
+        <Row label="Telefone" value="+55 (11) 9****-4321" />
         <Row label="Plano" value={c.plan.name} />
         <Row label="Escopo" value={c.plan.scope} />
         <Row label="Cobrança" value={`Mensal recorrente · todo dia ${c.billingDay}`} />
@@ -20,11 +22,18 @@ export default function RevisaoPage() {
         </div>
       </div>
 
-      <Link href="/pagamento">
-        <Button size="lg" className="w-full">
-          Ir para pagamento
-        </Button>
-      </Link>
+      <div className="flex gap-3">
+        <Link href="/servicos" className="flex-1">
+          <Button variant="secondary" size="lg" className="w-full">
+            Voltar
+          </Button>
+        </Link>
+        <Link href="/pagamento" className="flex-[2]">
+          <Button size="lg" className="w-full">
+            Ir para pagamento
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

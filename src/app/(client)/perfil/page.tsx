@@ -21,12 +21,16 @@ export default function PerfilPage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label>E-mail</Label>
-            <Input type="email" defaultValue="william@email.com" />
+            <Label>Nascimento</Label>
+            <Input defaultValue="14/03/1992" inputMode="numeric" />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Telefone</Label>
             <Input defaultValue="+55 (11) 9____-4321" />
+          </div>
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label>E-mail</Label>
+            <Input type="email" defaultValue="william@email.com" />
           </div>
         </div>
         <Button className="self-start">Salvar alterações</Button>
