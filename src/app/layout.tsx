@@ -2,6 +2,7 @@ import "@/styles/globals.css";
 import type { Metadata } from "next";
 import { inter, bigShoulders } from "./fonts";
 import { ThemeScript } from "@/components/theme/theme-script";
+import { Providers } from "@/components/providers";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { brandingStyle } from "@/lib/tenant/branding-style";
 
@@ -28,7 +29,9 @@ export default async function RootLayout({
       <head>
         <ThemeScript />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
