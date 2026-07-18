@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronDown, Eye, MailCheck, Pencil, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Drawer } from "@/components/ui/drawer";
 import { ConfirmModal } from "@/components/ui/modal";
 
@@ -28,6 +29,8 @@ export function CrudTable<T extends { id: string; name: string }>({
   fields,
   searchKeys,
   inviteBanner,
+  inviteBlock,
+  saveLabel = "Salvar",
 }: {
   title: string;
   newLabel: string;
@@ -36,6 +39,8 @@ export function CrudTable<T extends { id: string; name: string }>({
   fields: CrudField[];
   searchKeys: (keyof T)[];
   inviteBanner?: React.ReactNode;
+  inviteBlock?: React.ReactNode;
+  saveLabel?: string;
 }) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<T | "new" | null>(null);
@@ -153,7 +158,7 @@ export function CrudTable<T extends { id: string; name: string }>({
             <Button variant="secondary" onClick={() => setEditing(null)}>
               Cancelar
             </Button>
-            <Button onClick={() => setEditing(null)}>Salvar</Button>
+            <Button onClick={() => setEditing(null)}>{saveLabel}</Button>
           </div>
         }
       >
@@ -172,6 +177,13 @@ export function CrudTable<T extends { id: string; name: string }>({
               />
             </div>
           ))}
+
+          <div className="flex items-center justify-between">
+            <Label className="mb-0">Ativo</Label>
+            <Switch defaultChecked />
+          </div>
+
+          {inviteBlock}
         </form>
       </Drawer>
 
