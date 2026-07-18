@@ -1,0 +1,44 @@
+/* =======================================================================
+   DESIGN TOKENS — white-label (--bb-*)  ·  fiel ao handoff (01 · Design System)
+   Trocar de tenant = sobrescrever os tokens de accent/logo (ver ThemeStyle).
+   NUNCA hardcode hex em componente; sempre var(--bb-*).
+   ======================================================================= */
+
+/* ---- Fixos (independem de tema) + default do tenant Oliveira ---- */
+[data-theme] {
+  --bb-font-display: var(--font-big-shoulders), 'Big Shoulders Display', 'Inter', sans-serif;
+  --bb-font-ui: var(--font-inter), 'Inter', sans-serif;
+
+  --bb-gold-300: #E9CF96; --bb-gold-400: #DDB86A; --bb-gold-500: #C9A24B; --bb-gold-600: #A8842F; --bb-gold-700: #7D611F;
+  --bb-pole-red: #B31935; --bb-pole-blue: #5556EE; --bb-pole-white: #FFFFFF;
+
+  --bb-success: #08D48B; --bb-success-strong: #0A8F5F; --bb-success-bg: #E6FBF3;
+  --bb-warning: #FFC839; --bb-warning-strong: #C0780C; --bb-warning-bg: #FFF9EB;
+  --bb-danger: #FF385C; --bb-danger-strong: #B31935; --bb-danger-bg: #FFEBEF;
+  --bb-info: #5556EE; --bb-info-bg: #EEEEFD;
+
+  --bb-radius-sm: 4px; --bb-radius-md: 8px; --bb-radius-lg: 16px; --bb-radius-pill: 999px;
+  --bb-shadow-sm: 0 2px 3px 0 rgba(0,0,0,0.08);
+  --bb-shadow-md: 0 4px 8px 0 rgba(0,0,0,0.10);
+  --bb-shadow-lg: 0 8px 24px 0 rgba(0,0,0,0.18);
+}
+
+/* ---- Tema DARK (padrão da marca) ---- */
+[data-theme="dark"] {
+  --bb-bg: #0D0D0D; --bb-surface: #171717; --bb-elevated: #212121; --bb-inset: #101010;
+  --bb-border: #2B2B2B; --bb-border-subtle: #1F1F1F;
+  --bb-text: #F5F1E8; --bb-text-2: #B9B2A4; --bb-text-muted: #7A756B; --bb-text-inverse: #171717;
+  --bb-accent: #C9A24B; --bb-accent-hover: #DDB86A; --bb-accent-down: #A8842F; --bb-accent-wash: rgba(201,162,75,0.12);
+  --bb-focus: #DDB86A;
+  --bb-n50:#FAFAF7; --bb-n100:#F0EEE8; --bb-n200:#DCD8CE; --bb-n300:#B9B2A4; --bb-n400:#948D7F; --bb-n500:#7A756B; --bb-n600:#565248; --bb-n700:#3B382F; --bb-n800:#242219; --bb-n900:#14130E;
+}
+
+/* ---- Tema LIGHT ---- */
+[data-theme="light"] {
+  --bb-bg: #FAFAF7; --bb-surface: #FFFFFF; --bb-elevated: #FFFFFF; --bb-inset: #F0EEE8;
+  --bb-border: #DCD8CE; --bb-border-subtle: #EBE8E0;
+  --bb-text: #171717; --bb-text-2: #565248; --bb-text-muted: #948D7F; --bb-text-inverse: #FAFAF7;
+  --bb-accent: #A8842F; --bb-accent-hover: #7D611F; --bb-accent-down: #7D611F; --bb-accent-wash: rgba(168,132,47,0.10);
+  --bb-focus: #A8842F;
+  --bb-n50:#FAFAF7; --bb-n100:#F0EEE8; --bb-n200:#DCD8CE; --bb-n300:#B9B2A4; --bb-n400:#948D7F; --bb-n500:#7A756B; --bb-n600:#565248; --bb-n700:#3B382F; --bb-n800:#242219; --bb-n900:#14130E;
+}
