@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { sendPasswordReset, updatePassword } from "../services/auth-service";
+import { cn } from "@/lib/utils";
+
+const STRENGTH_LABEL = ["—", "fraca", "boa", "forte"];
+function pwStrength(pw: string): number {
+  let s = 0;
+  if (pw.length >= 8) s++;
+  if (/[A-Za-z]/.test(pw) && /\d/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  return s;
+}
 
 export function ForgotForm() {
   const router = useRouter();
@@ -81,6 +91,20 @@ export function ForgotForm() {
           onChange={(e) => setPw2(e.target.value)}
           placeholder="Confirmar nova senha"
         />
+        <div className="flex items-center gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-1 flex-1 rounded-full",
+                i < pwStrength(pw) ? "bg-success" : "bg-n700"
+              )}
+            />
+          ))}
+          <span className="text-[11px] text-text-muted">
+            força: {STRENGTH_LABEL[pwStrength(pw)]}
+          </span>
+        </div>
         {error && <p className="text-caption text-danger">{error}</p>}
         <Button type="button" variant="outline" onClick={onSave}>
           Salvar nova senha

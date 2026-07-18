@@ -37,7 +37,7 @@ export function LoginForm() {
       <div className="flex flex-col gap-1.5">
         <Label>E-mail ou telefone</Label>
         <Input
-          type="email"
+          type="text"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="william@email.com"

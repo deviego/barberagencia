@@ -45,5 +45,7 @@
   --bb-text: #171717; --bb-text-2: #565248; --bb-text-muted: #948D7F; --bb-text-inverse: #FAFAF7;
   --bb-accent: #A8842F; --bb-accent-hover: #7D611F; --bb-accent-down: #7D611F; --bb-accent-wash: rgba(168,132,47,0.10);
   --bb-focus: #A8842F;
-  --bb-n50:#FAFAF7; --bb-n100:#F0EEE8; --bb-n200:#DCD8CE; --bb-n300:#B9B2A4; --bb-n400:#948D7F; --bb-n500:#7A756B; --bb-n600:#565248; --bb-n700:#3B382F; --bb-n800:#242219; --bb-n900:#14130E;
+  /* No tema light os neutros altos são CLAREADOS (conforme handoff 02) —
+     afeta o anel do CutMeter e o disabled do modal de termos. */
+  --bb-n50:#FAFAF7; --bb-n100:#F0EEE8; --bb-n200:#DCD8CE; --bb-n300:#B9B2A4; --bb-n400:#948D7F; --bb-n500:#7A756B; --bb-n600:#948D7F; --bb-n700:#DCD8CE; --bb-n800:#F0EEE8; --bb-n900:#14130E;
 }
