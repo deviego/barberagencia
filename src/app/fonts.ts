@@ -1,5 +1,5 @@
 import localFont from "next/font/local";
-import { Big_Shoulders_Display } from "next/font/google";
+import { Big_Shoulders } from "next/font/google";
 
 // UI font — Inter variable (arquivo local, do handoff)
 export const inter = localFont({
@@ -10,7 +10,7 @@ export const inter = localFont({
 });
 
 // Display font — títulos uppercase, pesos 500–900
-export const bigShoulders = Big_Shoulders_Display({
+export const bigShoulders = Big_Shoulders({
   subsets: ["latin"],
   variable: "--font-big-shoulders",
   display: "swap",
