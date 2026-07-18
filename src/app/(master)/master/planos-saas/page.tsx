@@ -1,98 +1,147 @@
-import { Check, Minus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { PLANS, hasEntitlement, getLimit, type FeatureKey } from "@/lib/entitlements";
-import type { SaasPlanKey } from "@/lib/tenant/types";
-import { formatBRL } from "@/lib/utils";
+import { Check, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const ORDER: SaasPlanKey[] = ["essencial", "profissional", "advanced"];
+const PLANS_UI = [
+  {
+    name: "Essencial",
+    price: "R$ 99",
+    desc: "Para começar a organizar a barbearia.",
+    highlight: false,
+    features: [
+      { ok: true, text: "Até 100 clientes cadastrados" },
+      { ok: true, text: "Relatório financeiro básico — últimos 30 dias" },
+      { ok: true, text: "Agendamento" },
+      { ok: true, text: "Disparo de WhatsApp manual, um a um" },
+      { ok: false, text: "Site de agendamento para o cliente" },
+      { ok: false, text: "Plataforma de atendimento (chat/suporte)" },
+      { ok: false, text: "Automação de WhatsApp e marketing" },
+    ],
+  },
+  {
+    name: "Profissional",
+    price: "R$ 199",
+    desc: "Para quem quer agenda cheia no automático.",
+    highlight: true,
+    badge: "Mais popular",
+    features: [
+      { ok: true, text: "Até 500 clientes cadastrados" },
+      { ok: true, text: "Relatório financeiro completo — 12 meses" },
+      { ok: true, text: "Agendamento automatizado" },
+      { ok: true, text: "Site do cliente incluído (subdomínio)" },
+      { ok: true, text: "Plataforma de atendimento (chat + suporte)" },
+      { ok: true, text: "Automação de WhatsApp: lembretes e confirmações" },
+      { ok: true, text: "Marketing básico — campanhas por segmento" },
+    ],
+  },
+  {
+    name: "Advanced",
+    price: "R$ 349",
+    desc: "Para redes e franquias em escala.",
+    highlight: false,
+    features: [
+      { ok: true, text: "Clientes ilimitados" },
+      { ok: true, text: "Relatório financeiro ilimitado + exportação" },
+      { ok: true, text: "Agendamento automatizado + recorrência" },
+      { ok: true, text: "Site do cliente com domínio próprio" },
+      { ok: true, text: "Atendimento com chatbot e filas" },
+      { ok: true, text: "Automação total de WhatsApp + campanhas segmentadas" },
+      { ok: true, text: "Marketing avançado + consolidado multi-unidades" },
+    ],
+  },
+];
 
-const FEATURE_ROWS: { key: FeatureKey; label: string }[] = [
-  { key: "site.subdomain", label: "Site em subdomínio" },
-  { key: "site.customDomain", label: "Domínio próprio" },
-  { key: "support.desk", label: "Central de atendimento" },
-  { key: "whatsapp.automation", label: "Automação de WhatsApp" },
-  { key: "whatsapp.chatbot", label: "Chatbot no WhatsApp" },
-  { key: "marketing.basic", label: "Marketing (campanhas)" },
-  { key: "marketing.segmented", label: "Campanhas segmentadas" },
-  { key: "network.multiUnit", label: "Multi-unidades (rede)" },
+const PLAN_TABLE = [
+  { label: "Clientes cadastrados", a: "100", b: "500", c: "Ilimitado" },
+  { label: "Relatório financeiro", a: "Básico · 30 dias", b: "Completo · 12 meses", c: "Ilimitado + exportação" },
+  { label: "Agendamento", a: "Manual", b: "Automatizado", c: "Automatizado + recorrência" },
+  { label: "Site para o cliente", a: "—", b: "Subdomínio", c: "Domínio próprio" },
+  { label: "Plataforma de atendimento", a: "—", b: "Chat + suporte", c: "Chatbot + filas" },
+  { label: "Disparo de WhatsApp", a: "Manual", b: "Automação (lembretes)", c: "Automação + campanhas" },
+  { label: "Marketing", a: "—", b: "Básico (segmentos)", c: "Avançado (jornadas)" },
+  { label: "Unidades", a: "1", b: "1", c: "Até 5 + visão de rede" },
 ];
 
 export default function PlanosSaasPage() {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-h3 font-bold text-text">Planos SaaS</h1>
-
-      {/* Cards */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {ORDER.map((key) => {
-          const plan = PLANS[key];
-          const featured = key === "profissional";
-          const clients = getLimit(key, "clients.limit");
-          return (
-            <div
-              key={key}
-              className={`flex flex-col gap-4 rounded-lg border bg-surface p-6 ${
-                featured ? "border-2 border-accent" : "border-border"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-display text-h4 uppercase text-text">{plan.label}</span>
-                {featured && <Badge variant="accent">Popular</Badge>}
-              </div>
-              <div className="text-h1 text-accent tabular">
-                {formatBRL(plan.priceBRL)}
-                <span className="text-body text-text-muted">/mês</span>
-              </div>
-              <div className="text-caption text-text-muted">
-                {clients === -1 ? "Clientes ilimitados" : `${clients} clientes`}
-              </div>
-              <ul className="flex flex-col gap-2 text-body">
-                {FEATURE_ROWS.filter((f) => hasEntitlement(key, f.key)).map((f) => (
-                  <li key={f.key} className="flex items-center gap-2 text-text-2">
-                    <Check size={16} className="text-success-strong" />
-                    {f.label}
-                  </li>
-                ))}
-              </ul>
-              <Button variant={featured ? "primary" : "outline"} className="mt-auto">
-                Selecionar
-              </Button>
-            </div>
-          );
-        })}
+      <div>
+        <h1 className="font-display text-h2 uppercase text-text">Planos da plataforma</h1>
+        <p className="text-caption text-text-2">
+          O que cada barbearia contrata — limites e recursos por plano. Cobrança mensal, sem fidelidade.
+        </p>
       </div>
 
-      {/* Tabela comparativa */}
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-body">
-          <thead>
-            <tr className="border-b border-border bg-surface text-caption uppercase text-text-muted">
-              <th className="px-4 py-3 text-left font-semibold">Recurso</th>
-              {ORDER.map((k) => (
-                <th key={k} className="px-4 py-3 text-center font-semibold">
-                  {PLANS[k].label}
-                </th>
+      {/* Cards */}
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+        {PLANS_UI.map((pl) => (
+          <div
+            key={pl.name}
+            className={cn(
+              "relative flex flex-col gap-3.5 rounded-lg bg-surface p-6 transition-shadow hover:shadow-sm",
+              pl.highlight ? "border-2 border-accent" : "border border-border"
+            )}
+          >
+            {pl.highlight && pl.badge && (
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-pill bg-accent px-3.5 py-1 text-[11px] font-bold text-text-inverse">
+                {pl.badge}
+              </span>
+            )}
+            <div className="font-display text-[26px] font-extrabold uppercase leading-none text-text">
+              {pl.name}
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-display text-[40px] font-black leading-none text-accent">
+                {pl.price}
+              </span>
+              <span className="text-caption text-text-muted">/mês por unidade</span>
+            </div>
+            <p className="text-caption text-text-2">{pl.desc}</p>
+            <div className="h-px bg-border-subtle" />
+            <div className="flex flex-1 flex-col gap-2.5">
+              {pl.features.map((f, i) => (
+                <div key={i} className="flex items-start gap-2.5 text-caption leading-snug">
+                  {f.ok ? (
+                    <Check size={16} className="mt-px shrink-0 text-success-strong" />
+                  ) : (
+                    <X size={16} className="mt-px shrink-0 text-text-muted" />
+                  )}
+                  <span className={f.ok ? "text-text" : "text-text-muted"}>{f.text}</span>
+                </div>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {FEATURE_ROWS.map((f) => (
-              <tr key={f.key} className="border-b border-border-subtle">
-                <td className="px-4 py-3 text-text-2">{f.label}</td>
-                {ORDER.map((k) => (
-                  <td key={k} className="px-4 py-3 text-center">
-                    {hasEntitlement(k, f.key) ? (
-                      <Check size={16} className="mx-auto text-success-strong" />
-                    ) : (
-                      <Minus size={16} className="mx-auto text-text-muted" />
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </div>
+            <button
+              className={cn(
+                "rounded-md py-3 text-body font-bold transition-opacity hover:opacity-90",
+                pl.highlight
+                  ? "bg-accent text-text-inverse"
+                  : "border border-accent text-accent"
+              )}
+            >
+              Escolher {pl.name}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Comparativo */}
+      <div className="overflow-hidden rounded-lg border border-border bg-surface">
+        <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-2 border-b border-border px-5 py-3 text-overline uppercase text-text-muted">
+          <span>Comparativo</span>
+          <span>Essencial</span>
+          <span className="text-accent">Profissional</span>
+          <span>Advanced</span>
+        </div>
+        {PLAN_TABLE.map((row) => (
+          <div
+            key={row.label}
+            className="grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center gap-2 border-b border-border-subtle px-5 py-3 text-body transition-colors last:border-b-0 hover:bg-accent-wash"
+          >
+            <span className="font-medium text-text">{row.label}</span>
+            <span className="text-text-2">{row.a}</span>
+            <span className="font-semibold text-accent">{row.b}</span>
+            <span className="text-text-2">{row.c}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
