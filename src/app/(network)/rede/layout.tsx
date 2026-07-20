@@ -1,8 +1,15 @@
+import { redirect } from "next/navigation";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { getSessionUser } from "@/lib/auth/session";
+import { isNetworkAdmin } from "@/lib/rbac";
 
 export default async function NetworkLayout({ children }: { children: React.ReactNode }) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  if (!user.role || !isNetworkAdmin(user.role)) redirect("/");
+
   const tenant = await getCurrentTenant();
   return (
     <div className="min-h-screen">

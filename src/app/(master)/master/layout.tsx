@@ -1,8 +1,15 @@
+import { redirect } from "next/navigation";
 import { MasterSidebar } from "@/components/nav/master-sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Badge } from "@/components/ui/badge";
+import { getSessionUser } from "@/lib/auth/session";
+import { isMaster } from "@/lib/rbac";
 
-export default function MasterLayout({ children }: { children: React.ReactNode }) {
+export default async function MasterLayout({ children }: { children: React.ReactNode }) {
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  if (!user.role || !isMaster(user.role)) redirect("/");
+
   return (
     <div className="flex min-h-screen">
       <MasterSidebar />

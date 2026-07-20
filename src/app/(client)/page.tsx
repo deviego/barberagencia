@@ -1,65 +1,90 @@
 import Link from "next/link";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { CalendarClock, CreditCard, Headphones, Scissors, ShoppingBag } from "lucide-react";
 import { CutMeter } from "@/components/cut-meter";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusBadge, type AppointmentStatus } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { AppointmentActions } from "@/features/client/components/appointment-actions";
-import { CURRENT_CLIENT } from "@/features/client/mock-data";
+import { getClientHome } from "@/features/client/data";
 
-export default function ClientHome() {
-  const c = CURRENT_CLIENT;
-  const appt = c.nextAppointment;
-  const barberInitial = appt.barber.charAt(0);
+// Relações "to-one" do supabase podem vir como objeto ou array de 1 — normaliza.
+function one<T>(rel: T | T[] | null | undefined): T | null {
+  if (!rel) return null;
+  return Array.isArray(rel) ? (rel[0] ?? null) : rel;
+}
+
+export default async function ClientHome() {
+  const home = await getClientHome();
+  const firstName = home?.client?.name?.split(" ")[0] ?? "";
+  const sub = home?.sub as
+    | { saldo_cortes: number; billing_day: number; combo_plans: { name: string; cuts: number } | { name: string; cuts: number }[] }
+    | null
+    | undefined;
+  const combo = one(sub?.combo_plans);
+  const next = home?.next as
+    | { start_at: string; status: string; barbers: unknown; services: unknown; combo_plans: unknown }
+    | null
+    | undefined;
+
+  const nextService = one(next?.services as { name: string }[] | { name: string }) ?? one(next?.combo_plans as { name: string }[] | { name: string });
+  const nextBarber = one(next?.barbers as { name: string }[] | { name: string });
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-h2 uppercase leading-none text-text">Olá, {c.name}</h1>
-        <p className="mt-1 text-body text-text-muted">Sábado, 19 de julho</p>
+        <h1 className="font-display text-h2 uppercase leading-none text-text">Olá, {firstName}</h1>
+        <p className="mt-1 text-body text-text-muted">
+          {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+        </p>
       </div>
 
       {/* Próximo agendamento */}
-      <div className="relative overflow-hidden rounded-lg border-2 border-accent bg-surface p-5 shadow-md">
-        <div
-          className="absolute inset-x-0 top-0 h-1"
-          style={{
-            background:
-              "repeating-linear-gradient(-45deg, var(--bb-pole-red) 0 10px, var(--bb-pole-white) 10px 20px, var(--bb-pole-blue) 20px 30px)",
-          }}
-        />
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-overline uppercase text-text-muted">Próximo agendamento</span>
-          <StatusBadge status={appt.status} />
-        </div>
-        <div className="text-h4 font-semibold text-text">{appt.service}</div>
-        <div className="mt-2 flex items-center gap-2 text-body text-text-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-text-inverse">
-            {barberInitial}
-          </span>
-          <span className="tabular">
-            com {appt.barber} · {appt.dateLabel} · {appt.timeLabel}
-          </span>
-        </div>
-        <div className="mt-4">
-          <AppointmentActions isPlan />
-        </div>
-      </div>
-
-      {/* Medidor de cortes */}
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-6">
-        <CutMeter remaining={c.cutsRemaining} total={c.cutsTotal} />
-        <div className="text-center">
-          <div className="text-body font-semibold text-text">{c.plan.name}</div>
-          <div className="text-caption text-text-muted">
-            {c.cutsRemaining} de {c.cutsTotal} cortes neste mês · renova dia {c.billingDay}
+      {next ? (
+        <div className="relative overflow-hidden rounded-lg border-2 border-accent bg-surface p-5 shadow-md">
+          <div
+            className="absolute inset-x-0 top-0 h-1"
+            style={{
+              background:
+                "repeating-linear-gradient(-45deg, var(--bb-pole-red) 0 10px, var(--bb-pole-white) 10px 20px, var(--bb-pole-blue) 20px 30px)",
+            }}
+          />
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-overline uppercase text-text-muted">Próximo agendamento</span>
+            <StatusBadge status={next.status as AppointmentStatus} />
+          </div>
+          <div className="text-h4 font-semibold text-text">{nextService?.name ?? "Agendamento"}</div>
+          <div className="mt-1 text-body text-text-2 tabular">
+            {format(new Date(next.start_at), "EEE, dd MMM · HH:mm", { locale: ptBR })}
+            {nextBarber ? ` · com ${nextBarber.name}` : ""}
+          </div>
+          <div className="mt-4">
+            <AppointmentActions isPlan={!!combo} />
           </div>
         </div>
-        <Link href="/meu-plano">
-          <Button variant="outline" size="sm">
-            Ver meu plano
-          </Button>
-        </Link>
-      </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border bg-surface p-6 text-center">
+          <p className="text-body text-text-2">Você não tem agendamentos.</p>
+        </div>
+      )}
+
+      {/* Medidor de cortes (se assinante) */}
+      {sub && combo && (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-6">
+          <CutMeter remaining={sub.saldo_cortes} total={combo.cuts} />
+          <div className="text-center">
+            <div className="text-body font-semibold text-text">{combo.name}</div>
+            <div className="text-caption text-text-muted">
+              {sub.saldo_cortes} de {combo.cuts} cortes neste mês · renova dia {sub.billing_day}
+            </div>
+          </div>
+          <Link href="/meu-plano">
+            <Button variant="outline" size="sm">
+              Ver meu plano
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* CTA AGENDAR */}
       <Link href="/servicos">

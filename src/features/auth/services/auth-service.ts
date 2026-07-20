@@ -9,6 +9,21 @@ export async function signInWithPassword(email: string, password: string) {
   return data;
 }
 
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+  meta: { full_name?: string; phone?: string }
+) {
+  const supabase = createSupabaseBrowserClient();
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: meta },
+  });
+  if (error) throw new Error(error.message);
+  return data; // data.session === null quando confirmação de e-mail está ativa
+}
+
 export async function sendPasswordReset(email: string) {
   const supabase = createSupabaseBrowserClient();
   const redirectTo =

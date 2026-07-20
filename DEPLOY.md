@@ -48,6 +48,30 @@ npx prisma migrate deploy    # aplica migrations em produção
 npx prisma migrate dev --name init
 ```
 
+## 3b. Banco funcional (SQL — sem depender do pooler)
+O runtime usa **supabase-js (HTTPS/RLS)**, então não precisa do pooler para funcionar. Basta criar as tabelas:
+1. Supabase → **SQL Editor** → **New query**.
+2. Cole e rode **`supabase/schema.sql`** (tabelas + RLS + trigger de onboarding + RPC).
+3. Cole e rode **`supabase/seed.sql`** (tenant "Barbearia Oliveira 01" + serviços/combos/barbeiros).
+4. Em **Authentication → Providers → Email**: para testar sem confirmar e-mail, desative "Confirm email" (ou confirme pelo link).
+
+### Criar um assinante de teste (saldo de cortes)
+Após um usuário se cadastrar (o trigger cria profile+client+membership CLIENT), rode no SQL Editor:
+```sql
+insert into public.client_subscriptions (tenant_id, client_id, combo_plan_id, saldo_cortes)
+select c.tenant_id, c.id, cp.id, cp.cuts
+from public.clients c
+join public.combo_plans cp on cp.tenant_id = c.tenant_id and cp.name = 'Combo Mensal 02'
+where c.email = 'SEU-EMAIL@exemplo.com';
+```
+
+### Promover um usuário a admin da unidade (para acessar /admin)
+```sql
+update public.memberships set role = 'UNIT_ADMIN'
+where user_id = (select id from auth.users where email = 'ADMIN@exemplo.com');
+```
+(Use `'MASTER'` para acessar `/master` e `'NETWORK_ADMIN'` para `/rede`.)
+
 ## 4. Domínios (white-label)
 - Domínio da plataforma (master) → `NEXT_PUBLIC_MASTER_HOST`.
 - Cada barbearia = subdomínio `*.barber.app` (wildcard) ou domínio próprio (plano Advanced).
