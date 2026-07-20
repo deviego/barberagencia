@@ -9,10 +9,10 @@ export function maskDate(value: string): string {
   return out;
 }
 
-/** Telefone brasileiro: +55 (XX) XXXXX-XXXX (aceita fixo de 10 dígitos também). */
+/** Telefone brasileiro: (XX) XXXXX-XXXX (aceita fixo de 10 dígitos também). */
 export function maskPhoneBR(value: string): string {
   let d = value.replace(/\D/g, "");
-  // remove código do país se colado junto (+55...)
+  // remove código do país se colado junto (55...)
   if (d.startsWith("55") && d.length > 11) d = d.slice(2);
   d = d.slice(0, 11);
   if (!d) return "";
@@ -25,5 +25,5 @@ export function maskPhoneBR(value: string): string {
     if (rest.length <= 4) out += rest;
     else out += rest.slice(0, rest.length - 4) + "-" + rest.slice(rest.length - 4);
   }
-  return `+55 ${out}`;
+  return out;
 }

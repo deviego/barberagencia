@@ -112,9 +112,9 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
             <Input
               value={form.phone}
               onChange={(e) => set("phone", maskPhoneBR(e.target.value))}
-              placeholder="+55 (11) 91234-5678"
+              placeholder="(11) 91234-5678"
               inputMode="tel"
-              maxLength={19}
+              maxLength={15}
             />
           </div>
         </div>
