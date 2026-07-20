@@ -9,6 +9,7 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { TermsModal } from "./terms-modal";
 import { signUpWithPassword } from "../services/auth-service";
+import { maskDate, maskPhoneBR } from "@/lib/masks";
 
 export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: string }) {
   const router = useRouter();
@@ -98,11 +99,23 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
             <Label>Nascimento</Label>
-            <Input value={form.birth} onChange={(e) => set("birth", e.target.value)} placeholder="DD/MM/AAAA" inputMode="numeric" />
+            <Input
+              value={form.birth}
+              onChange={(e) => set("birth", maskDate(e.target.value))}
+              placeholder="DD/MM/AAAA"
+              inputMode="numeric"
+              maxLength={10}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Telefone</Label>
-            <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+55 (11) 9____-____" inputMode="tel" />
+            <Input
+              value={form.phone}
+              onChange={(e) => set("phone", maskPhoneBR(e.target.value))}
+              placeholder="+55 (11) 91234-5678"
+              inputMode="tel"
+              maxLength={19}
+            />
           </div>
         </div>
 
