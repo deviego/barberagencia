@@ -30,6 +30,9 @@ yarn-error.log*
 !.vscode/extensions.json
 .idea
 
+# script administrativo local (contém credenciais — nunca versionar)
+/dbadmin.mjs
+
 # design reference (kept out of the app bundle)
 /slides
 /handof

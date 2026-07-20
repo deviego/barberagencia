@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MailCheck } from "lucide-react";
+import { MailCheck, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { TermsModal } from "./terms-modal";
 import { signUpWithPassword } from "../services/auth-service";
 
-export function SignupForm() {
+export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: string }) {
   const router = useRouter();
   const [termsOpen, setTermsOpen] = useState(false);
   const [form, setForm] = useState({ name: "", birth: "", phone: "", email: "", password: "" });
@@ -47,18 +47,34 @@ export function SignupForm() {
   }
 
   if (sentConfirm) {
+    const firstName = form.name.trim().split(" ")[0];
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-7 text-center shadow-lg">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-wash">
-          <MailCheck size={26} className="text-accent" />
+      <div className="relative flex flex-col items-center gap-4 overflow-hidden rounded-lg border border-border bg-surface p-8 text-center shadow-lg">
+        <div
+          className="absolute inset-x-0 top-0 h-1.5"
+          style={{
+            background:
+              "repeating-linear-gradient(-45deg, var(--bb-pole-red) 0 12px, var(--bb-pole-white) 12px 24px, var(--bb-pole-blue) 24px 36px)",
+          }}
+        />
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-wash">
+          <Scissors size={28} className="text-accent" />
         </span>
-        <h2 className="text-h4 font-semibold text-text">Confirme seu e-mail</h2>
-        <p className="text-body text-text-2">
-          Enviamos um link de confirmação para <strong className="text-text">{form.email}</strong>.
-          Confirme para acessar sua conta.
+        <h2 className="font-display text-h2 uppercase leading-none text-text">
+          Bem-vindo{firstName ? `, ${firstName}` : ""}!
+        </h2>
+        <p className="max-w-sm text-body text-text-2">
+          Que bom ter você na <strong className="text-text">{tenantName}</strong>. Falta só um passo:
+          enviamos um link de confirmação para{" "}
+          <strong className="text-text">{form.email}</strong>. Confirme para ativar sua conta e já
+          agendar seu primeiro corte. ✂️
         </p>
+        <div className="flex items-center gap-2 rounded-md bg-inset px-3 py-2 text-caption text-text-muted">
+          <MailCheck size={15} className="text-accent" />
+          Não recebeu? Verifique o spam ou aguarde alguns instantes.
+        </div>
         <Link href="/login" className="text-body font-semibold text-accent hover:underline">
-          Voltar ao login
+          Já confirmei — ir para o login
         </Link>
       </div>
     );

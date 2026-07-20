@@ -1,0 +1,41 @@
+<!--
+  Supabase → Authentication → Email Templates → "Confirm signup"
+  Assunto sugerido: Bem-vindo à Barbearia Oliveira 01 ✂️ Confirme seu e-mail
+  Cole o HTML abaixo no corpo. Variável do Supabase: {{ .ConfirmationURL }}
+-->
+<div style="margin:0;padding:0;background:#0D0D0D;font-family:Arial,Helvetica,sans-serif;">
+  <div style="height:6px;background:repeating-linear-gradient(-45deg,#B31935 0 12px,#FFFFFF 12px 24px,#5556EE 24px 36px);"></div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0D0D0D;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;background:#171717;border:1px solid #2B2B2B;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="padding:32px 32px 8px;text-align:center;">
+              <div style="width:64px;height:64px;margin:0 auto;border-radius:12px;background:#C9A24B;color:#171717;font-weight:900;font-size:28px;line-height:64px;">BO</div>
+              <h1 style="margin:20px 0 4px;color:#F5F1E8;font-size:26px;text-transform:uppercase;letter-spacing:0.04em;">Bem-vindo!</h1>
+              <p style="margin:0;color:#B9B2A4;font-size:14px;">à Barbearia Oliveira 01 ✂️</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px 8px;color:#B9B2A4;font-size:15px;line-height:1.6;text-align:center;">
+              Que bom ter você com a gente! Falta só confirmar seu e-mail para ativar sua conta e já agendar seu próximo corte.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 32px;text-align:center;">
+              <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#C9A24B;color:#171717;font-weight:700;font-size:16px;text-decoration:none;padding:14px 28px;border-radius:8px;">Confirmar meu e-mail</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 28px;color:#7A756B;font-size:12px;line-height:1.6;text-align:center;">
+              Se o botão não funcionar, copie e cole este link no navegador:<br>
+              <a href="{{ .ConfirmationURL }}" style="color:#DDB86A;word-break:break-all;">{{ .ConfirmationURL }}</a>
+              <br><br>Se você não criou esta conta, pode ignorar este e-mail.
+            </td>
+          </tr>
+        </table>
+        <p style="margin:16px 0 0;color:#565248;font-size:11px;">Barbearia Oliveira 01 · @barbeariaoliveira01</p>
+      </td>
+    </tr>
+  </table>
+</div>
