@@ -12,7 +12,7 @@ export const REFERENCE_TENANT: ResolvedTenant = {
   subdomain: "oliveira01",
   customDomain: null,
   networkId: null,
-  saasPlan: "advanced",
+  saasPlan: "advance",
   branding: {
     logoText: "BO",
     logoUrl: null,

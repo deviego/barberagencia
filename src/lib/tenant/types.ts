@@ -14,7 +14,7 @@ export interface TenantBranding {
   instagram?: string | null;
 }
 
-export type SaasPlanKey = "essencial" | "profissional" | "advanced";
+export type SaasPlanKey = "personal" | "essencial" | "advance";
 
 /** Tenant resolvido a partir do host da requisição. */
 export interface ResolvedTenant {

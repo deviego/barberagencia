@@ -2,7 +2,7 @@ import type { SaasPlanKey } from "@/lib/tenant/types";
 
 /**
  * Camada 2 — Entitlements por PLANO SaaS do tenant (feature gating).
- * Fonte única de verdade do que cada plano habilita. Checar SEMPRE no servidor;
+ * Planos: Personal / Essencial / Advance (conforme docx). Checar SEMPRE no servidor;
  * a UI usa <Gate> só para esconder/upsell.
  */
 export type FeatureKey =
@@ -11,17 +11,25 @@ export type FeatureKey =
   | "support.desk"
   | "whatsapp.manual"
   | "whatsapp.automation"
-  | "whatsapp.chatbot"
+  | "whatsapp.chatbot" // bot IA
   | "marketing.basic"
   | "marketing.segmented"
+  | "recovery.abandoned"
+  | "products.display"
+  | "invoice.nfe"
+  | "sales.direct"
+  | "payments.gateway"
   | "network.multiUnit";
 
-export type NumericLimitKey = "clients.limit" | "reports.retentionDays";
+export type NumericLimitKey =
+  | "clients.limit"
+  | "professionals.limit"
+  | "appointments.monthly"
+  | "admins.limit";
 
 interface PlanConfig {
   label: string;
   priceBRL: number; // mensalidade
-  setupBRL: number; // adesão
   features: Record<FeatureKey, boolean>;
   limits: Record<NumericLimitKey, number>; // -1 = ilimitado
 }
@@ -29,10 +37,9 @@ interface PlanConfig {
 const UNLIMITED = -1;
 
 export const PLANS: Record<SaasPlanKey, PlanConfig> = {
-  essencial: {
-    label: "Essencial",
-    priceBRL: 65,
-    setupBRL: 139.9,
+  personal: {
+    label: "Personal",
+    priceBRL: 69.9,
     features: {
       "site.subdomain": false,
       "site.customDomain": false,
@@ -42,31 +49,49 @@ export const PLANS: Record<SaasPlanKey, PlanConfig> = {
       "whatsapp.chatbot": false,
       "marketing.basic": false,
       "marketing.segmented": false,
+      "recovery.abandoned": false,
+      "products.display": false,
+      "invoice.nfe": false,
+      "sales.direct": false,
+      "payments.gateway": false,
       "network.multiUnit": false,
     },
-    limits: { "clients.limit": 100, "reports.retentionDays": 30 },
+    limits: {
+      "clients.limit": 20,
+      "professionals.limit": 3,
+      "appointments.monthly": 300,
+      "admins.limit": 1,
+    },
   },
-  profissional: {
-    label: "Profissional",
-    priceBRL: 85,
-    setupBRL: 199,
+  essencial: {
+    label: "Essencial",
+    priceBRL: 189.9,
     features: {
       "site.subdomain": true,
       "site.customDomain": false,
       "support.desk": true,
       "whatsapp.manual": true,
       "whatsapp.automation": true,
-      "whatsapp.chatbot": false,
+      "whatsapp.chatbot": true,
       "marketing.basic": true,
       "marketing.segmented": false,
+      "recovery.abandoned": true,
+      "products.display": true,
+      "invoice.nfe": false,
+      "sales.direct": false,
+      "payments.gateway": false,
       "network.multiUnit": false,
     },
-    limits: { "clients.limit": 500, "reports.retentionDays": 365 },
+    limits: {
+      "clients.limit": 90,
+      "professionals.limit": 5,
+      "appointments.monthly": 1500,
+      "admins.limit": 3,
+    },
   },
-  advanced: {
-    label: "Advanced",
-    priceBRL: 105,
-    setupBRL: 259,
+  advance: {
+    label: "Advance",
+    priceBRL: 249.9,
     features: {
       "site.subdomain": true,
       "site.customDomain": true,
@@ -76,9 +101,19 @@ export const PLANS: Record<SaasPlanKey, PlanConfig> = {
       "whatsapp.chatbot": true,
       "marketing.basic": true,
       "marketing.segmented": true,
+      "recovery.abandoned": true,
+      "products.display": true,
+      "invoice.nfe": true,
+      "sales.direct": true,
+      "payments.gateway": true,
       "network.multiUnit": true,
     },
-    limits: { "clients.limit": UNLIMITED, "reports.retentionDays": UNLIMITED },
+    limits: {
+      "clients.limit": UNLIMITED,
+      "professionals.limit": 8,
+      "appointments.monthly": 3000,
+      "admins.limit": 4,
+    },
   },
 };
 

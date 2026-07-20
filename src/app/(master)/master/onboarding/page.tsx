@@ -10,7 +10,7 @@ import type { SaasPlanKey } from "@/lib/tenant/types";
 import { formatBRL, cn } from "@/lib/utils";
 
 const STEPS = ["Dados", "Domínio", "Tema", "Plano"];
-const PLAN_ORDER: SaasPlanKey[] = ["essencial", "profissional", "advanced"];
+const PLAN_ORDER: SaasPlanKey[] = ["personal", "essencial", "advance"];
 const PRESET_COLORS = ["#C9A24B", "#5556EE", "#08D48B", "#FF385C"];
 
 export default function OnboardingPage() {
@@ -18,7 +18,7 @@ export default function OnboardingPage() {
   const [name, setName] = useState("Barbearia Oliveira 01");
   const [subdomain, setSubdomain] = useState("oliveira01");
   const [accent, setAccent] = useState("#C9A24B");
-  const [plan, setPlan] = useState<SaasPlanKey>("profissional");
+  const [plan, setPlan] = useState<SaasPlanKey>("essencial");
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "barber.app";
   const logo = name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "BB";
 
