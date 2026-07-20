@@ -2,10 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 /** Rotas públicas (sem sessão). Todo o resto exige login. */
-const PUBLIC_PREFIXES = ["/login", "/cadastro", "/otp", "/recuperar-senha", "/design-system"];
+const PUBLIC_PREFIXES = ["/login", "/cadastro", "/otp", "/recuperar-senha", "/design-system", "/auth"];
+/** Páginas de auth: se já logado, redireciona para a home. */
+const AUTH_PAGES = ["/login", "/cadastro", "/otp"];
 
 function isPublic(path: string) {
   return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+function isAuthPage(path: string) {
+  return AUTH_PAGES.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
 export async function middleware(request: NextRequest) {
@@ -42,8 +47,8 @@ export async function middleware(request: NextRequest) {
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  // Logado em rota de auth → home (o layout redireciona por papel)
-  if (user && isPublic(path) && path !== "/design-system") {
+  // Logado numa página de auth → home (o layout redireciona por papel)
+  if (user && isAuthPage(path)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

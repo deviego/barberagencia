@@ -15,10 +15,12 @@ export async function signUpWithPassword(
   meta: { full_name?: string; phone?: string }
 ) {
   const supabase = createSupabaseBrowserClient();
+  const emailRedirectTo =
+    typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: meta },
+    options: { data: meta, emailRedirectTo },
   });
   if (error) throw new Error(error.message);
   return data; // data.session === null quando confirmação de e-mail está ativa
