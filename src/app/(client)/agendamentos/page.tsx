@@ -66,7 +66,7 @@ export default async function AgendamentosPage() {
               </div>
               {a.status === "CONFIRMED" && (
                 <div className="mt-3 border-t border-border-subtle pt-3">
-                  <AppointmentActions isPlan />
+                  <AppointmentActions appointmentId={a.id} isPlan />
                 </div>
               )}
             </div>

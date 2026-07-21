@@ -23,7 +23,7 @@ export default async function ClientHome() {
     | undefined;
   const combo = one(sub?.combo_plans);
   const next = home?.next as
-    | { start_at: string; status: string; barbers: unknown; services: unknown; combo_plans: unknown }
+    | { id: string; start_at: string; status: string; barbers: unknown; services: unknown; combo_plans: unknown }
     | null
     | undefined;
 
@@ -59,7 +59,7 @@ export default async function ClientHome() {
             {nextBarber ? ` · com ${nextBarber.name}` : ""}
           </div>
           <div className="mt-4">
-            <AppointmentActions isPlan={!!combo} />
+            <AppointmentActions appointmentId={next.id} isPlan={!!combo} />
           </div>
         </div>
       ) : (

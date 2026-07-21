@@ -56,3 +56,39 @@ export async function requestAppointment(input: RequestAppointmentInput) {
   revalidatePath("/agendamentos");
   return { ok: true as const, id: data.id as string };
 }
+
+/** Assina/ativa um combo para o cliente logado (pagamento no local). */
+export async function subscribeCombo(comboPlanId: string) {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return { ok: false as const, error: "Cliente não encontrado" };
+  const { error } = await supabase.rpc("assign_combo", {
+    p_client_id: client.id,
+    p_combo_plan_id: comboPlanId,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/");
+  revalidatePath("/meu-plano");
+  return { ok: true as const };
+}
+
+/** Cancela um agendamento do cliente; devolve o corte ao saldo se era do plano. */
+export async function cancelAppointment(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select("client_id, consumed_from_plan")
+    .eq("id", id)
+    .maybeSingle();
+  if (!appt) return { ok: false as const, error: "Agendamento não encontrado" };
+
+  const { error } = await supabase.from("appointments").update({ status: "CANCELLED" }).eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+
+  if (appt.consumed_from_plan) {
+    await supabase.rpc("return_cut", { p_client_id: appt.client_id });
+  }
+  revalidatePath("/");
+  revalidatePath("/agendamentos");
+  return { ok: true as const };
+}
