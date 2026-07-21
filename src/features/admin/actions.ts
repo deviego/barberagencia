@@ -89,6 +89,49 @@ export async function createSale(input: { clientId: string | null; method: strin
   return { ok: true as const };
 }
 
+/** Cria uma campanha de marketing. */
+export async function createCampaign(values: { name: string; segment: string; message: string }) {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const { error } = await supabase.from("campaigns").insert({
+    tenant_id: user.tenantId,
+    name: values.name,
+    segment: values.segment,
+    message: values.message,
+    status: "ACTIVE",
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/marketing");
+  return { ok: true as const };
+}
+
+/** Salva o branding (white-label) da unidade. */
+export async function saveBranding(values: { accent?: string; instagram?: string }) {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const { error } = await supabase
+    .from("branding")
+    .update({ accent: values.accent ?? null, instagram: values.instagram ?? null })
+    .eq("tenant_id", user.tenantId);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/config");
+  return { ok: true as const };
+}
+
+/** Atribui/renova um combo a um cliente (admin). */
+export async function assignComboToClient(clientId: string, comboPlanId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("assign_combo", {
+    p_client_id: clientId,
+    p_combo_plan_id: comboPlanId,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/clientes");
+  return { ok: true as const };
+}
+
 /** Registra um saque/retirada do caixa. */
 export async function registerWithdrawal(amountBRL: number, note?: string) {
   const supabase = await createSupabaseServerClient();

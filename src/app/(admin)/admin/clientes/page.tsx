@@ -1,5 +1,6 @@
 import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-table";
-import { getClients } from "@/features/admin/data";
+import { AssignCombo } from "@/features/admin/components/assign-combo";
+import { getClients, getCombos } from "@/features/admin/data";
 
 const columns: CrudColumn[] = [
   { key: "name", label: "Nome" },
@@ -9,20 +10,25 @@ const columns: CrudColumn[] = [
 ];
 
 export default async function ClientesPage() {
-  const rows = await getClients();
+  const [rows, combos] = await Promise.all([getClients(), getCombos()]);
   return (
-    <CrudTable
-      table="clients"
-      title="Clientes"
-      newLabel="Novo cliente"
-      rows={rows}
-      searchKeys={["name", "phone", "email"]}
-      columns={columns}
-      fields={[
-        { name: "name", label: "Nome completo" },
-        { name: "phone", label: "Telefone", placeholder: "(11) 91234-5678" },
-        { name: "email", label: "E-mail", type: "email" },
-      ]}
-    />
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <AssignCombo clients={rows as { id: string; name: string }[]} combos={combos as { id: string; name: string }[]} />
+      </div>
+      <CrudTable
+        table="clients"
+        title="Clientes"
+        newLabel="Novo cliente"
+        rows={rows}
+        searchKeys={["name", "phone", "email"]}
+        columns={columns}
+        fields={[
+          { name: "name", label: "Nome completo" },
+          { name: "phone", label: "Telefone", placeholder: "(11) 91234-5678" },
+          { name: "email", label: "E-mail", type: "email" },
+        ]}
+      />
+    </div>
   );
 }

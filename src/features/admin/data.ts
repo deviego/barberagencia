@@ -89,6 +89,47 @@ export async function getFinance() {
   return { revenue, expenses, closing: revenue - expenses, withdrawals, byMethod, receipts };
 }
 
+export async function getCampaigns() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("campaigns")
+    .select("id, name, segment, status, reach, created_at")
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
+
+export async function getCombos() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("combo_plans")
+    .select("id, name, cuts, price_brl")
+    .eq("active", true)
+    .order("name");
+  return data ?? [];
+}
+
+export async function getBranding() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("branding")
+    .select("logo_text, logo_url, accent, instagram")
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
+/** Cancelamentos recentes (para o painel de cancelamentos/reembolsos). */
+export async function getRecentCancellations() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("appointments")
+    .select("id, start_at, consumed_from_plan, clients(name), services(name), combo_plans(name)")
+    .in("status", ["CANCELLED", "EXPIRED"])
+    .order("start_at", { ascending: false })
+    .limit(10);
+  return data ?? [];
+}
+
 /** Leitores de CRUD (admin, sob RLS do tenant). */
 export async function getServices() {
   const supabase = await createSupabaseServerClient();

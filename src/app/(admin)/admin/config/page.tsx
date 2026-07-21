@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LogoMark } from "@/components/brand/logo";
 import { Gate } from "@/components/gate";
+import { BrandingForm } from "@/features/admin/components/branding-form";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { getBranding } from "@/features/admin/data";
 
 export default async function ConfigPage() {
   const tenant = await getCurrentTenant();
+  const branding = await getBranding();
   const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "barber.app";
 
   return (
@@ -61,31 +64,10 @@ export default async function ConfigPage() {
           </Button>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Cor de acento</Label>
-            <div className="flex items-center gap-2">
-              {[
-                { c: "#C9A24B", sel: true },
-                { c: "#5556EE", sel: false },
-                { c: "#08D48B", sel: false },
-                { c: "#FF385C", sel: false },
-              ].map(({ c, sel }) => (
-                <span
-                  key={c}
-                  className={`h-9 w-9 rounded-md border-2 ${sel ? "border-text" : "border-transparent"}`}
-                  style={{ background: c }}
-                />
-              ))}
-              <span className="mx-1 h-6 w-px bg-border" />
-              <Input defaultValue="#C9A24B" className="w-28" />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Instagram</Label>
-            <Input defaultValue={tenant.branding.instagram ?? ""} placeholder="@barbearia" />
-          </div>
-        </div>
+        <BrandingForm
+          initialAccent={branding?.accent ?? "#C9A24B"}
+          initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
+        />
 
         <div className="flex flex-col gap-1.5">
           <Label>Subdomínio</Label>
@@ -110,8 +92,6 @@ export default async function ConfigPage() {
             <Input placeholder="www.suabarbearia.com.br" />
           </div>
         </Gate>
-
-        <Button className="self-start">Salvar alterações</Button>
       </section>
     </div>
   );
