@@ -147,6 +147,14 @@ export async function getProducts() {
     .order("name");
   return data ?? [];
 }
+export async function getComboPlans() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("combo_plans")
+    .select("id, name, cuts, scope, price_brl, active")
+    .order("name");
+  return data ?? [];
+}
 export async function getBarbers() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.from("barbers").select("id, name, active").order("name");
