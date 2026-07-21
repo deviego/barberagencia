@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Gauge,
   Megaphone,
+  MessageSquareText,
   Package,
   Scissors,
   Settings,
@@ -31,5 +32,6 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin/barbeiros", label: "Barbeiros", icon: User },
   { href: "/admin/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone, feature: "marketing.basic" },
+  { href: "/admin/mensagens", label: "Mensagens", icon: MessageSquareText, feature: "whatsapp.manual" },
   { href: "/admin/config", label: "Configurações", icon: Settings },
 ];

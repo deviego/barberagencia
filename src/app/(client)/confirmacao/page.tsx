@@ -37,6 +37,16 @@ export default function ConfirmacaoPage() {
         </NotifCard>
       </div>
 
+      {/* Regras de cancelamento */}
+      <div className="w-full rounded-lg border border-border bg-surface p-4 text-left">
+        <div className="mb-2 text-overline uppercase text-text-muted">Regras de cancelamento</div>
+        <ul className="flex flex-col gap-1 text-caption text-text-2">
+          <li>• Pelo app: cancele com no mínimo 10 minutos de antecedência.</li>
+          <li>• Imprevisto? Avise no WhatsApp com até 30 minutos antes do horário.</li>
+          <li>• Faltar sem avisar pode restringir novos agendamentos online.</li>
+        </ul>
+      </div>
+
       <Link href="/agendamentos" className="w-full max-w-xs">
         <Button size="lg" className="w-full">
           Ver meus agendamentos

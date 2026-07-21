@@ -29,18 +29,19 @@ export function CancelRefundModal({
         <div className="flex flex-col gap-2 text-body text-text-2">
           {isPlan ? (
             <p>
-              Este corte <strong className="text-text">volta ao seu saldo na hora</strong> — você
-              fica com 4/4 cortes neste mês.
+              Este corte <strong className="text-text">volta ao seu saldo na hora</strong>.
             </p>
           ) : (
             <p>
-              O valor pago será <strong className="text-text">estornado em até 5 dias úteis</strong>{" "}
-              no mesmo meio de pagamento.
+              Seu horário será liberado. O pagamento é feito no local, então{" "}
+              <strong className="text-text">não há cobrança a estornar</strong>.
             </p>
           )}
-          <p className="text-caption text-text-muted">
-            Cancelamentos até 2h antes do horário têm reembolso integral.
-          </p>
+          <ul className="mt-1 flex flex-col gap-1 text-caption text-text-muted">
+            <li>• Pelo app: até 10 minutos antes do horário.</li>
+            <li>• Imprevisto em cima da hora? Avise no WhatsApp com até 30 minutos de antecedência.</li>
+            <li>• Faltar sem avisar pode restringir novos agendamentos online.</li>
+          </ul>
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <button
