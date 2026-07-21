@@ -8,12 +8,20 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { CLIENT_NAV } from "@/features/client/nav";
 import { cn } from "@/lib/utils";
 
-export function ClientHeader({ logoText, name }: { logoText: string; name: string }) {
+export function ClientHeader({
+  logoText,
+  logoUrl,
+  name,
+}: {
+  logoText: string;
+  logoUrl?: string | null;
+  name: string;
+}) {
   const pathname = usePathname();
   return (
     <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-5 py-3 md:px-8">
       <Link href="/" className="flex items-center gap-3 text-text">
-        <LogoMark text={logoText} />
+        <LogoMark text={logoText} src={logoUrl} />
         <span className="font-display text-h5 font-extrabold uppercase tracking-wide">{name}</span>
       </Link>
 

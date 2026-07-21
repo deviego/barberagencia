@@ -1,15 +1,31 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** Bloco de logo do tenant (placeholder tipográfico até haver imagem). */
+/**
+ * Logo do tenant. Se `src` (logoUrl) existir, mostra a imagem; senão, o
+ * placeholder tipográfico com as iniciais.
+ */
 export function LogoMark({
   text,
+  src,
   size = 34,
   className,
 }: {
   text: string;
+  src?: string | null;
   size?: number;
   className?: string;
 }) {
+  if (src) {
+    return (
+      <span
+        className={cn("relative block shrink-0 overflow-hidden rounded-md", className)}
+        style={{ height: size, width: size }}
+      >
+        <Image src={src} alt={text} fill sizes={`${size}px`} className="object-contain" />
+      </span>
+    );
+  }
   return (
     <div
       className={cn(

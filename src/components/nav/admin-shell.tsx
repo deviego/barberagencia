@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Building2, ChevronDown, LogOut, Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { FabWhatsApp } from "@/components/nav/fab-whatsapp";
+import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { ADMIN_NAV } from "@/features/admin/nav";
 import { hasEntitlement } from "@/lib/entitlements";
@@ -14,11 +15,13 @@ import { cn } from "@/lib/utils";
 
 export function AdminShell({
   logoText,
+  logoUrl,
   name,
   plan,
   children,
 }: {
   logoText: string;
+  logoUrl?: string | null;
   name: string;
   plan: SaasPlanKey;
   children: React.ReactNode;
@@ -42,9 +45,7 @@ export function AdminShell({
             <Menu size={18} />
           </button>
           <Link href="/admin" className="flex items-center gap-2.5 text-text">
-            <div className="flex h-[30px] w-[30px] items-center justify-center rounded-md bg-accent font-display text-caption font-black text-text-inverse">
-              {logoText}
-            </div>
+            <LogoMark text={logoText} src={logoUrl} size={30} />
             <span className="hidden font-display text-h5 font-extrabold uppercase tracking-wide sm:inline">
               {name}
             </span>

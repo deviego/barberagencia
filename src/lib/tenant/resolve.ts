@@ -15,7 +15,7 @@ export const REFERENCE_TENANT: ResolvedTenant = {
   saasPlan: "advance",
   branding: {
     logoText: "BO",
-    logoUrl: null,
+    logoUrl: "/logo-oliveira.jpeg",
     // null => herda o accent do tema (dourado). Um tenant white-label sobrescreve aqui.
     accent: null,
     accentHover: null,

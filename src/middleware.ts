@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 /** Rotas públicas (sem sessão). Todo o resto exige login. */
-const PUBLIC_PREFIXES = ["/login", "/cadastro", "/otp", "/recuperar-senha", "/design-system", "/auth"];
+const PUBLIC_PREFIXES = ["/login", "/cadastro", "/otp", "/recuperar-senha", "/design-system", "/auth", "/termos", "/privacidade"];
 /** Páginas de auth: se já logado, redireciona para a home. */
 const AUTH_PAGES = ["/login", "/cadastro", "/otp"];
 

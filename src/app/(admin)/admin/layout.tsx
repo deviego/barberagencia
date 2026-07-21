@@ -11,7 +11,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const tenant = await getCurrentTenant();
   return (
-    <AdminShell logoText={tenant.branding.logoText} name={tenant.name} plan={tenant.saasPlan}>
+    <AdminShell
+      logoText={tenant.branding.logoText}
+      logoUrl={tenant.branding.logoUrl}
+      name={tenant.name}
+      plan={tenant.saasPlan}
+    >
       {children}
     </AdminShell>
   );

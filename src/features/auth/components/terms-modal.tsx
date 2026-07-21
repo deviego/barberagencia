@@ -45,7 +45,16 @@ export function TermsModal({
         >
           <Checkbox checked={ck1} />
           <span>
-            Li e aceito os <span className="text-accent">Termos de Uso</span>
+            Li e aceito os{" "}
+            <a
+              href="/termos"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-accent underline"
+            >
+              Termos de Uso
+            </a>
           </span>
         </button>
         <button
@@ -55,7 +64,16 @@ export function TermsModal({
         >
           <Checkbox checked={ck2} />
           <span>
-            Li e aceito a <span className="text-accent">Política de Privacidade</span>
+            Li e aceito a{" "}
+            <a
+              href="/privacidade"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-accent underline"
+            >
+              Política de Privacidade
+            </a>
           </span>
         </button>
 
