@@ -8,19 +8,22 @@ import { formatBRL, cn } from "@/lib/utils";
 import { requestAppointment } from "@/features/client/actions";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const TIMES = ["09:00", "09:45", "10:30", "11:15", "14:00", "14:45", "15:30", "16:15", "17:00"];
+const SLOT_MIN = 45;
 
 interface Barber { id: string; name: string }
 interface Service { id: string; name: string; price_brl: number }
 interface PlanInfo { comboPlanId: string; name: string; saldo: number }
+interface WorkingHour { barber_id: string; weekday: number; start_min: number; end_min: number }
 
 export function AgendarForm({
   barbers,
   services,
+  workingHours,
   plan,
 }: {
   barbers: Barber[];
   services: Service[];
+  workingHours: WorkingHour[];
   plan: PlanInfo | null;
 }) {
   const router = useRouter();
@@ -39,6 +42,19 @@ export function AgendarForm({
       return { idx: i, wd: WEEKDAYS[d.getDay()], dd: d.getDate(), date: d };
     });
   }, []);
+
+  const slots = useMemo(() => {
+    const day = days[dayIdx]?.date;
+    if (!day || !barberId) return [];
+    const wd = day.getDay();
+    const out: string[] = [];
+    for (const w of workingHours.filter((x) => x.barber_id === barberId && x.weekday === wd)) {
+      for (let t = w.start_min; t + SLOT_MIN <= w.end_min; t += SLOT_MIN) {
+        out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+      }
+    }
+    return out.sort();
+  }, [days, dayIdx, barberId, workingHours]);
 
   function submit() {
     setError(null);
@@ -114,20 +130,26 @@ export function AgendarForm({
       {/* Horário */}
       <section className="flex flex-col gap-2">
         <div className="text-overline uppercase text-text-muted">Horário</div>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {TIMES.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTime(t)}
-              className={cn(
-                "rounded-md border py-2 text-body tabular transition-colors",
-                time === t ? "border-2 border-accent bg-accent-wash text-accent" : "border-border text-text hover:border-accent"
-              )}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        {slots.length === 0 ? (
+          <p className="text-caption text-text-muted">
+            Sem horários para este barbeiro neste dia. Escolha outro dia ou barbeiro.
+          </p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {slots.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTime(t)}
+                className={cn(
+                  "rounded-md border py-2 text-body tabular transition-colors",
+                  time === t ? "border-2 border-accent bg-accent-wash text-accent" : "border-border text-text hover:border-accent"
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Resumo */}

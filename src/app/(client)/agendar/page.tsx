@@ -1,5 +1,5 @@
 import { AgendarForm } from "@/features/client/components/agendar-form";
-import { getCatalog, getClientHome } from "@/features/client/data";
+import { getCatalog, getClientHome, getWorkingHours } from "@/features/client/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -7,7 +7,11 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 export default async function AgendarPage() {
-  const [catalog, home] = await Promise.all([getCatalog(), getClientHome()]);
+  const [catalog, home, workingHours] = await Promise.all([
+    getCatalog(),
+    getClientHome(),
+    getWorkingHours(),
+  ]);
 
   const sub = home?.sub as
     | { combo_plan_id: string; saldo_cortes: number; combo_plans: unknown }
@@ -26,7 +30,12 @@ export default async function AgendarPage() {
         ⚠️ O pagamento é feito no local após o atendimento (dinheiro, PIX ou cartão). Vai pagar em
         dinheiro? Se precisar de troco, avise o barbeiro ao chegar. Aproveite! ✂️
       </div>
-      <AgendarForm barbers={catalog.barbers} services={catalog.services} plan={plan} />
+      <AgendarForm
+        barbers={catalog.barbers}
+        services={catalog.services}
+        workingHours={workingHours}
+        plan={plan}
+      />
     </div>
   );
 }

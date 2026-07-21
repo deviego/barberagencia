@@ -44,6 +44,15 @@ export async function getClientHome() {
   return { client, sub, next };
 }
 
+/** Horários de trabalho dos barbeiros do tenant (para gerar disponibilidade). */
+export async function getWorkingHours() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("working_hours")
+    .select("barber_id, weekday, start_min, end_min");
+  return data ?? [];
+}
+
 /** Catálogo do tenant: serviços, combos e barbeiros ativos. */
 export async function getCatalog() {
   const supabase = await createSupabaseServerClient();
