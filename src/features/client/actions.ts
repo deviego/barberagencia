@@ -72,6 +72,51 @@ export async function subscribeCombo(comboPlanId: string) {
   return { ok: true as const };
 }
 
+/** Cancela a assinatura ativa do cliente. */
+export async function cancelSubscription() {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return { ok: false as const, error: "Cliente não encontrado" };
+  const { error } = await supabase
+    .from("client_subscriptions")
+    .update({ status: "CANCELLED" })
+    .eq("client_id", client.id)
+    .eq("status", "ACTIVE");
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/");
+  revalidatePath("/meu-plano");
+  return { ok: true as const };
+}
+
+/** Atualiza dados do perfil (profiles + clients). */
+export async function updateProfile(values: { fullName: string; phone: string }) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: "Sessão expirada" };
+  await supabase.from("profiles").update({ full_name: values.fullName, phone: values.phone }).eq("id", user.id);
+  await supabase.from("clients").update({ name: values.fullName, phone: values.phone }).eq("user_id", user.id);
+  revalidatePath("/perfil");
+  revalidatePath("/");
+  return { ok: true as const };
+}
+
+/** Reserva um produto para retirada. */
+export async function reserveProduct(productId: string, qty = 1) {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return { ok: false as const, error: "Cliente não encontrado" };
+  const { error } = await supabase.from("product_reservations").insert({
+    tenant_id: client.tenant_id,
+    client_id: client.id,
+    product_id: productId,
+    qty,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  return { ok: true as const };
+}
+
 /** Cancela um agendamento do cliente; devolve o corte ao saldo se era do plano. */
 export async function cancelAppointment(id: string) {
   const supabase = await createSupabaseServerClient();
