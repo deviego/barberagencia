@@ -1,40 +1,76 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Check, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { formatBRL, cn } from "@/lib/utils";
-import { CLIENTS, PRODUCTS, SERVICES } from "@/features/admin/mock-data";
+import { createSale, type SaleItemInput } from "@/features/admin/actions";
 
-const METHODS = ["PIX", "Cartão", "Dinheiro", "Plano"] as const;
+interface Item { id: string; name: string; price_brl: number }
+interface ClientOpt { id: string; name: string }
 
-/** Botão + drawer de POS ("Lançar venda"). Autocontido; use no Dashboard e Financeiro. */
-export function PosButton({ variant = "primary" }: { variant?: "primary" | "outline" }) {
+const METHODS: { label: string; value: string }[] = [
+  { label: "PIX", value: "PIX" },
+  { label: "Cartão", value: "CARD_CREDIT" },
+  { label: "Dinheiro", value: "CASH" },
+  { label: "Plano", value: "PLAN" },
+];
+
+export function PosButton({
+  services,
+  products,
+  clients,
+  variant = "primary",
+}: {
+  services: Item[];
+  products: Item[];
+  clients: ClientOpt[];
+  variant?: "primary" | "outline";
+}) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<Record<string, number>>({});
-  const [method, setMethod] = useState<(typeof METHODS)[number]>("PIX");
+  const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [clientId, setClientId] = useState<string>("");
+  const [method, setMethod] = useState("PIX");
+  const [picked, setPicked] = useState<Record<string, { kind: "service" | "product"; name: string; price: number }>>({});
 
-  const catalog = [
-    ...SERVICES.map((s) => ({ id: `s:${s.id}`, name: s.name, priceBRL: s.priceBRL })),
-    ...PRODUCTS.map((p) => ({ id: `p:${p.id}`, name: p.name, priceBRL: p.priceBRL })),
-  ];
-  const total = catalog.reduce((sum, i) => sum + (items[i.id] ?? 0) * i.priceBRL, 0);
+  const total = Object.values(picked).reduce((s, i) => s + i.price, 0);
 
-  function toggle(id: string) {
-    setItems((c) => {
-      const n = { ...c };
-      if (n[id]) delete n[id];
-      else n[id] = 1;
+  function toggle(kind: "service" | "product", it: Item) {
+    setPicked((p) => {
+      const n = { ...p };
+      if (n[it.id]) delete n[it.id];
+      else n[it.id] = { kind, name: it.name, price: it.price_brl };
       return n;
     });
   }
-
   function reset() {
-    setItems({});
+    setPicked({});
     setMethod("PIX");
+    setClientId("");
     setDone(false);
+    setError(null);
+  }
+  function submit() {
+    setError(null);
+    const items: SaleItemInput[] = Object.entries(picked).map(([id, v]) => ({
+      kind: v.kind,
+      refId: id,
+      name: v.name,
+      priceBRL: v.price,
+      qty: 1,
+    }));
+    startTransition(async () => {
+      const res = await createSale({ clientId: clientId || null, method, items });
+      if (res.ok) {
+        setDone(true);
+        router.refresh();
+      } else setError(res.error);
+    });
   }
 
   return (
@@ -53,11 +89,7 @@ export function PosButton({ variant = "primary" }: { variant?: "primary" | "outl
         title="Lançar venda"
         footer={
           !done ? (
-            <Button
-              className="w-full"
-              disabled={total === 0}
-              onClick={() => setDone(true)}
-            >
+            <Button className="w-full" loading={pending} disabled={total === 0} onClick={submit}>
               Lançar venda · {formatBRL(total)}
             </Button>
           ) : (
@@ -73,41 +105,33 @@ export function PosButton({ variant = "primary" }: { variant?: "primary" | "outl
               <Check size={26} className="text-success-strong" strokeWidth={3} />
             </span>
             <div className="text-h4 font-semibold text-text">Venda lançada</div>
-            <div className="text-body text-text-2">{formatBRL(total)} · {method}</div>
           </div>
         ) : (
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
               <span className="text-caption font-semibold text-text-2">Cliente</span>
-              <select className="h-10 rounded-md border border-border bg-inset px-3 text-body text-text focus-visible:border-focus focus-visible:outline-none">
-                <option>Venda de balcão</option>
-                {CLIENTS.map((c) => (
-                  <option key={c.id}>{c.name}</option>
+              <select
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                className="h-10 rounded-md border border-border bg-inset px-3 text-body text-text focus-visible:border-focus focus-visible:outline-none"
+              >
+                <option value="">Venda de balcão</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             </div>
 
             <Section label="Serviços">
-              {SERVICES.map((s) => (
-                <ItemChip
-                  key={s.id}
-                  active={!!items[`s:${s.id}`]}
-                  onClick={() => toggle(`s:${s.id}`)}
-                  name={s.name}
-                  price={s.priceBRL}
-                />
+              {services.map((s) => (
+                <Chip key={s.id} active={!!picked[s.id]} onClick={() => toggle("service", s)} name={s.name} price={s.price_brl} />
               ))}
             </Section>
-
             <Section label="Produtos">
-              {PRODUCTS.map((p) => (
-                <ItemChip
-                  key={p.id}
-                  active={!!items[`p:${p.id}`]}
-                  onClick={() => toggle(`p:${p.id}`)}
-                  name={p.name}
-                  price={p.priceBRL}
-                />
+              {products.map((p) => (
+                <Chip key={p.id} active={!!picked[p.id]} onClick={() => toggle("product", p)} name={p.name} price={p.price_brl} />
               ))}
             </Section>
 
@@ -116,20 +140,20 @@ export function PosButton({ variant = "primary" }: { variant?: "primary" | "outl
               <div className="grid grid-cols-4 gap-2">
                 {METHODS.map((m) => (
                   <button
-                    key={m}
-                    onClick={() => setMethod(m)}
+                    key={m.value}
+                    onClick={() => setMethod(m.value)}
                     className={cn(
                       "rounded-md border py-2 text-caption transition-colors",
-                      method === m
-                        ? "border-2 border-accent bg-accent-wash text-accent"
-                        : "border-border text-text-2 hover:border-accent"
+                      method === m.value ? "border-2 border-accent bg-accent-wash text-accent" : "border-border text-text-2 hover:border-accent"
                     )}
                   >
-                    {m}
+                    {m.label}
                   </button>
                 ))}
               </div>
             </div>
+
+            {error && <p className="text-caption text-danger">{error}</p>}
           </div>
         )}
       </Drawer>
@@ -145,18 +169,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
     </div>
   );
 }
-
-function ItemChip({
-  active,
-  onClick,
-  name,
-  price,
-}: {
-  active: boolean;
-  onClick: () => void;
-  name: string;
-  price: number;
-}) {
+function Chip({ active, onClick, name, price }: { active: boolean; onClick: () => void; name: string; price: number }) {
   return (
     <button
       onClick={onClick}
