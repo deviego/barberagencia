@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MASTER_NAV } from "@/features/platform/nav";
+import { LogoutButton } from "@/components/nav/logout-button";
 import { cn } from "@/lib/utils";
 
 export function MasterSidebar() {
@@ -40,6 +41,9 @@ export function MasterSidebar() {
           );
         })}
       </nav>
+      <div className="border-t border-border p-2">
+        <LogoutButton variant="sidebar" />
+      </div>
     </aside>
   );
 }

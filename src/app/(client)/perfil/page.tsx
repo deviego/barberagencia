@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
-import { LogoutButton } from "@/features/client/components/logout-button";
+import { LogoutButton } from "@/components/nav/logout-button";
 import { PerfilForm } from "@/features/client/components/perfil-form";
 import { getProfile } from "@/features/client/data";
 

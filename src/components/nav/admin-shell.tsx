@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Building2, ChevronDown, LogOut, Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { FabWhatsApp } from "@/components/nav/fab-whatsapp";
+import { LogoutButton } from "@/components/nav/logout-button";
 import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { ADMIN_NAV } from "@/features/admin/nav";
@@ -77,6 +78,7 @@ export function AdminShell({
           >
             {initials}
           </span>
+          <LogoutButton />
         </div>
       </header>
 
