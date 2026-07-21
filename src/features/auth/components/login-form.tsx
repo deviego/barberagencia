@@ -8,7 +8,7 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signInWithPassword } from "../services/auth-service";
 
-export function LoginForm() {
+export function LoginForm({ showSignup = true }: { showSignup?: boolean }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,12 +65,14 @@ export function LoginForm() {
         Entrar
       </Button>
 
-      <p className="text-center text-body text-text-2">
-        Primeira inscrição?{" "}
-        <Link href="/cadastro" className="font-semibold text-accent hover:underline">
-          Cadastrar
-        </Link>
-      </p>
+      {showSignup && (
+        <p className="text-center text-body text-text-2">
+          Primeira inscrição?{" "}
+          <Link href="/cadastro" className="font-semibold text-accent hover:underline">
+            Cadastrar
+          </Link>
+        </p>
+      )}
     </form>
   );
 }

@@ -2,9 +2,20 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 /** Rotas públicas (sem sessão). Todo o resto exige login. */
-const PUBLIC_PREFIXES = ["/login", "/cadastro", "/otp", "/recuperar-senha", "/design-system", "/auth", "/termos", "/privacidade", "/convite"];
-/** Páginas de auth: se já logado, redireciona para a home. */
-const AUTH_PAGES = ["/login", "/cadastro", "/otp"];
+const PUBLIC_PREFIXES = [
+  "/login", "/admin/login", "/master/login", "/cadastro", "/otp", "/recuperar-senha",
+  "/design-system", "/auth", "/termos", "/privacidade", "/convite",
+];
+/** Páginas de login: se já logado, redireciona para a home (guardas roteiam por papel). */
+const AUTH_PAGES = ["/login", "/admin/login", "/master/login", "/cadastro", "/otp"];
+
+/** Tela de login apropriada para uma rota protegida. */
+function loginFor(path: string) {
+  if (path.startsWith("/admin")) return "/admin/login";
+  if (path.startsWith("/master")) return "/master/login";
+  if (path.startsWith("/rede")) return "/admin/login";
+  return "/login";
+}
 
 function isPublic(path: string) {
   return PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
@@ -41,10 +52,10 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // Não logado tentando rota protegida → login
+  // Não logado tentando rota protegida → login da área correspondente
   if (!user && !isPublic(path)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = loginFor(path);
     return NextResponse.redirect(url);
   }
   // Logado numa página de auth → home (o layout redireciona por papel)
