@@ -1,31 +1,27 @@
-"use client";
+import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-table";
+import { getServices } from "@/features/admin/data";
 
-import { Badge } from "@/components/ui/badge";
-import { CrudTable } from "@/features/admin/components/crud-table";
-import { SERVICES } from "@/features/admin/mock-data";
-import { formatBRL } from "@/lib/utils";
+const columns: CrudColumn[] = [
+  { key: "name", label: "Serviço" },
+  { key: "duration_min", label: "Duração", format: "minutes" },
+  { key: "price_brl", label: "Preço", format: "price" },
+  { key: "active", label: "Status", format: "activeBadge" },
+];
 
-export default function ServicosAdminPage() {
+export default async function ServicosAdminPage() {
+  const rows = await getServices();
   return (
     <CrudTable
+      table="services"
       title="Serviços"
       newLabel="Novo serviço"
-      rows={SERVICES}
+      rows={rows}
       searchKeys={["name"]}
-      columns={[
-        { key: "name", label: "Serviço" },
-        { key: "durationMin", label: "Duração", render: (r) => `${r.durationMin} min` },
-        { key: "priceBRL", label: "Preço", render: (r) => formatBRL(r.priceBRL) },
-        {
-          key: "active",
-          label: "Status",
-          render: (r) => (r.active ? <Badge variant="success">Ativo</Badge> : <Badge>Inativo</Badge>),
-        },
-      ]}
+      columns={columns}
       fields={[
         { name: "name", label: "Nome do serviço" },
-        { name: "durationMin", label: "Duração (min)", type: "number" },
-        { name: "priceBRL", label: "Preço (R$)", type: "number" },
+        { name: "duration_min", label: "Duração (min)", type: "number" },
+        { name: "price_brl", label: "Preço (R$)", type: "number" },
         { name: "category", label: "Categoria" },
       ]}
     />

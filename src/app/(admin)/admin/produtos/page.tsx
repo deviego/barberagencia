@@ -1,41 +1,29 @@
-"use client";
+import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-table";
+import { getProducts } from "@/features/admin/data";
 
-import { Badge } from "@/components/ui/badge";
-import { CrudTable } from "@/features/admin/components/crud-table";
-import { PRODUCTS } from "@/features/admin/mock-data";
-import { formatBRL } from "@/lib/utils";
+const columns: CrudColumn[] = [
+  { key: "name", label: "Produto" },
+  { key: "sku", label: "SKU" },
+  { key: "price_brl", label: "Preço", format: "price" },
+  { key: "stock", label: "Estoque", format: "stock" },
+  { key: "active", label: "Status", format: "activeBadge" },
+];
 
-export default function ProdutosPage() {
+export default async function ProdutosPage() {
+  const rows = await getProducts();
   return (
     <CrudTable
+      table="products"
       title="Produtos"
       newLabel="Novo produto"
-      rows={PRODUCTS}
+      rows={rows}
       searchKeys={["name", "sku"]}
-      columns={[
-        { key: "name", label: "Produto" },
-        { key: "sku", label: "SKU" },
-        { key: "priceBRL", label: "Preço", render: (r) => formatBRL(r.priceBRL) },
-        {
-          key: "stock",
-          label: "Estoque",
-          render: (r) =>
-            r.stock > 0 ? (
-              <span className="tabular">{r.stock}</span>
-            ) : (
-              <Badge variant="danger">Sem estoque</Badge>
-            ),
-        },
-        {
-          key: "active",
-          label: "Status",
-          render: (r) => (r.active ? <Badge variant="success">Ativo</Badge> : <Badge>Inativo</Badge>),
-        },
-      ]}
+      columns={columns}
       fields={[
         { name: "name", label: "Nome do produto" },
         { name: "sku", label: "SKU" },
-        { name: "priceBRL", label: "Preço (R$)", type: "number" },
+        { name: "price_brl", label: "Preço (R$)", type: "number" },
+        { name: "cost_brl", label: "Custo (R$)", type: "number" },
         { name: "stock", label: "Estoque", type: "number" },
       ]}
     />
