@@ -89,6 +89,25 @@ export async function createSale(input: { clientId: string | null; method: strin
   return { ok: true as const };
 }
 
+/** Cria um convite de cliente (link expira em 48h). Retorna o token. */
+export async function createInvite(values: { name?: string; phone?: string; email?: string }) {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase.from("client_invites").insert({
+    tenant_id: user.tenantId,
+    token,
+    name: values.name ?? null,
+    email: values.email ?? null,
+    phone: values.phone ?? null,
+    expires_at: expiresAt,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  return { ok: true as const, token };
+}
+
 /** Cria uma campanha de marketing. */
 export async function createCampaign(values: { name: string; segment: string; message: string }) {
   const supabase = await createSupabaseServerClient();
