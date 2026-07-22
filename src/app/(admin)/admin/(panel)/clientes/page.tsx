@@ -23,6 +23,7 @@ export default async function ClientesPage() {
         title="Clientes"
         newLabel="Novo cliente"
         rows={rows}
+        detail="client"
         searchKeys={["name", "phone", "email"]}
         columns={columns}
         fields={[

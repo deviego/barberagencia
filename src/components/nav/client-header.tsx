@@ -2,22 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { LogoutButton } from "@/components/nav/logout-button";
 import { CLIENT_NAV } from "@/features/client/nav";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 
 export function ClientHeader({
   logoText,
   logoUrl,
   name,
+  userName,
+  userEmail,
+  avatarUrl,
 }: {
   logoText: string;
   logoUrl?: string | null;
   name: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  avatarUrl?: string | null;
 }) {
   const pathname = usePathname();
+  const initials = getInitials(userName, userEmail);
   return (
     <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-5 py-3 md:px-8">
       <Link href="/" className="flex items-center gap-3 text-text">
@@ -45,21 +52,18 @@ export function ClientHeader({
       </nav>
 
       <div className="flex items-center gap-2">
-        <button
-          className="relative flex rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
-          aria-label="Notificações"
-        >
-          <Bell size={18} />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-surface bg-danger" />
-        </button>
         <ThemeToggle />
-        <Link
-          href="/perfil"
-          aria-label="Perfil"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-caption font-bold text-text-inverse"
-        >
-          W
+        <Link href="/perfil" aria-label="Perfil" className="flex">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt={initials} className="h-9 w-9 rounded-full object-cover" />
+          ) : (
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-caption font-bold text-text-inverse">
+              {initials}
+            </span>
+          )}
         </Link>
+        <LogoutButton className="hidden sm:inline-flex" />
       </div>
     </header>
   );

@@ -24,7 +24,7 @@ export interface AdminNavItem {
 
 export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin", label: "Dashboard", icon: Gauge },
-  { href: "/admin/solicitacoes", label: "Solicitações", icon: Bell, badge: 2 },
+  { href: "/admin/solicitacoes", label: "Solicitações", icon: Bell },
   { href: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/servicos", label: "Serviços", icon: Scissors },

@@ -2,7 +2,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { RequestCard, type RequestRow } from "@/features/admin/components/request-card";
-import { listRequests, getRecentCancellations } from "@/features/admin/data";
+import { PlanRequestCard, type PlanRequestRow } from "@/features/admin/components/plan-request-card";
+import { listRequests, getRecentCancellations, getPlanRequests } from "@/features/admin/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -10,8 +11,9 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 export default async function SolicitacoesPage() {
-  const [requests, cancellations] = await Promise.all([
+  const [requests, planRequests, cancellations] = await Promise.all([
     listRequests() as unknown as Promise<RequestRow[]>,
+    getPlanRequests() as unknown as Promise<PlanRequestRow[]>,
     getRecentCancellations(),
   ]);
   const cancels = cancellations as {
@@ -41,6 +43,23 @@ export default async function SolicitacoesPage() {
           {requests.map((r) => (
             <RequestCard key={r.id} req={r} />
           ))}
+        </div>
+      )}
+
+      {/* Pedidos de plano (troca/cancelamento) */}
+      {planRequests.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <div className="text-overline uppercase text-text-muted">Pedidos de plano</div>
+            <p className="text-caption text-text-muted">
+              Trocas e cancelamentos de assinatura aguardando sua confirmação.
+            </p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {planRequests.map((r) => (
+              <PlanRequestCard key={r.id} req={r} />
+            ))}
+          </div>
         </div>
       )}
 

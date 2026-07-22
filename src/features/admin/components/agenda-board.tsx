@@ -47,7 +47,17 @@ function serviceOf(a: Appt) {
   );
 }
 
-export function AgendaBoard({ barbers, appointments }: { barbers: Barber[]; appointments: Appt[] }) {
+export function AgendaBoard({
+  barbers,
+  appointments,
+  view = "day",
+  weekStart,
+}: {
+  barbers: Barber[];
+  appointments: Appt[];
+  view?: "day" | "week";
+  weekStart?: string; // yyyy-MM-dd (1º dia da semana)
+}) {
   const router = useRouter();
   const [selected, setSelected] = useState<Appt | null>(null);
   const [pending, startTransition] = useTransition();
@@ -62,6 +72,64 @@ export function AgendaBoard({ barbers, appointments }: { barbers: Barber[]; appo
     });
   }
 
+  function renderChip(a: Appt, withDay = false) {
+    const st = STATUS[a.status] ?? STATUS.REQUESTED;
+    return (
+      <button
+        key={a.id}
+        onClick={() => setSelected(a)}
+        className={cn("w-full rounded-md border px-3 py-2 text-left transition-transform hover:scale-[1.01]", st.cls)}
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-caption font-bold tabular">
+            {format(new Date(a.start_at), withDay ? "dd/MM HH:mm" : "HH:mm")}
+          </span>
+          <span className="text-[10px] uppercase opacity-80">{st.label}</span>
+        </div>
+        <div className="text-caption font-semibold">{nameOf(a)}</div>
+        <div className="text-[11px] opacity-80">{serviceOf(a)}</div>
+      </button>
+    );
+  }
+
+  // ----- Visão SEMANA: 7 colunas por dia -----
+  if (view === "week" && weekStart) {
+    const base = new Date(weekStart + "T00:00:00");
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      return d;
+    });
+    return (
+      <>
+        <div className="grid gap-3 md:grid-cols-7">
+          {days.map((d) => {
+            const key = format(d, "yyyy-MM-dd");
+            const list = appointments.filter((a) => format(new Date(a.start_at), "yyyy-MM-dd") === key);
+            return (
+              <div key={key} className="rounded-lg border border-border bg-surface p-3">
+                <div className="mb-2 text-center">
+                  <div className="text-caption font-semibold capitalize text-text">
+                    {format(d, "EEE", { locale: ptBR })}
+                  </div>
+                  <div className="text-h5 font-bold tabular text-text">{format(d, "dd")}</div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {list.length === 0 && (
+                    <p className="py-2 text-center text-[11px] text-text-muted">—</p>
+                  )}
+                  {list.map((a) => renderChip(a, true))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {detailDrawer()}
+      </>
+    );
+  }
+
+  // ----- Visão DIA: colunas por barbeiro -----
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {barbers.map((b) => {
@@ -74,7 +142,7 @@ export function AgendaBoard({ barbers, appointments }: { barbers: Barber[]; appo
               </span>
               <div>
                 <div className="text-body font-semibold text-text">{b.name}</div>
-                <div className="text-caption text-text-muted">{list.length} hoje</div>
+                <div className="text-caption text-text-muted">{list.length} agendamento(s)</div>
               </div>
             </div>
             <div className="flex flex-col gap-2">
@@ -83,30 +151,18 @@ export function AgendaBoard({ barbers, appointments }: { barbers: Barber[]; appo
                   Sem agendamentos.
                 </p>
               )}
-              {list.map((a) => {
-                const st = STATUS[a.status] ?? STATUS.REQUESTED;
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => setSelected(a)}
-                    className={cn("rounded-md border px-3 py-2 text-left transition-transform hover:scale-[1.01]", st.cls)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-caption font-bold tabular">
-                        {format(new Date(a.start_at), "HH:mm")}
-                      </span>
-                      <span className="text-[10px] uppercase opacity-80">{st.label}</span>
-                    </div>
-                    <div className="text-caption font-semibold">{nameOf(a)}</div>
-                    <div className="text-[11px] opacity-80">{serviceOf(a)}</div>
-                  </button>
-                );
-              })}
+              {list.map((a) => renderChip(a))}
             </div>
           </div>
         );
       })}
 
+      {detailDrawer()}
+    </div>
+  );
+
+  function detailDrawer() {
+    return (
       <Drawer
         open={selected !== null}
         onClose={() => setSelected(null)}
@@ -151,8 +207,8 @@ export function AgendaBoard({ barbers, appointments }: { barbers: Barber[]; appo
           </div>
         )}
       </Drawer>
-    </div>
-  );
+    );
+  }
 }
 
 function Row({ label, value }: { label: string; value: string }) {

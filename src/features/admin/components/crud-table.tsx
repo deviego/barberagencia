@@ -2,14 +2,16 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Eye, MailCheck, Pencil, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { ConfirmModal } from "@/components/ui/modal";
-import { formatBRL } from "@/lib/utils";
+import { ClientDetail } from "@/features/admin/components/client-detail";
+import { formatBRL, cn } from "@/lib/utils";
+import { maskBRL, brlInputFromNumber } from "@/lib/masks";
 import { saveRow, deleteRow } from "@/features/admin/crud-actions";
 
 type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge";
@@ -21,9 +23,11 @@ export interface CrudColumn {
 export interface CrudField {
   name: string;
   label: string;
+  /** "currency" aplica máscara de R$; os demais seguem o input HTML nativo. */
   type?: string;
   placeholder?: string;
 }
+type StatusFilter = "all" | "active" | "inactive";
 type Row = Record<string, unknown> & { id: string };
 
 function renderCell(col: CrudColumn, row: Row) {
@@ -56,6 +60,7 @@ export function CrudTable({
   searchKeys,
   inviteBlock,
   saveLabel = "Salvar",
+  detail,
 }: {
   table: string;
   title: string;
@@ -66,21 +71,35 @@ export function CrudTable({
   searchKeys: string[];
   inviteBlock?: React.ReactNode;
   saveLabel?: string;
+  /** Habilita o "olho" com uma view de detalhe dedicada. */
+  detail?: "client";
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Row | "new" | null>(null);
+  const [viewing, setViewing] = useState<Row | null>(null);
   const [deleting, setDeleting] = useState<Row | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [active, setActive] = useState(true);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  const hasStatus = columns.some((c) => c.format === "activeBadge");
+  const currencyKeys = useMemo(() => fields.filter((f) => f.type === "currency").map((f) => f.name), [fields]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(q)));
-  }, [query, rows, searchKeys]);
+    return rows.filter((r) => {
+      if (q && !searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(q))) return false;
+      if (status === "active" && r.active === false) return false;
+      if (status === "inactive" && r.active !== false) return false;
+      return true;
+    });
+  }, [query, rows, searchKeys, status]);
+
+  const statusLabel = status === "active" ? "ativos" : status === "inactive" ? "inativos" : "todos";
 
   function openNew() {
     setError(null);
@@ -91,7 +110,10 @@ export function CrudTable({
   function openEdit(row: Row) {
     setError(null);
     const f: Record<string, string> = {};
-    for (const fld of fields) f[fld.name] = row[fld.name] == null ? "" : String(row[fld.name]);
+    for (const fld of fields) {
+      if (fld.type === "currency") f[fld.name] = brlInputFromNumber(row[fld.name] as number | null);
+      else f[fld.name] = row[fld.name] == null ? "" : String(row[fld.name]);
+    }
     setForm(f);
     setActive(row.active !== false);
     setEditing(row);
@@ -133,14 +155,39 @@ export function CrudTable({
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar…" className="w-full pl-9" />
         </div>
-        <button className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-caption text-text-2 transition-colors hover:border-accent hover:text-accent">
-          <SlidersHorizontal size={14} />
-          Filtros
-        </button>
-        <button className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-caption text-text-2 transition-colors hover:border-accent hover:text-accent">
-          Status: todos
-          <ChevronDown size={14} />
-        </button>
+        {hasStatus && (
+          <div className="relative">
+            <button
+              onClick={() => setStatusOpen((o) => !o)}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-caption capitalize text-text-2 transition-colors hover:border-accent hover:text-accent"
+            >
+              Status: {statusLabel}
+              <ChevronDown size={14} />
+            </button>
+            {statusOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setStatusOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-36 overflow-hidden rounded-md border border-border bg-surface shadow-lg">
+                  {(["all", "active", "inactive"] as StatusFilter[]).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setStatus(s);
+                        setStatusOpen(false);
+                      }}
+                      className={cn(
+                        "block w-full px-3 py-2 text-left text-caption capitalize transition-colors hover:bg-accent-wash",
+                        status === s ? "font-bold text-accent" : "text-text-2"
+                      )}
+                    >
+                      {s === "all" ? "Todos" : s === "active" ? "Ativos" : "Inativos"}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">
@@ -165,7 +212,7 @@ export function CrudTable({
                 ))}
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-1">
-                    <button onClick={() => openEdit(row)} className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-accent-wash hover:text-accent" aria-label="Ver">
+                    <button onClick={() => (detail ? setViewing(row) : openEdit(row))} className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-accent-wash hover:text-accent" aria-label="Ver">
                       <Eye size={16} />
                     </button>
                     <button onClick={() => openEdit(row)} className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-accent-wash hover:text-accent" aria-label="Editar">
@@ -211,17 +258,23 @@ export function CrudTable({
             save();
           }}
         >
-          {fields.map((f) => (
-            <div key={f.name} className="flex flex-col gap-1.5">
-              <Label>{f.label}</Label>
-              <Input
-                type={f.type ?? "text"}
-                placeholder={f.placeholder}
-                value={form[f.name] ?? ""}
-                onChange={(e) => setForm((s) => ({ ...s, [f.name]: e.target.value }))}
-              />
-            </div>
-          ))}
+          {fields.map((f) => {
+            const isCurrency = f.type === "currency";
+            return (
+              <div key={f.name} className="flex flex-col gap-1.5">
+                <Label>{f.label}</Label>
+                <Input
+                  type={isCurrency ? "text" : f.type ?? "text"}
+                  inputMode={isCurrency ? "numeric" : undefined}
+                  placeholder={isCurrency ? "R$ 0,00" : f.placeholder}
+                  value={form[f.name] ?? ""}
+                  onChange={(e) =>
+                    setForm((s) => ({ ...s, [f.name]: isCurrency ? maskBRL(e.target.value) : e.target.value }))
+                  }
+                />
+              </div>
+            );
+          })}
           <div className="flex items-center justify-between">
             <Label className="mb-0">Ativo</Label>
             <Switch defaultChecked={active} onChange={setActive} />
@@ -229,6 +282,14 @@ export function CrudTable({
           {error && <p className="text-caption text-danger">{error}</p>}
           {inviteBlock}
         </form>
+      </Drawer>
+
+      <Drawer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={`Detalhe · ${title.replace(/s$/i, "").toLowerCase()}`}
+      >
+        {viewing && detail === "client" && <ClientDetail clientId={viewing.id} />}
       </Drawer>
 
       <ConfirmModal

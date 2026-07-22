@@ -8,6 +8,8 @@ export interface SessionUser {
   email: string | null;
   role: Role | null;
   tenantId: string | null;
+  name: string | null;
+  avatarUrl: string | null;
 }
 
 /**
@@ -21,17 +23,17 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: membership } = await supabase
-    .from("memberships")
-    .select("role, tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  const [{ data: membership }, { data: profile }] = await Promise.all([
+    supabase.from("memberships").select("role, tenant_id").eq("user_id", user.id).limit(1).maybeSingle(),
+    supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).maybeSingle(),
+  ]);
 
   return {
     id: user.id,
     email: user.email ?? null,
     role: (membership?.role as Role | undefined) ?? null,
     tenantId: (membership?.tenant_id as string | undefined) ?? null,
+    name: (profile?.full_name as string | undefined) ?? null,
+    avatarUrl: (profile?.avatar_url as string | undefined) ?? null,
   };
 });

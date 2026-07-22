@@ -9,6 +9,28 @@ export function maskDate(value: string): string {
   return out;
 }
 
+/** Moeda BRL a partir do que é digitado (base centavos): "4500" → "R$ 45,00". */
+export function maskBRL(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    Number(digits) / 100
+  );
+}
+
+/** Converte uma string mascarada em BRL para número (R$ 45,00 → 45). */
+export function parseBRLToNumber(value: string): number {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
+}
+
+/** Semeia um input de moeda a partir de um número (45 → "R$ 45,00"). */
+export function brlInputFromNumber(n: number | string | null | undefined): string {
+  const num = Number(n ?? 0);
+  if (!num) return "";
+  return maskBRL(String(Math.round(num * 100)));
+}
+
 /** Telefone brasileiro: (XX) XXXXX-XXXX (aceita fixo de 10 dígitos também). */
 export function maskPhoneBR(value: string): string {
   let d = value.replace(/\D/g, "");

@@ -169,6 +169,99 @@ export async function getClients() {
   return data ?? [];
 }
 
+/** Agenda num intervalo [from, to) — usada pela navegação por dia/semana. */
+export async function getAgenda(fromISO: string, toISO: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("appointments")
+    .select("id, start_at, status, no_show, barber_id, clients(name), services(name), combo_plans(name)")
+    .gte("start_at", fromISO)
+    .lt("start_at", toISO)
+    .order("start_at", { ascending: true });
+  return data ?? [];
+}
+
+/** Horários de trabalho dos barbeiros do tenant (para gerar slots no admin). */
+export async function getWorkingHours() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("working_hours")
+    .select("barber_id, weekday, start_min, end_min");
+  return data ?? [];
+}
+
+/** Clientes ativos com o plano ativo (para o "Novo agendamento" vincular o combo). */
+export async function getClientsWithPlan() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("clients")
+    .select("id, name, client_subscriptions(combo_plan_id, saldo_cortes, status, combo_plans(name, cuts))")
+    .eq("active", true)
+    .order("name");
+  return (data ?? []).map((c) => {
+    const subs = (c.client_subscriptions ?? []) as {
+      combo_plan_id: string;
+      saldo_cortes: number;
+      status: string;
+      combo_plans: { name: string; cuts: number } | { name: string; cuts: number }[] | null;
+    }[];
+    const active = subs.find((s) => s.status === "ACTIVE");
+    const combo = active
+      ? Array.isArray(active.combo_plans)
+        ? active.combo_plans[0]
+        : active.combo_plans
+      : null;
+    return {
+      id: c.id as string,
+      name: c.name as string,
+      plan: active ? { comboPlanId: active.combo_plan_id, name: combo?.name ?? "Plano", saldo: active.saldo_cortes } : null,
+    };
+  });
+}
+
+/** Pedidos de plano pendentes (troca/cancelamento) do tenant. */
+export async function getPlanRequests() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("plan_requests")
+    .select("id, type, created_at, clients(name), combo_plans(name)")
+    .eq("status", "PENDING")
+    .order("created_at", { ascending: true });
+  return data ?? [];
+}
+
+/** Contagem de itens pendentes (solicitações de agendamento + pedidos de plano). */
+export async function getPendingCount() {
+  const supabase = await createSupabaseServerClient();
+  const [appts, plans] = await Promise.all([
+    supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "REQUESTED"),
+    supabase.from("plan_requests").select("id", { count: "exact", head: true }).eq("status", "PENDING"),
+  ]);
+  return (appts.count ?? 0) + (plans.count ?? 0);
+}
+
+/** Detalhe do cliente: dados + plano ativo + histórico de serviços. */
+export async function getClientDetail(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: client }, { data: sub }, { data: history }] = await Promise.all([
+    supabase.from("clients").select("id, name, email, phone, active, avatar_url").eq("id", id).maybeSingle(),
+    supabase
+      .from("client_subscriptions")
+      .select("saldo_cortes, status, combo_plans(name, cuts, price_brl)")
+      .eq("client_id", id)
+      .eq("status", "ACTIVE")
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("appointments")
+      .select("id, start_at, status, consumed_from_plan, services(name), combo_plans(name), barbers(name)")
+      .eq("client_id", id)
+      .order("start_at", { ascending: false })
+      .limit(20),
+  ]);
+  return { client, sub, history: history ?? [] };
+}
+
 /** Agenda do dia (todos os status ativos) do tenant. */
 export async function getTodayAppointments() {
   const supabase = await createSupabaseServerClient();

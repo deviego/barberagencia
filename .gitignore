@@ -39,3 +39,4 @@ yarn-error.log*
 Slide*.jpeg
 Slide*.JPG.jpeg
 /Unclear message.zip
+tsconfig.tsbuildinfo

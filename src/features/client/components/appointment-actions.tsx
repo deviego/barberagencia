@@ -41,7 +41,11 @@ export function AppointmentActions({
   return (
     <>
       <div className="flex gap-3">
-        <Button variant="outline" size={size} onClick={() => router.push("/agendar")}>
+        <Button
+          variant="outline"
+          size={size}
+          onClick={() => router.push(appointmentId ? `/reagendar/${appointmentId}` : "/agendar")}
+        >
           Reagendar
         </Button>
         <Button variant="ghost" size={size} loading={pending} onClick={() => setOpen(true)}>

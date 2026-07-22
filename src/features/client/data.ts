@@ -10,7 +10,7 @@ export async function getMyClient() {
   if (!user) return null;
   const { data } = await supabase
     .from("clients")
-    .select("id, tenant_id, name, email, phone")
+    .select("id, tenant_id, name, email, phone, avatar_url")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
@@ -87,7 +87,26 @@ export async function getMyPlan() {
     .eq("consumed_from_plan", true)
     .order("start_at", { ascending: false })
     .limit(10);
-  return { sub, usage: usage ?? [] };
+  const { data: request } = await supabase
+    .from("plan_requests")
+    .select("id, type, created_at, combo_plans(name)")
+    .eq("client_id", client.id)
+    .eq("status", "PENDING")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return { sub, usage: usage ?? [], request };
+}
+
+/** Um agendamento do cliente, para a tela de reagendamento. */
+export async function getAppointmentForReschedule(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("appointments")
+    .select("id, start_at, status, barber_id, service_id, combo_plan_id, consumed_from_plan, barbers(name), services(name), combo_plans(name)")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
 }
 
 /** Perfil do cliente (auth + profile + client). */
@@ -98,10 +117,17 @@ export async function getProfile() {
   } = await supabase.auth.getUser();
   if (!user) return null;
   const [{ data: profile }, client] = await Promise.all([
-    supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("full_name, phone, avatar_url").eq("id", user.id).maybeSingle(),
     getMyClient(),
   ]);
-  return { email: user.email ?? "", fullName: profile?.full_name ?? "", phone: profile?.phone ?? "", client };
+  return {
+    userId: user.id,
+    email: user.email ?? "",
+    fullName: profile?.full_name ?? "",
+    phone: profile?.phone ?? "",
+    avatarUrl: (profile?.avatar_url as string | null) ?? (client?.avatar_url as string | null) ?? null,
+    client,
+  };
 }
 
 /** Catálogo de produtos ativos do tenant. */

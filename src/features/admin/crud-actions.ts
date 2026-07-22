@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
+import { parseBRLToNumber } from "@/lib/masks";
 
 interface CrudSchema {
   fields: string[];
@@ -40,7 +41,11 @@ export async function saveRow(table: string, id: string | null, values: Record<s
   for (const f of schema.fields) {
     if (!(f in values)) continue;
     let v = values[f];
-    if (schema.numeric.includes(f)) v = v === "" || v == null ? null : Number(v);
+    if (schema.numeric.includes(f)) {
+      if (v === "" || v == null) v = null;
+      else if (typeof v === "string" && /[,R$]/.test(v)) v = parseBRLToNumber(v); // string mascarada em BRL
+      else v = Number(v);
+    }
     payload[f] = v;
   }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
+import { getClientDetail } from "./data";
 
 async function setStatus(
   id: string,
@@ -165,6 +166,110 @@ export async function registerWithdrawal(amountBRL: number, note?: string) {
   });
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin/financeiro");
+  return { ok: true as const };
+}
+
+/** Novo agendamento pelo admin — nasce CONFIRMED e consome 1 corte se for plano. */
+export async function createAppointmentAdmin(input: {
+  clientId: string;
+  barberId: string | null;
+  serviceId: string | null;
+  comboPlanId: string | null;
+  startAt: string;
+  usePlan: boolean;
+}) {
+  if (!input.clientId || !input.startAt) return { ok: false as const, error: "Dados incompletos" };
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+
+  const { data, error } = await supabase
+    .from("appointments")
+    .insert({
+      tenant_id: user.tenantId,
+      client_id: input.clientId,
+      barber_id: input.barberId,
+      service_id: input.usePlan ? null : input.serviceId,
+      combo_plan_id: input.usePlan ? input.comboPlanId : null,
+      start_at: input.startAt,
+      status: "CONFIRMED",
+      consumed_from_plan: input.usePlan,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false as const, error: error.message };
+
+  if (input.usePlan) {
+    const { error: rpcErr } = await supabase.rpc("consume_cut", { p_client_id: input.clientId });
+    if (rpcErr) {
+      await supabase.from("appointments").delete().eq("id", data.id);
+      return { ok: false as const, error: rpcErr.message };
+    }
+  }
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Aprova um pedido de plano (troca → assign_combo; cancelamento → CANCELLED). */
+export async function approvePlanRequest(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: req } = await supabase
+    .from("plan_requests")
+    .select("client_id, type, combo_plan_id, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!req || req.status !== "PENDING") return { ok: false as const, error: "Pedido inválido" };
+
+  if (req.type === "CHANGE" && req.combo_plan_id) {
+    const { error } = await supabase.rpc("assign_combo", {
+      p_client_id: req.client_id,
+      p_combo_plan_id: req.combo_plan_id,
+    });
+    if (error) return { ok: false as const, error: error.message };
+  } else if (req.type === "CANCEL") {
+    const { error } = await supabase
+      .from("client_subscriptions")
+      .update({ status: "CANCELLED" })
+      .eq("client_id", req.client_id)
+      .eq("status", "ACTIVE");
+    if (error) return { ok: false as const, error: error.message };
+  }
+
+  await supabase
+    .from("plan_requests")
+    .update({ status: "APPROVED", resolved_at: new Date().toISOString() })
+    .eq("id", id);
+  revalidatePath("/admin/solicitacoes");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Recusa um pedido de plano (nada muda no plano). */
+export async function rejectPlanRequest(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("plan_requests")
+    .update({ status: "REJECTED", resolved_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "PENDING");
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/solicitacoes");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Detalhe do cliente (para o drawer de visualização). */
+export async function fetchClientDetail(id: string) {
+  return getClientDetail(id);
+}
+
+/** Salva a foto (avatar) de um cliente (upload feito no browser). */
+export async function updateClientAvatar(clientId: string, avatarUrl: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("clients").update({ avatar_url: avatarUrl }).eq("id", clientId);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/clientes");
   return { ok: true as const };
 }
 

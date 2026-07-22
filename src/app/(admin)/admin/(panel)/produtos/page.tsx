@@ -22,8 +22,8 @@ export default async function ProdutosPage() {
       fields={[
         { name: "name", label: "Nome do produto" },
         { name: "sku", label: "SKU" },
-        { name: "price_brl", label: "Preço (R$)", type: "number" },
-        { name: "cost_brl", label: "Custo (R$)", type: "number" },
+        { name: "price_brl", label: "Preço (R$)", type: "currency" },
+        { name: "cost_brl", label: "Custo (R$)", type: "currency" },
         { name: "stock", label: "Estoque", type: "number" },
       ]}
     />

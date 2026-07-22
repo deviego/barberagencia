@@ -31,7 +31,7 @@ export default async function ServicosAdminPage() {
         fields={[
           { name: "name", label: "Nome do serviço" },
           { name: "duration_min", label: "Duração (min)", type: "number" },
-          { name: "price_brl", label: "Preço (R$)", type: "number" },
+          { name: "price_brl", label: "Preço (R$)", type: "currency" },
           { name: "category", label: "Categoria" },
         ]}
       />
@@ -51,7 +51,7 @@ export default async function ServicosAdminPage() {
             { name: "name", label: "Nome do plano", placeholder: "Ex.: Combo Mensal 02" },
             { name: "cuts", label: "Cortes por mês", type: "number" },
             { name: "scope", label: "Escopo", placeholder: "Ex.: cabelo+barba+sobrancelha" },
-            { name: "price_brl", label: "Preço (R$/mês)", type: "number" },
+            { name: "price_brl", label: "Preço (R$/mês)", type: "currency" },
           ]}
         />
       </div>
