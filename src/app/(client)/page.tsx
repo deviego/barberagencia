@@ -86,8 +86,8 @@ export default async function ClientHome() {
         </div>
       )}
 
-      {/* CTA AGENDAR */}
-      <Link href="/servicos">
+      {/* CTA AGENDAR — com plano e saldo, vai direto ao horário */}
+      <Link href={sub && combo && sub.saldo_cortes > 0 ? "/agendar" : "/servicos"}>
         <button className="flex h-16 w-full items-center justify-center gap-3 rounded-lg bg-accent font-display text-h2 uppercase text-text-inverse shadow-md transition-colors hover:bg-accent-hover">
           <Scissors size={26} />
           Agendar

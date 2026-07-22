@@ -15,6 +15,7 @@ export function ClientHeader({
   userName,
   userEmail,
   avatarUrl,
+  agendarHref = "/servicos",
 }: {
   logoText: string;
   logoUrl?: string | null;
@@ -22,6 +23,7 @@ export function ClientHeader({
   userName?: string | null;
   userEmail?: string | null;
   avatarUrl?: string | null;
+  agendarHref?: string;
 }) {
   const pathname = usePathname();
   const initials = getInitials(userName, userEmail);
@@ -34,11 +36,12 @@ export function ClientHeader({
 
       <nav className="hidden items-center gap-1 md:flex">
         {CLIENT_NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const target = href === "/servicos" ? agendarHref : href;
+          const active = pathname === target;
           return (
             <Link
               key={href}
-              href={href}
+              href={target}
               className={cn(
                 "flex items-center gap-2 rounded-md px-3 py-2 text-body transition-colors",
                 active ? "bg-accent-wash text-accent" : "text-text-2 hover:text-text"

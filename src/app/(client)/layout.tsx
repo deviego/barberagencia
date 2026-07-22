@@ -3,6 +3,7 @@ import { ClientHeader } from "@/components/nav/client-header";
 import { BottomNav } from "@/components/nav/bottom-nav";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getSessionUser } from "@/lib/auth/session";
+import { getActivePlanBalance } from "@/features/client/data";
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
@@ -11,7 +12,9 @@ export default async function ClientLayout({ children }: { children: React.React
   if (user.role === "NETWORK_ADMIN") redirect("/rede");
   if (user.role === "UNIT_ADMIN") redirect("/admin");
 
-  const tenant = await getCurrentTenant();
+  const [tenant, balance] = await Promise.all([getCurrentTenant(), getActivePlanBalance()]);
+  // Com plano e saldo > 0, "Agendar" vai direto ao horário; senão, escolhe serviço.
+  const agendarHref = (balance ?? 0) > 0 ? "/agendar" : "/servicos";
   return (
     <div className="min-h-screen">
       <ClientHeader
@@ -21,9 +24,10 @@ export default async function ClientLayout({ children }: { children: React.React
         userName={user.name}
         userEmail={user.email}
         avatarUrl={user.avatarUrl}
+        agendarHref={agendarHref}
       />
       <main className="mx-auto w-full max-w-3xl px-5 pb-28 pt-6 md:pb-10">{children}</main>
-      <BottomNav />
+      <BottomNav agendarHref={agendarHref} />
     </div>
   );
 }

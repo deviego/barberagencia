@@ -53,6 +53,21 @@ export async function getWorkingHours() {
   return data ?? [];
 }
 
+/** Saldo de cortes da assinatura ATIVA do cliente logado (null se não tiver plano). */
+export async function getActivePlanBalance(): Promise<number | null> {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return null;
+  const { data } = await supabase
+    .from("client_subscriptions")
+    .select("saldo_cortes")
+    .eq("client_id", client.id)
+    .eq("status", "ACTIVE")
+    .limit(1)
+    .maybeSingle();
+  return data ? (data.saldo_cortes as number) : null;
+}
+
 /** Catálogo do tenant: serviços, combos e barbeiros ativos. */
 export async function getCatalog() {
   const supabase = await createSupabaseServerClient();
