@@ -12,7 +12,7 @@ const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const SLOT_MIN = 45;
 
 interface Barber { id: string; name: string }
-interface Service { id: string; name: string; price_brl: number }
+interface Service { id: string; name: string; price_brl: number; duration_min?: number }
 interface Product { id: string; name: string; price_brl: number }
 interface PlanInfo { comboPlanId: string; name: string; saldo: number }
 interface WorkingHour { barber_id: string; weekday: number; start_min: number; end_min: number }
@@ -116,7 +116,7 @@ export function AgendarForm({
     const svc = serviceIds
       .map((id) => services.find((s) => s.id === id))
       .filter((s): s is Service => !!s)
-      .map((s) => ({ kind: "service" as const, refId: s.id, name: s.name, priceBRL: s.price_brl, qty: 1 }));
+      .map((s) => ({ kind: "service" as const, refId: s.id, name: s.name, priceBRL: s.price_brl, qty: 1, durationMin: s.duration_min ?? 0 }));
     const prod = Object.entries(prodQty)
       .filter(([, q]) => q > 0)
       .map(([id, q]) => {

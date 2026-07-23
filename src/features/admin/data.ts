@@ -252,6 +252,25 @@ export async function getProductReservations() {
   return data ?? [];
 }
 
+/** Comandas de hoje (confirmadas, em atendimento e finalizadas) para a aba Pedidos. */
+export async function getComandas() {
+  const supabase = await createSupabaseServerClient();
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  const { data } = await supabase
+    .from("appointments")
+    .select(
+      "id, start_at, status, service_started_at, service_ended_at, barber_id, clients(name), barbers(name), appointment_items(id, kind, name, price_brl, qty, covered_by_plan, duration_min)"
+    )
+    .gte("start_at", start.toISOString())
+    .lt("start_at", end.toISOString())
+    .in("status", ["CONFIRMED", "DONE"])
+    .order("start_at", { ascending: true });
+  return data ?? [];
+}
+
 /** Detalhe do cliente: dados + plano ativo + histórico de serviços. */
 export async function getClientDetail(id: string) {
   const supabase = await createSupabaseServerClient();

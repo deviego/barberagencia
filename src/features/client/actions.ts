@@ -11,6 +11,7 @@ const itemSchema = z.object({
   name: z.string().min(1),
   priceBRL: z.number().nonnegative(),
   qty: z.number().int().positive(),
+  durationMin: z.number().int().nonnegative().optional(),
 });
 
 const schema = z.object({
@@ -63,6 +64,7 @@ export async function requestAppointment(input: RequestAppointmentInput) {
     name: i.name,
     price_brl: i.priceBRL,
     qty: i.qty,
+    duration_min: i.durationMin ?? 0,
     covered_by_plan: usePlan && idx === firstServiceIdx,
   }));
   const { error: itemsErr } = await supabase.from("appointment_items").insert(rows);

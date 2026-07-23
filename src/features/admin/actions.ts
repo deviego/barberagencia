@@ -290,6 +290,90 @@ export async function cancelReservation(id: string) {
   return { ok: true as const };
 }
 
+/** Inicia o atendimento (comanda) — dispara o cronômetro. */
+export async function startService(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("appointments")
+    .update({ service_started_at: new Date().toISOString() })
+    .eq("id", id);
+  revalidatePath("/admin/pedidos");
+  revalidatePath("/admin/agenda");
+  return { ok: !error, error: error?.message };
+}
+
+/** Adiciona um item (serviço/produto) à comanda durante o atendimento. */
+export async function addComandaItem(
+  appointmentId: string,
+  item: { kind: "service" | "product"; refId: string | null; name: string; priceBRL: number; qty: number; durationMin?: number }
+) {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const { error } = await supabase.from("appointment_items").insert({
+    appointment_id: appointmentId,
+    tenant_id: user.tenantId,
+    kind: item.kind,
+    ref_id: item.refId,
+    name: item.name,
+    price_brl: item.priceBRL,
+    qty: item.qty,
+    duration_min: item.durationMin ?? 0,
+    covered_by_plan: false,
+  });
+  revalidatePath("/admin/pedidos");
+  return { ok: !error, error: error?.message };
+}
+
+/** Remove um item da comanda. */
+export async function removeComandaItem(itemId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("appointment_items").delete().eq("id", itemId);
+  revalidatePath("/admin/pedidos");
+  return { ok: !error, error: error?.message };
+}
+
+/** Finaliza a comanda: lança o total (exceto o coberto pelo plano) no financeiro e marca Atendido. */
+export async function finalizeComanda(appointmentId: string, method: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select("client_id, appointment_items(kind, ref_id, name, price_brl, qty, covered_by_plan)")
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (!appt) return { ok: false as const, error: "Comanda não encontrada" };
+
+  const items = (appt.appointment_items ?? []).filter((i) => !i.covered_by_plan);
+  const total = items.reduce((s, i) => s + Number(i.price_brl) * i.qty, 0);
+
+  if (total > 0) {
+    const res = await createSale({
+      clientId: (appt.client_id as string) ?? null,
+      method,
+      items: items.map((i) => ({
+        kind: i.kind as "service" | "product",
+        refId: (i.ref_id as string) ?? "",
+        name: i.name as string,
+        priceBRL: Number(i.price_brl),
+        qty: i.qty as number,
+      })),
+    });
+    if (!res.ok) return res;
+  }
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({ status: "DONE", service_ended_at: new Date().toISOString() })
+    .eq("id", appointmentId);
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath("/admin/pedidos");
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/financeiro");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
 /** Salva a foto (avatar) de um cliente (upload feito no browser). */
 export async function updateClientAvatar(clientId: string, avatarUrl: string) {
   const supabase = await createSupabaseServerClient();

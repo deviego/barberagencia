@@ -156,6 +156,29 @@ export async function getProducts() {
   return data ?? [];
 }
 
+/** Comanda ativa do cliente (em atendimento, ou o próximo confirmado/solicitado). */
+export async function getMyActiveComanda() {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return null;
+  const { data } = await supabase
+    .from("appointments")
+    .select(
+      "id, start_at, status, service_started_at, service_ended_at, barbers(name), appointment_items(id, kind, name, price_brl, qty, covered_by_plan, duration_min)"
+    )
+    .eq("client_id", client.id)
+    .in("status", ["REQUESTED", "CONFIRMED", "ALT_OFFERED"])
+    .order("start_at", { ascending: true })
+    .limit(20);
+  const list = data ?? [];
+  if (list.length === 0) return null;
+  // Prioriza um em atendimento; senão o próximo a partir de agora; senão o 1º.
+  const inService = list.find((a) => a.service_started_at && a.status !== "DONE");
+  if (inService) return inService;
+  const nowIso = new Date().toISOString();
+  return list.find((a) => a.start_at >= nowIso) ?? list[0];
+}
+
 /** Retiradas de produto solicitadas pelo cliente (para o histórico). */
 export async function getMyReservations() {
   const supabase = await createSupabaseServerClient();
