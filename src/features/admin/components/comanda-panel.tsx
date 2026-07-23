@@ -140,7 +140,7 @@ export function ComandaPanel({
       <Drawer
         open={selected !== null}
         onClose={() => setSelectedId(null)}
-        title={selected ? `Comanda · ${nameOf(selected)}` : "Comanda"}
+        title={selected ? `Pedido · ${nameOf(selected)}` : "Pedido"}
         footer={
           selected && selected.status !== "DONE" ? (
             selected.service_started_at ? (

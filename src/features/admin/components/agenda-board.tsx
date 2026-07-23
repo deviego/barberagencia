@@ -214,7 +214,7 @@ export function AgendaBoard({
             </dl>
             {(selected.appointment_items?.length ?? 0) > 0 && (
               <div className="flex flex-col gap-1.5 rounded-md border border-border-subtle p-3 text-body">
-                <div className="text-overline uppercase text-text-muted">Comanda</div>
+                <div className="text-overline uppercase text-text-muted">Pedido</div>
                 {selected.appointment_items!.map((it, i) => (
                   <div key={i} className="flex items-center justify-between text-caption">
                     <span className="text-text-2">

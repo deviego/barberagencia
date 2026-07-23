@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { CutMeter } from "@/components/cut-meter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,8 +41,6 @@ export default async function MeuPlanoPage() {
     );
   }
 
-  const usage = (data?.usage ?? []) as { id: string; start_at: string; services: unknown; combo_plans: unknown }[];
-
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-h3 font-bold text-text">Meu plano</h1>
@@ -72,25 +68,6 @@ export default async function MeuPlanoPage() {
         </div>
         <MeuPlanoActions combos={combos} currentComboName={combo.name} hasPending={!!request} />
       </div>
-
-      <section className="flex flex-col gap-2">
-        <div className="text-overline uppercase text-text-muted">Histórico de uso</div>
-        {usage.length === 0 && <p className="text-caption text-text-muted">Nenhum uso ainda.</p>}
-        {usage.map((u) => {
-          const svc = one(u.services as { name: string }[] | { name: string }) ?? one(u.combo_plans as { name: string }[] | { name: string });
-          return (
-            <div
-              key={u.id}
-              className="flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3"
-            >
-              <span className="text-body text-text">{svc?.name ?? "Corte"}</span>
-              <span className="text-caption text-text-muted tabular">
-                {format(new Date(u.start_at), "dd MMM · HH:mm", { locale: ptBR })}
-              </span>
-            </div>
-          );
-        })}
-      </section>
     </div>
   );
 }
