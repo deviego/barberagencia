@@ -7,11 +7,20 @@ import { ptBR } from "date-fns/locale";
 import { Check, Clock, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatBRL } from "@/lib/utils";
 import { acceptAppointment, expireAppointment } from "@/features/admin/actions";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
+}
+
+export interface ComandaItem {
+  kind: string;
+  name: string;
+  price_brl: number;
+  qty: number;
+  covered_by_plan: boolean;
 }
 
 export interface RequestRow {
@@ -23,6 +32,7 @@ export interface RequestRow {
   barbers: { name: string } | { name: string }[] | null;
   services: { name: string } | { name: string }[] | null;
   combo_plans: { name: string } | { name: string }[] | null;
+  appointment_items?: ComandaItem[] | null;
 }
 
 export function RequestCard({ req }: { req: RequestRow }) {
@@ -31,6 +41,8 @@ export function RequestCard({ req }: { req: RequestRow }) {
   const client = one(req.clients);
   const barber = one(req.barbers);
   const service = one(req.services) ?? one(req.combo_plans);
+  const items = req.appointment_items ?? [];
+  const total = items.reduce((s, it) => (it.covered_by_plan ? s : s + it.price_brl * it.qty), 0);
 
   const expiresMs = req.request_expires_at ? new Date(req.request_expires_at).getTime() : 0;
   const [now, setNow] = useState(() => Date.now());
@@ -78,6 +90,28 @@ export function RequestCard({ req }: { req: RequestRow }) {
       <div className="text-body text-text-2 tabular">
         {format(new Date(req.start_at), "EEE, dd MMM · HH:mm", { locale: ptBR })}
       </div>
+
+      {items.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-md border border-border-subtle p-3">
+          {items.map((it, i) => (
+            <div key={i} className="flex items-center justify-between text-caption">
+              <span className="text-text-2">
+                {it.qty > 1 ? `${it.qty}x ` : ""}
+                {it.name}
+              </span>
+              {it.covered_by_plan ? (
+                <span className="font-semibold text-accent">Plano</span>
+              ) : (
+                <span className="tabular text-text">{formatBRL(it.price_brl * it.qty)}</span>
+              )}
+            </div>
+          ))}
+          <div className="mt-1 flex items-center justify-between border-t border-border-subtle pt-1.5 text-caption">
+            <span className="font-semibold text-text">A receber no local</span>
+            <span className="tabular font-bold text-accent">{formatBRL(total)}</span>
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="mb-1 flex items-center justify-between text-caption">

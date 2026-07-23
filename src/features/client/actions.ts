@@ -5,25 +5,36 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMyClient } from "./data";
 
+const itemSchema = z.object({
+  kind: z.enum(["service", "product"]),
+  refId: z.string().uuid().nullable().optional(),
+  name: z.string().min(1),
+  priceBRL: z.number().nonnegative(),
+  qty: z.number().int().positive(),
+});
+
 const schema = z.object({
   barberId: z.string().uuid().nullable().optional(),
-  serviceId: z.string().uuid().nullable().optional(),
   comboPlanId: z.string().uuid().nullable().optional(),
   startAt: z.string().min(1),
   usePlan: z.boolean(),
+  items: z.array(itemSchema).min(1),
 });
 
 export type RequestAppointmentInput = z.infer<typeof schema>;
 
-/** Cria um agendamento como SOLICITAÇÃO (timer 10 min). Consome saldo se for plano. */
+/** Cria uma comanda como SOLICITAÇÃO (timer 10 min). Consome 1 corte do plano se usePlan. */
 export async function requestAppointment(input: RequestAppointmentInput) {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Dados inválidos" };
+  const { barberId, comboPlanId, startAt, usePlan, items } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();
   if (!client) return { ok: false as const, error: "Cliente não encontrado" };
 
+  const firstServiceIdx = items.findIndex((i) => i.kind === "service");
+  const primaryServiceRef = firstServiceIdx >= 0 ? items[firstServiceIdx].refId ?? null : null;
   const requestExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
@@ -31,20 +42,36 @@ export async function requestAppointment(input: RequestAppointmentInput) {
     .insert({
       tenant_id: client.tenant_id,
       client_id: client.id,
-      barber_id: parsed.data.barberId ?? null,
-      service_id: parsed.data.serviceId ?? null,
-      combo_plan_id: parsed.data.comboPlanId ?? null,
-      start_at: parsed.data.startAt,
+      barber_id: barberId ?? null,
+      service_id: primaryServiceRef,
+      combo_plan_id: usePlan ? comboPlanId ?? null : null,
+      start_at: startAt,
       status: "REQUESTED",
       request_expires_at: requestExpiresAt,
-      consumed_from_plan: parsed.data.usePlan,
+      consumed_from_plan: usePlan,
     })
     .select("id")
     .single();
-
   if (error) return { ok: false as const, error: error.message };
 
-  if (parsed.data.usePlan) {
+  // Linhas da comanda; o 1º serviço fica coberto pelo plano quando usePlan.
+  const rows = items.map((i, idx) => ({
+    appointment_id: data.id,
+    tenant_id: client.tenant_id,
+    kind: i.kind,
+    ref_id: i.refId ?? null,
+    name: i.name,
+    price_brl: i.priceBRL,
+    qty: i.qty,
+    covered_by_plan: usePlan && idx === firstServiceIdx,
+  }));
+  const { error: itemsErr } = await supabase.from("appointment_items").insert(rows);
+  if (itemsErr) {
+    await supabase.from("appointments").delete().eq("id", data.id);
+    return { ok: false as const, error: itemsErr.message };
+  }
+
+  if (usePlan) {
     const { error: rpcErr } = await supabase.rpc("consume_cut", { p_client_id: client.id });
     if (rpcErr) {
       await supabase.from("appointments").delete().eq("id", data.id);

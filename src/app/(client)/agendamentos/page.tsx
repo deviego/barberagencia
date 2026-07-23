@@ -12,6 +12,13 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
 }
 
+interface ComandaItem {
+  kind: string;
+  name: string;
+  price_brl: number;
+  qty: number;
+  covered_by_plan: boolean;
+}
 interface Appt {
   id: string;
   start_at: string;
@@ -20,6 +27,7 @@ interface Appt {
   barbers: unknown;
   services: unknown;
   combo_plans: unknown;
+  appointment_items?: ComandaItem[] | null;
 }
 
 function title(a: Appt) {
@@ -54,6 +62,23 @@ function ApptCard({ a, highlight, actions }: { a: Appt; highlight?: boolean; act
         </div>
         <StatusBadge status={a.status as AppointmentStatus} />
       </div>
+      {(() => {
+        const items = a.appointment_items ?? [];
+        if (items.length <= 1) return null;
+        const total = items.reduce((s, it) => (it.covered_by_plan ? s : s + it.price_brl * it.qty), 0);
+        return (
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-text-muted">
+            {items.map((it, i) => (
+              <span key={i}>
+                {it.qty > 1 ? `${it.qty}x ` : ""}
+                {it.name}
+                {i < items.length - 1 ? " ·" : ""}
+              </span>
+            ))}
+            {total > 0 && <span className="font-semibold text-accent">{formatBRL(total)} no local</span>}
+          </div>
+        );
+      })()}
       {actions && ACTIONABLE.includes(a.status) && (
         <div className="mt-3 border-t border-border-subtle pt-3">
           <AppointmentActions appointmentId={a.id} isPlan={a.consumed_from_plan} />

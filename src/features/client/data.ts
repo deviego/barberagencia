@@ -177,7 +177,7 @@ export async function getMyAppointments() {
   if (!client) return [];
   const { data } = await supabase
     .from("appointments")
-    .select("id, start_at, status, consumed_from_plan, barbers(name), services(name), combo_plans(name)")
+    .select("id, start_at, status, consumed_from_plan, barbers(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)")
     .eq("client_id", client.id)
     .order("start_at", { ascending: false })
     .limit(100);

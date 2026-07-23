@@ -7,7 +7,7 @@ export async function listRequests() {
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_at, status, request_expires_at, consumed_from_plan, clients(name), barbers(name), services(name), combo_plans(name)"
+      "id, start_at, status, request_expires_at, consumed_from_plan, clients(name), barbers(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)"
     )
     .eq("status", "REQUESTED")
     .order("start_at", { ascending: true });
@@ -174,7 +174,7 @@ export async function getAgenda(fromISO: string, toISO: string) {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("appointments")
-    .select("id, start_at, status, no_show, barber_id, clients(name), services(name), combo_plans(name)")
+    .select("id, start_at, status, no_show, barber_id, clients(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)")
     .gte("start_at", fromISO)
     .lt("start_at", toISO)
     .order("start_at", { ascending: true });
@@ -283,7 +283,7 @@ export async function getTodayAppointments() {
   end.setDate(end.getDate() + 1);
   const { data } = await supabase
     .from("appointments")
-    .select("id, start_at, status, no_show, barber_id, clients(name), services(name), combo_plans(name)")
+    .select("id, start_at, status, no_show, barber_id, clients(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)")
     .gte("start_at", start.toISOString())
     .lt("start_at", end.toISOString())
     .order("start_at", { ascending: true });

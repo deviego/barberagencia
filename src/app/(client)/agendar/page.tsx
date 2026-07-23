@@ -1,6 +1,6 @@
 import { AgendarForm } from "@/features/client/components/agendar-form";
 import { PaymentNotice } from "@/features/client/components/payment-notice";
-import { getCatalog, getClientHome, getWorkingHours } from "@/features/client/data";
+import { getCatalog, getClientHome, getProducts, getWorkingHours } from "@/features/client/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -8,10 +8,11 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 export default async function AgendarPage() {
-  const [catalog, home, workingHours] = await Promise.all([
+  const [catalog, home, workingHours, products] = await Promise.all([
     getCatalog(),
     getClientHome(),
     getWorkingHours(),
+    getProducts(),
   ]);
 
   const sub = home?.sub as
@@ -31,6 +32,7 @@ export default async function AgendarPage() {
       <AgendarForm
         barbers={catalog.barbers}
         services={catalog.services}
+        products={products}
         workingHours={workingHours}
         plan={plan}
       />

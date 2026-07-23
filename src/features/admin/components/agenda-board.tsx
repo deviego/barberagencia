@@ -8,13 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { adminCancelAppointment, markDone, markNoShow } from "@/features/admin/actions";
-import { cn } from "@/lib/utils";
+import { cn, formatBRL } from "@/lib/utils";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
 }
 
+interface ComandaItem {
+  kind: string;
+  name: string;
+  price_brl: number;
+  qty: number;
+  covered_by_plan: boolean;
+}
 interface Appt {
   id: string;
   start_at: string;
@@ -24,6 +31,7 @@ interface Appt {
   clients: unknown;
   services: unknown;
   combo_plans: unknown;
+  appointment_items?: ComandaItem[] | null;
 }
 interface Barber { id: string; name: string }
 
@@ -204,6 +212,35 @@ export function AgendaBoard({
               />
               <Row label="Falta" value={selected.no_show ? "Sim" : "Não"} />
             </dl>
+            {(selected.appointment_items?.length ?? 0) > 0 && (
+              <div className="flex flex-col gap-1.5 rounded-md border border-border-subtle p-3 text-body">
+                <div className="text-overline uppercase text-text-muted">Comanda</div>
+                {selected.appointment_items!.map((it, i) => (
+                  <div key={i} className="flex items-center justify-between text-caption">
+                    <span className="text-text-2">
+                      {it.qty > 1 ? `${it.qty}x ` : ""}
+                      {it.name}
+                    </span>
+                    {it.covered_by_plan ? (
+                      <span className="font-semibold text-accent">Plano</span>
+                    ) : (
+                      <span className="tabular text-text">{formatBRL(it.price_brl * it.qty)}</span>
+                    )}
+                  </div>
+                ))}
+                <div className="mt-1 flex items-center justify-between border-t border-border-subtle pt-1.5 text-caption">
+                  <span className="font-semibold text-text">A receber no local</span>
+                  <span className="tabular font-bold text-accent">
+                    {formatBRL(
+                      selected.appointment_items!.reduce(
+                        (s, it) => (it.covered_by_plan ? s : s + it.price_brl * it.qty),
+                        0
+                      )
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Drawer>
