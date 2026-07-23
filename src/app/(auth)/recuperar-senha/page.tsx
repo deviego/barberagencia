@@ -9,9 +9,9 @@ export default function RecuperarSenhaPage() {
         <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-accent-wash">
           <KeyRound size={28} className="text-accent" />
         </div>
-        <h1 className="font-display text-h2 uppercase leading-none text-text">Redefinir senha</h1>
+        <h1 className="font-display text-h2 uppercase leading-none text-text">Recuperar senha</h1>
         <p className="mt-2 text-body text-text-2">
-          Informe seu e-mail e enviaremos o link de redefinição.
+          Informe seu e-mail e enviaremos um link para você criar uma nova senha.
         </p>
       </div>
       <ForgotForm />

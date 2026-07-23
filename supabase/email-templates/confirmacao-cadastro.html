@@ -1,0 +1,60 @@
+<!--
+  Template: CONFIRM SIGNUP (confirmação de cadastro)
+  Onde colar: Supabase Dashboard → Authentication → Email Templates → "Confirm signup"
+  Assunto sugerido: Confirme seu cadastro — Barbearia Oliveira 01
+  Variável usada: {{ .ConfirmationURL }}
+-->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Falta 1 passo: confirme seu e-mail e comece a agendar. ✂️</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ec;margin:0;padding:24px 0;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e6e0d6;">
+        <!-- Cabeçalho -->
+        <tr>
+          <td style="background:#171412;padding:22px 28px;">
+            <div style="height:4px;width:100%;background:repeating-linear-gradient(-45deg,#b23b3b 0 10px,#f2eee7 10px 20px,#2f5aa8 20px 30px);border-radius:3px;margin-bottom:16px;"></div>
+            <span style="color:#c8a24b;font-size:20px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;">Barbearia Oliveira 01</span>
+          </td>
+        </tr>
+        <!-- Corpo -->
+        <tr>
+          <td style="padding:32px 28px 8px;">
+            <h1 style="margin:0 0 12px;color:#171412;font-size:22px;">Bem-vindo! 👋✂️</h1>
+            <p style="margin:0 0 18px;color:#4a453d;font-size:15px;line-height:1.6;">
+              Que bom ter você na <strong>Barbearia Oliveira 01</strong>. Falta só um passo para ativar
+              sua conta e garantir seus horários: confirme seu e-mail no botão abaixo.
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;">
+              <tr>
+                <td style="border-radius:10px;background:#c8a24b;">
+                  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 30px;color:#171412;font-size:15px;font-weight:bold;text-decoration:none;">
+                    Confirmar meu e-mail
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 6px;color:#8a8578;font-size:12px;line-height:1.6;">
+              Se o botão não funcionar, copie e cole este endereço no navegador:
+            </p>
+            <p style="margin:0 0 18px;word-break:break-all;">
+              <a href="{{ .ConfirmationURL }}" style="color:#9a7a2e;font-size:12px;">{{ .ConfirmationURL }}</a>
+            </p>
+            <p style="margin:0;color:#8a8578;font-size:12px;line-height:1.6;">
+              Não foi você que criou esta conta? É só ignorar este e-mail.
+            </p>
+          </td>
+        </tr>
+        <!-- Rodapé -->
+        <tr>
+          <td style="padding:20px 28px 26px;border-top:1px solid #eee7db;">
+            <p style="margin:0;color:#8a8578;font-size:12px;line-height:1.7;">
+              💈 Seg–Sáb 9h–20h · 2 primeiros domingos do mês 8h–12h<br/>
+              📲 WhatsApp (21) 99088-3359 · Instagram @oliveira_01_barbearia<br/>
+              💵 Pagamento no local (dinheiro, PIX ou cartão).
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 
 /** Rotas públicas (sem sessão). Todo o resto exige login. */
 const PUBLIC_PREFIXES = [
-  "/login", "/admin/login", "/master/login", "/cadastro", "/otp", "/recuperar-senha",
+  "/login", "/admin/login", "/master/login", "/cadastro", "/otp", "/recuperar-senha", "/redefinir-senha",
   "/design-system", "/auth", "/termos", "/privacidade", "/convite",
 ];
 /** Páginas de login: se já logado, redireciona para a home (guardas roteiam por papel). */
