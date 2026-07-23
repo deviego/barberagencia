@@ -126,13 +126,17 @@ export function ComandaPanel({
         <div className="flex flex-col gap-2">
           <div className="text-overline uppercase text-text-muted">Finalizados hoje</div>
           {done.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface px-4 py-3">
+            <button
+              key={c.id}
+              onClick={() => setSelectedId(c.id)}
+              className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface px-4 py-3 text-left transition-colors hover:border-accent"
+            >
               <span className="text-body text-text">{nameOf(c)}</span>
               <div className="flex items-center gap-3">
                 <span className="text-caption text-text-muted tabular">{formatBRL(totalOf(c))}</span>
                 <Badge variant="success">Atendido</Badge>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
