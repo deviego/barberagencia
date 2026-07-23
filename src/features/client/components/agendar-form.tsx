@@ -51,9 +51,13 @@ export function AgendarForm({
     const day = days[dayIdx]?.date;
     if (!day || !barberId) return [];
     const wd = day.getDay();
+    const now = new Date();
+    const isToday = day.toDateString() === now.toDateString();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
     const out: string[] = [];
     for (const w of workingHours.filter((x) => x.barber_id === barberId && x.weekday === wd)) {
       for (let t = w.start_min; t + SLOT_MIN <= w.end_min; t += SLOT_MIN) {
+        if (isToday && t <= nowMin) continue; // já passou hoje
         out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
       }
     }
