@@ -22,11 +22,12 @@ export function PaymentNotice() {
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-wash text-accent">
             <Wallet size={20} />
           </span>
-          <h3 className="text-h4 font-semibold text-text">Pagamento no local</h3>
+          <h3 className="text-h4 font-semibold text-text">Informações sobre o pagamento</h3>
         </div>
         <p className="text-body leading-relaxed text-text-2">
-          O pagamento é feito no local após o atendimento — dinheiro, PIX ou cartão. Vai pagar em
-          dinheiro? Se precisar de troco, avise o barbeiro ao chegar. Aproveite! ✂️
+          No momento, trabalhamos apenas com pagamento no local pelo serviço selecionado. Aceitamos
+          cartão (crédito ou débito), PIX e dinheiro. Se desejar troco, informe durante a confirmação
+          do atendimento pelo WhatsApp. ✂️
         </p>
         <Button className="mt-5 w-full" onClick={() => setOpen(false)}>
           Entendi
