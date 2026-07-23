@@ -24,11 +24,8 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
   }
 
   async function onAccept() {
+    setTermsOpen(false); // fecha o modal ao aceitar — erros aparecem no formulário, não atrás dele
     setError(null);
-    if (form.password.length < 8) {
-      setError("A senha deve ter ao menos 8 caracteres.");
-      return;
-    }
     setLoading(true);
     try {
       const data = await signUpWithPassword(form.email, form.password, {
@@ -87,6 +84,10 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
         onSubmit={(e) => {
           e.preventDefault();
           setError(null);
+          if (form.password.length < 8) {
+            setError("A senha deve ter ao menos 8 caracteres.");
+            return;
+          }
           setTermsOpen(true);
         }}
         className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-7 shadow-lg"
