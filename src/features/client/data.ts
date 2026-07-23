@@ -156,26 +156,30 @@ export async function getProducts() {
   return data ?? [];
 }
 
-/** Agendamentos do cliente (próximos + passados). */
+/** Retiradas de produto solicitadas pelo cliente (para o histórico). */
+export async function getMyReservations() {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return [];
+  const { data } = await supabase
+    .from("product_reservations")
+    .select("id, qty, status, created_at, products(name, price_brl)")
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  return data ?? [];
+}
+
+/** Todos os agendamentos do cliente (a página agrupa em hoje/futuros/passados/cancelados). */
 export async function getMyAppointments() {
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();
-  if (!client) return { upcoming: [], past: [] };
-  const nowIso = new Date().toISOString();
-  const [up, past] = await Promise.all([
-    supabase
-      .from("appointments")
-      .select("id, start_at, status, barbers(name), services(name), combo_plans(name)")
-      .eq("client_id", client.id)
-      .gte("start_at", nowIso)
-      .order("start_at", { ascending: true }),
-    supabase
-      .from("appointments")
-      .select("id, start_at, status, barbers(name), services(name), combo_plans(name)")
-      .eq("client_id", client.id)
-      .lt("start_at", nowIso)
-      .order("start_at", { ascending: false })
-      .limit(10),
-  ]);
-  return { upcoming: up.data ?? [], past: past.data ?? [] };
+  if (!client) return [];
+  const { data } = await supabase
+    .from("appointments")
+    .select("id, start_at, status, consumed_from_plan, barbers(name), services(name), combo_plans(name)")
+    .eq("client_id", client.id)
+    .order("start_at", { ascending: false })
+    .limit(100);
+  return data ?? [];
 }

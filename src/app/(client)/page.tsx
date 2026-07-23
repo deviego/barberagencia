@@ -96,7 +96,7 @@ export default async function ClientHome() {
 
       {/* Atalhos */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Shortcut href="/meu-plano" icon={<CreditCard size={22} />} label="Meu plano" />
+        {sub && combo && <Shortcut href="/meu-plano" icon={<CreditCard size={22} />} label="Meu plano" />}
         <Shortcut href="/agendamentos" icon={<CalendarClock size={22} />} label="Agendamentos" />
         <Shortcut href="/produtos" icon={<ShoppingBag size={22} />} label="Produtos" />
         <Shortcut href="/suporte" icon={<Headphones size={22} />} label="Suporte" />

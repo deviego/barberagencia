@@ -13,6 +13,7 @@ export default async function ClientLayout({ children }: { children: React.React
   if (user.role === "UNIT_ADMIN") redirect("/admin");
 
   const [tenant, balance] = await Promise.all([getCurrentTenant(), getActivePlanBalance()]);
+  const hasPlan = balance !== null; // sem assinatura ativa → oculta "Meu plano"
   // Com plano e saldo > 0, "Agendar" vai direto ao horário; senão, escolhe serviço.
   const agendarHref = (balance ?? 0) > 0 ? "/agendar" : "/servicos";
   return (
@@ -25,9 +26,10 @@ export default async function ClientLayout({ children }: { children: React.React
         userEmail={user.email}
         avatarUrl={user.avatarUrl}
         agendarHref={agendarHref}
+        hasPlan={hasPlan}
       />
       <main className="mx-auto w-full max-w-3xl px-5 pb-28 pt-6 md:pb-10">{children}</main>
-      <BottomNav agendarHref={agendarHref} />
+      <BottomNav agendarHref={agendarHref} hasPlan={hasPlan} />
     </div>
   );
 }

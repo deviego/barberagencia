@@ -3,7 +3,8 @@ import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { RequestCard, type RequestRow } from "@/features/admin/components/request-card";
 import { PlanRequestCard, type PlanRequestRow } from "@/features/admin/components/plan-request-card";
-import { listRequests, getRecentCancellations, getPlanRequests } from "@/features/admin/data";
+import { ReservationCard, type ReservationRow } from "@/features/admin/components/reservation-card";
+import { listRequests, getRecentCancellations, getPlanRequests, getProductReservations } from "@/features/admin/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -11,9 +12,10 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 export default async function SolicitacoesPage() {
-  const [requests, planRequests, cancellations] = await Promise.all([
+  const [requests, planRequests, reservations, cancellations] = await Promise.all([
     listRequests() as unknown as Promise<RequestRow[]>,
     getPlanRequests() as unknown as Promise<PlanRequestRow[]>,
+    getProductReservations() as unknown as Promise<ReservationRow[]>,
     getRecentCancellations(),
   ]);
   const cancels = cancellations as {
@@ -58,6 +60,23 @@ export default async function SolicitacoesPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             {planRequests.map((r) => (
               <PlanRequestCard key={r.id} req={r} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Retiradas de produto */}
+      {reservations.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <div className="text-overline uppercase text-text-muted">Retiradas de produto</div>
+            <p className="text-caption text-text-muted">
+              Clientes que solicitaram produtos para retirar na barbearia.
+            </p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {reservations.map((r) => (
+              <ReservationCard key={r.id} res={r} />
             ))}
           </div>
         </div>

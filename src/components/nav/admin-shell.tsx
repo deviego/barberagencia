@@ -70,11 +70,12 @@ export function AdminShell({
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     async function refresh() {
-      const [appts, plans] = await Promise.all([
+      const [appts, plans, reservas] = await Promise.all([
         supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "REQUESTED"),
         supabase.from("plan_requests").select("id", { count: "exact", head: true }).eq("status", "PENDING"),
+        supabase.from("product_reservations").select("id", { count: "exact", head: true }).eq("status", "RESERVED"),
       ]);
-      const next = (appts.count ?? 0) + (plans.count ?? 0);
+      const next = (appts.count ?? 0) + (plans.count ?? 0) + (reservas.count ?? 0);
       if (next > prevCount.current) playBeep();
       prevCount.current = next;
       setCount(next);
@@ -83,6 +84,7 @@ export function AdminShell({
       .channel("admin-pending")
       .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "plan_requests" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "product_reservations" }, refresh)
       .subscribe();
     return () => {
       supabase.removeChannel(channel);

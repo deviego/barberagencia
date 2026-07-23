@@ -264,6 +264,32 @@ export async function fetchClientDetail(id: string) {
   return getClientDetail(id);
 }
 
+/** Marca uma retirada de produto como entregue (PICKED_UP). */
+export async function markReservationPickedUp(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("product_reservations")
+    .update({ status: "PICKED_UP" })
+    .eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/solicitacoes");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Cancela uma retirada de produto. */
+export async function cancelReservation(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("product_reservations")
+    .update({ status: "CANCELLED" })
+    .eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/solicitacoes");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
 /** Salva a foto (avatar) de um cliente (upload feito no browser). */
 export async function updateClientAvatar(clientId: string, avatarUrl: string) {
   const supabase = await createSupabaseServerClient();

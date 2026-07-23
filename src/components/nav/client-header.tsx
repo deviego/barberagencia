@@ -16,6 +16,7 @@ export function ClientHeader({
   userEmail,
   avatarUrl,
   agendarHref = "/servicos",
+  hasPlan = true,
 }: {
   logoText: string;
   logoUrl?: string | null;
@@ -24,9 +25,11 @@ export function ClientHeader({
   userEmail?: string | null;
   avatarUrl?: string | null;
   agendarHref?: string;
+  hasPlan?: boolean;
 }) {
   const pathname = usePathname();
   const initials = getInitials(userName, userEmail);
+  const navItems = CLIENT_NAV.filter((i) => hasPlan || i.href !== "/meu-plano");
   return (
     <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-5 py-3 md:px-8">
       <Link href="/" className="flex items-center gap-3 text-text">
@@ -35,7 +38,7 @@ export function ClientHeader({
       </Link>
 
       <nav className="hidden items-center gap-1 md:flex">
-        {CLIENT_NAV.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon }) => {
           const target = href === "/servicos" ? agendarHref : href;
           const active = pathname === target;
           return (

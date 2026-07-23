@@ -230,14 +230,26 @@ export async function getPlanRequests() {
   return data ?? [];
 }
 
-/** Contagem de itens pendentes (solicitações de agendamento + pedidos de plano). */
+/** Contagem de itens pendentes (agendamentos + pedidos de plano + retiradas de produto). */
 export async function getPendingCount() {
   const supabase = await createSupabaseServerClient();
-  const [appts, plans] = await Promise.all([
+  const [appts, plans, reservas] = await Promise.all([
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "REQUESTED"),
     supabase.from("plan_requests").select("id", { count: "exact", head: true }).eq("status", "PENDING"),
+    supabase.from("product_reservations").select("id", { count: "exact", head: true }).eq("status", "RESERVED"),
   ]);
-  return (appts.count ?? 0) + (plans.count ?? 0);
+  return (appts.count ?? 0) + (plans.count ?? 0) + (reservas.count ?? 0);
+}
+
+/** Retiradas de produto pendentes (RESERVED) do tenant. */
+export async function getProductReservations() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("product_reservations")
+    .select("id, qty, created_at, clients(name), products(name, price_brl)")
+    .eq("status", "RESERVED")
+    .order("created_at", { ascending: true });
+  return data ?? [];
 }
 
 /** Detalhe do cliente: dados + plano ativo + histórico de serviços. */
