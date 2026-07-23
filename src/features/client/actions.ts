@@ -167,6 +167,53 @@ export async function updateProfile(values: { fullName: string; phone: string; a
   return { ok: true as const };
 }
 
+const EDITAVEL = ["REQUESTED", "CONFIRMED", "ALT_OFFERED"];
+
+/** Cliente adiciona um item (serviço/produto) à própria comanda (agendamento futuro, não iniciado). */
+export async function addComandaItemClient(
+  appointmentId: string,
+  item: { kind: "service" | "product"; refId: string | null; name: string; priceBRL: number; qty: number; durationMin?: number }
+) {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return { ok: false as const, error: "Cliente não encontrado" };
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select("id, status, service_started_at, client_id")
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (!appt || appt.client_id !== client.id) return { ok: false as const, error: "Pedido não encontrado" };
+  if (appt.service_started_at || !EDITAVEL.includes(appt.status as string))
+    return { ok: false as const, error: "Este pedido não pode mais ser alterado." };
+
+  const { error } = await supabase.from("appointment_items").insert({
+    appointment_id: appointmentId,
+    tenant_id: client.tenant_id,
+    kind: item.kind,
+    ref_id: item.refId,
+    name: item.name,
+    price_brl: item.priceBRL,
+    qty: item.qty,
+    duration_min: item.durationMin ?? 0,
+    covered_by_plan: false,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/pedidos");
+  revalidatePath("/agendamentos");
+  revalidatePath("/");
+  return { ok: true as const };
+}
+
+/** Cliente remove um item que adicionou (RLS bloqueia o item coberto pelo plano / iniciado). */
+export async function removeComandaItemClient(itemId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("appointment_items").delete().eq("id", itemId);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/pedidos");
+  revalidatePath("/agendamentos");
+  return { ok: true as const };
+}
+
 /** Reserva um produto para retirada. */
 export async function reserveProduct(productId: string, qty = 1) {
   const supabase = await createSupabaseServerClient();
