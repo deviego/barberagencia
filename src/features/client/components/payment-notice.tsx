@@ -26,7 +26,7 @@ export function PaymentNotice() {
         </div>
         <p className="text-body leading-relaxed text-text-2">
           O pagamento do serviço é realizado diretamente no local. Aceitamos cartões, PIX ou dinheiro
-          — se precisar de troco, por favor, solicite aqui antecipadamente no WhatsApp. ✂️
+          — se precisar de troco, por favor, solicite antecipadamente no WhatsApp.
         </p>
         <Button className="mt-5 w-full" onClick={() => setOpen(false)}>
           Entendi
