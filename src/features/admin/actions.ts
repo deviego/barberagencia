@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getClientDetail } from "./data";
+import { notifyAppointmentConfirmed } from "@/server/notifications/notify";
 
 async function setStatus(
   id: string,
@@ -17,9 +18,17 @@ async function setStatus(
   return { ok: !error, error: error?.message };
 }
 
-/** Aceitar solicitação → CONFIRMED (notificação = stub por ora). */
+/** Aceitar solicitação → CONFIRMED + avisa o cliente por e-mail (se configurado). */
 export async function acceptAppointment(id: string) {
-  return setStatus(id, "CONFIRMED");
+  const res = await setStatus(id, "CONFIRMED");
+  if (res.ok) {
+    try {
+      await notifyAppointmentConfirmed(id);
+    } catch {
+      /* não bloqueia a confirmação se a notificação falhar */
+    }
+  }
+  return res;
 }
 
 /** Liberar horário (expirado/recusado). */

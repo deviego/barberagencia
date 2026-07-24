@@ -7,7 +7,7 @@ export async function listRequests() {
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_at, status, request_expires_at, consumed_from_plan, clients(name), barbers(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)"
+      "id, start_at, status, request_expires_at, consumed_from_plan, clients(name, phone), barbers(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)"
     )
     .eq("status", "REQUESTED")
     .order("start_at", { ascending: true });

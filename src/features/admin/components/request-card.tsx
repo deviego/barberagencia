@@ -4,10 +4,12 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Check, Clock, Scissors } from "lucide-react";
+import { Check, Clock, MessageCircle, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL } from "@/lib/utils";
+import { waLink } from "@/lib/contact";
+import { fillTemplate, getTemplate, APP_LINK } from "@/features/messages/templates";
 import { acceptAppointment, expireAppointment } from "@/features/admin/actions";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -28,7 +30,7 @@ export interface RequestRow {
   start_at: string;
   request_expires_at: string | null;
   consumed_from_plan: boolean;
-  clients: { name: string } | { name: string }[] | null;
+  clients: { name: string; phone?: string | null } | { name: string; phone?: string | null }[] | null;
   barbers: { name: string } | { name: string }[] | null;
   services: { name: string } | { name: string }[] | null;
   combo_plans: { name: string } | { name: string }[] | null;
@@ -43,6 +45,8 @@ export function RequestCard({ req }: { req: RequestRow }) {
   const service = one(req.services) ?? one(req.combo_plans);
   const items = req.appointment_items ?? [];
   const total = items.reduce((s, it) => (it.covered_by_plan ? s : s + it.price_brl * it.qty), 0);
+  const phone = (client as { phone?: string | null } | null)?.phone ?? null;
+  const waText = fillTemplate(getTemplate("confirmed")?.body ?? "", { nome: client?.name ?? "", link: APP_LINK });
 
   const expiresMs = req.request_expires_at ? new Date(req.request_expires_at).getTime() : 0;
   const [now, setNow] = useState(() => Date.now());
@@ -139,6 +143,19 @@ export function RequestCard({ req }: { req: RequestRow }) {
           Liberar horário
         </Button>
       </div>
+
+      {phone && (
+        <a
+          href={waLink(phone, waText)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-caption font-semibold text-white transition-transform hover:scale-[1.01]"
+          style={{ background: "#25D366" }}
+        >
+          <MessageCircle size={15} />
+          Avisar no WhatsApp
+        </a>
+      )}
     </div>
   );
 }

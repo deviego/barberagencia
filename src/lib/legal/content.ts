@@ -4,8 +4,8 @@
  */
 
 export const LEGAL_CONTACT = {
-  whatsapp: "(21) 99088-3359",
-  whatsappLink: "https://wa.me/5521990883359",
+  whatsapp: "(21) 98312-0628",
+  whatsappLink: "https://wa.me/5521983120628",
   instagram: "@oliveira_01_barbearia",
   updatedAt: "20 de julho de 2026",
 };

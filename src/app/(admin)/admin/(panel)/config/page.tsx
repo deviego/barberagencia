@@ -26,7 +26,7 @@ export default async function ConfigPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Telefone</Label>
-            <Input defaultValue="+55 (21) 99088-3359" />
+            <Input defaultValue="+55 (21) 98312-0628" />
           </div>
         </div>
         <div className="flex flex-col gap-1.5">

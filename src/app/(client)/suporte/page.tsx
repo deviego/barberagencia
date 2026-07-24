@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MessageCircle, Send, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SUPPORT_WHATSAPP } from "@/lib/contact";
 
 const QUICK_REPLIES = [
   "Quero remarcar um horário",
@@ -21,7 +22,7 @@ export default function SuportePage() {
 
       {/* WhatsApp */}
       <a
-        href="https://wa.me/5521990883359"
+        href={`https://wa.me/${SUPPORT_WHATSAPP}`}
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center gap-3 rounded-lg p-4 text-white shadow-md transition-transform hover:scale-[1.01]"

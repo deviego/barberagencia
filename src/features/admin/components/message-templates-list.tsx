@@ -4,8 +4,9 @@ import { useState } from "react";
 import { Check, Copy, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MESSAGE_TEMPLATES, fillTemplate } from "@/features/messages/templates";
+import { SUPPORT_WHATSAPP } from "@/lib/contact";
 
-const WHATSAPP_NUMBER = "5521990883359";
+const WHATSAPP_NUMBER = SUPPORT_WHATSAPP;
 
 export function MessageTemplatesList() {
   const [copied, setCopied] = useState<string | null>(null);
