@@ -1,15 +1,10 @@
-import { redirect } from "next/navigation";
 import { MasterSidebar } from "@/components/nav/master-sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Badge } from "@/components/ui/badge";
-import { getSessionUser } from "@/lib/auth/session";
-import { isMaster } from "@/lib/rbac";
 
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  if (!user.role || !isMaster(user.role)) redirect("/");
-
+  // TEMP: rota master pública por enquanto (guard de papel MASTER desativado).
+  // Reativar depois: exigir getSessionUser() + isMaster(user.role).
   return (
     <div className="flex min-h-screen">
       <MasterSidebar />
