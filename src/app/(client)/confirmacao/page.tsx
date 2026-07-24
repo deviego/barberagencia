@@ -13,8 +13,8 @@ export default function ConfirmacaoPage() {
         <h1 className="font-display text-h2 uppercase leading-none text-text">Solicitação enviada</h1>
         <Badge variant="warning">Aguardando confirmação</Badge>
         <p className="mt-1 max-w-md text-body text-text-2">
-          A barbearia vai confirmar seu horário — normalmente em até <strong>10 minutos</strong>.
-          Você será avisado assim que for confirmado.
+          Em breve você será atendido. Confira o <strong>e-mail cadastrado</strong> (caixa de entrada
+          ou spam) e também o <strong>WhatsApp cadastrado</strong>.
         </p>
       </div>
 
@@ -24,8 +24,11 @@ export default function ConfirmacaoPage() {
         <ul className="flex flex-col gap-1 text-caption text-text-2">
           <li>• Pelo app: cancele com no mínimo 10 minutos de antecedência.</li>
           <li>• Imprevisto? Avise no WhatsApp com até 30 minutos antes do horário.</li>
-          <li>• Faltar sem avisar pode restringir novos agendamentos online.</li>
         </ul>
+        <div className="mt-3 rounded-md border border-danger bg-danger-bg p-3 text-caption font-bold uppercase text-danger-strong">
+          Em caso de falta sem aviso prévio, o processo de agendamento poderá ser desativado pelo
+          aplicativo.
+        </div>
       </div>
 
       <Link href="/agendamentos" className="w-full max-w-xs">
