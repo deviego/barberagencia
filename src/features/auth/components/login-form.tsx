@@ -7,6 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signInWithPassword } from "../services/auth-service";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
+/** Rota de destino conforme o papel do usuário. */
+function homeForRole(role: string | null | undefined) {
+  if (role === "MASTER") return "/master";
+  if (role === "NETWORK_ADMIN") return "/rede";
+  if (role === "UNIT_ADMIN") return "/admin";
+  return "/";
+}
 
 export function LoginForm({ showSignup = true }: { showSignup?: boolean }) {
   const router = useRouter();
@@ -21,7 +30,22 @@ export function LoginForm({ showSignup = true }: { showSignup?: boolean }) {
     setLoading(true);
     try {
       await signInWithPassword(email, password);
-      router.push("/");
+      // Roteia pelo papel: admin → /admin, master → /master, rede → /rede, cliente → /
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      let dest = "/";
+      if (user) {
+        const { data: m } = await supabase
+          .from("memberships")
+          .select("role")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+        dest = homeForRole(m?.role as string | undefined);
+      }
+      router.push(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao entrar");
     } finally {
