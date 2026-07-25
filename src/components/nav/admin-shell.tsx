@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Building2, ChevronDown, Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
+import { MobileNav } from "@/components/nav/mobile-nav";
 import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { ADMIN_NAV } from "@/features/admin/nav";
@@ -59,12 +60,19 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(true);
+  const [mobileNav, setMobileNav] = useState(false);
   const [count, setCount] = useState(pendingCount);
   const prevCount = useRef(pendingCount);
 
   const items = ADMIN_NAV.filter((i) => !i.feature || hasEntitlement(plan, i.feature));
   const shortName = name.replace(/^Barbearia\s+/i, "");
   const initials = getInitials(userName, userEmail);
+  const mobileItems = items.map((i) => ({
+    href: i.href,
+    label: i.label,
+    icon: i.icon,
+    badge: i.href === "/admin/solicitacoes" && count > 0 ? count : undefined,
+  }));
 
   // Realtime: atualiza o contador de solicitações e toca som ao chegar algo novo.
   useEffect(() => {
@@ -93,11 +101,24 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-screen flex-col">
+      <MobileNav
+        open={mobileNav}
+        onClose={() => setMobileNav(false)}
+        items={mobileItems}
+        pathname={pathname}
+        rootHref="/admin"
+        title={name}
+        footer={<LogoutButton variant="sidebar" />}
+      />
+
       {/* Topbar full-width */}
       <header className="sticky top-0 z-drawer flex items-center justify-between gap-4 border-b border-border bg-surface px-5 py-2.5">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setOpen((o) => !o)}
+            onClick={() => {
+              setOpen((o) => !o); // desktop: colapsa a sidebar
+              setMobileNav((m) => !m); // mobile: abre o menu (overlay é md:hidden)
+            }}
             aria-label="Alternar menu"
             className="flex rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
           >

@@ -25,12 +25,12 @@ export function BottomNav({
             key={href}
             href={target}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 rounded-md py-1.5 text-caption transition-colors",
+              "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-md py-1.5 transition-colors",
               active ? "text-accent" : "text-text-muted hover:text-text-2"
             )}
           >
-            <Icon size={20} />
-            <span className="text-[11px]">{label}</span>
+            <Icon size={20} className="shrink-0" />
+            <span className="w-full truncate text-center text-[10px] leading-none">{label}</span>
           </Link>
         );
       })}

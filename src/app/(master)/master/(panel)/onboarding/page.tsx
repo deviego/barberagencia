@@ -41,7 +41,7 @@ export default function OnboardingPage() {
               >
                 {i < step ? <Check size={16} /> : i + 1}
               </span>
-              <span className={cn("text-caption", i === step ? "text-text" : "text-text-muted")}>{s}</span>
+              <span className={cn("hidden text-caption sm:inline", i === step ? "text-text" : "text-text-muted")}>{s}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div className={cn("mx-3 h-px flex-1", i < step ? "bg-accent" : "bg-border")} />
@@ -95,7 +95,7 @@ export default function OnboardingPage() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label>Cor primária (acento)</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {PRESET_COLORS.map((c) => (
                     <button
                       key={c}

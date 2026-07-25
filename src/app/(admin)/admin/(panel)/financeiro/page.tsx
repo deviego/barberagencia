@@ -60,7 +60,7 @@ export default async function FinanceiroPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-border bg-surface p-5">
           <div className="mb-4 text-overline uppercase text-text-muted">Recebimentos por método</div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
             <div
               className="relative flex h-40 w-40 items-center justify-center rounded-full"
               style={{ background: `conic-gradient(${segments})` }}

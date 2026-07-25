@@ -59,10 +59,10 @@ export default async function MeuPlanoPage() {
           </div>
           <Badge variant="success">Assinatura ativa</Badge>
         </div>
-        <div className="flex items-center gap-5">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
           <CutMeter remaining={sub.saldo_cortes} total={combo.cuts} size={110} />
-          <div className="flex flex-col gap-1 tabular">
-            <div className="text-h3 text-accent">{formatBRL(combo.price_brl)}/mês</div>
+          <div className="flex flex-col gap-1 text-center tabular sm:text-left">
+            <div className="text-h4 text-accent sm:text-h3">{formatBRL(combo.price_brl)}/mês</div>
             <div className="text-caption text-text-muted">Renova todo dia {sub.billing_day}</div>
           </div>
         </div>

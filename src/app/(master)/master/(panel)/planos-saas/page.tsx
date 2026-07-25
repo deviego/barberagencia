@@ -156,23 +156,27 @@ export default function PlanosSaasPage() {
 
       {/* Comparativo */}
       <div className="overflow-hidden rounded-lg border border-border bg-surface">
-        <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-2 border-b border-border px-5 py-3 text-overline uppercase text-text-muted">
-          <span>Comparativo</span>
-          <span>Personal</span>
-          <span className="text-accent">Essencial</span>
-          <span>Advance</span>
-        </div>
-        {PLAN_TABLE.map((row) => (
-          <div
-            key={row.label}
-            className="grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center gap-2 border-b border-border-subtle px-5 py-3 text-body transition-colors last:border-b-0 hover:bg-accent-wash"
-          >
-            <span className="font-medium text-text">{row.label}</span>
-            <span className="text-text-2">{row.a}</span>
-            <span className="font-semibold text-accent">{row.b}</span>
-            <span className="text-text-2">{row.c}</span>
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-2 border-b border-border px-5 py-3 text-overline uppercase text-text-muted">
+              <span>Comparativo</span>
+              <span>Personal</span>
+              <span className="text-accent">Essencial</span>
+              <span>Advance</span>
+            </div>
+            {PLAN_TABLE.map((row) => (
+              <div
+                key={row.label}
+                className="grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center gap-2 border-b border-border-subtle px-5 py-3 text-body transition-colors last:border-b-0 hover:bg-accent-wash"
+              >
+                <span className="font-medium text-text">{row.label}</span>
+                <span className="text-text-2">{row.a}</span>
+                <span className="font-semibold text-accent">{row.b}</span>
+                <span className="text-text-2">{row.c}</span>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
 
       <p className="text-caption text-text-muted">
