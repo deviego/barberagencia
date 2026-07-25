@@ -9,10 +9,23 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signUpWithPassword } from "../services/auth-service";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { maskPhoneBR } from "@/lib/masks";
 
-export function AcceptInviteForm({ token, email, name }: { token: string; email: string; name: string }) {
+export function AcceptInviteForm({
+  token,
+  email,
+  name,
+  phone,
+}: {
+  token: string;
+  email: string;
+  name: string;
+  phone: string;
+}) {
   const router = useRouter();
+  const [fullName, setFullName] = useState(name);
   const [mail, setMail] = useState(email);
+  const [tel, setTel] = useState(phone);
   const [pw, setPw] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +40,7 @@ export function AcceptInviteForm({ token, email, name }: { token: string; email:
     }
     setLoading(true);
     try {
-      const data = await signUpWithPassword(mail, pw, { full_name: name });
+      const data = await signUpWithPassword(mail, pw, { full_name: fullName, phone: tel });
       const supabase = createSupabaseBrowserClient();
       await supabase.rpc("accept_invite", { p_token: token });
       if (data.session) router.push("/");
@@ -58,8 +71,22 @@ export function AcceptInviteForm({ token, email, name }: { token: string; email:
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
+        <Label>Nome completo</Label>
+        <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+      </div>
+      <div className="flex flex-col gap-1.5">
         <Label>E-mail</Label>
         <Input type="email" value={mail} onChange={(e) => setMail(e.target.value)} required />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Telefone</Label>
+        <Input
+          value={tel}
+          onChange={(e) => setTel(maskPhoneBR(e.target.value))}
+          inputMode="tel"
+          maxLength={15}
+          placeholder="(11) 91234-5678"
+        />
       </div>
       <div className="flex flex-col gap-1.5">
         <Label>Crie sua senha</Label>

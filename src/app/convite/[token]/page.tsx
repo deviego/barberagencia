@@ -9,7 +9,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
   const [tenant, supabase] = await Promise.all([getCurrentTenant(), createSupabaseServerClient()]);
   const { data } = await supabase.rpc("invite_status", { p_token: token });
   const info = (Array.isArray(data) ? data[0] : data) as
-    | { valid: boolean; email: string | null; name: string | null }
+    | { valid: boolean; email: string | null; name: string | null; phone: string | null }
     | undefined;
 
   return (
@@ -26,7 +26,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
                 Você foi convidado{info.name ? `, ${info.name.split(" ")[0]}` : ""}! Crie seu acesso para
                 agendar seus cortes.
               </p>
-              <AcceptInviteForm token={token} email={info.email ?? ""} name={info.name ?? ""} />
+              <AcceptInviteForm token={token} email={info.email ?? ""} name={info.name ?? ""} phone={info.phone ?? ""} />
             </>
           ) : (
             <div className="flex flex-col items-center gap-3 text-center">
