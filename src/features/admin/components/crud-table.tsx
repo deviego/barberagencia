@@ -190,7 +190,41 @@ export function CrudTable({
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border">
+      {/* Mobile: cards */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {filtered.length === 0 && (
+          <p className="rounded-lg border border-dashed border-border bg-surface p-8 text-center text-text-muted">
+            Nenhum registro encontrado.
+          </p>
+        )}
+        {filtered.map((row) => (
+          <div key={row.id} className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 text-body font-semibold text-text">{renderCell(columns[0], row)}</div>
+              <div className="flex shrink-0 gap-1">
+                <button onClick={() => (detail ? setViewing(row) : openEdit(row))} className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-accent-wash hover:text-accent" aria-label="Ver">
+                  <Eye size={16} />
+                </button>
+                <button onClick={() => openEdit(row)} className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-accent-wash hover:text-accent" aria-label="Editar">
+                  <Pencil size={16} />
+                </button>
+                <button onClick={() => setDeleting(row)} className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-inset hover:text-danger" aria-label="Excluir">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+            {columns.slice(1).map((c) => (
+              <div key={c.key} className="flex items-center justify-between gap-3 border-t border-border-subtle pt-2 text-body">
+                <span className="text-caption uppercase text-text-muted">{c.label}</span>
+                <span className="text-right text-text">{renderCell(c, row)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: tabela */}
+      <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
         <table className="w-full text-body">
           <thead>
             <tr className="border-b border-border bg-surface text-left text-caption uppercase text-text-muted">
