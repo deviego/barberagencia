@@ -273,6 +273,29 @@ export async function fetchClientDetail(id: string) {
   return getClientDetail(id);
 }
 
+/** Salva (substitui) os horários de trabalho de um barbeiro. */
+export async function saveWorkingHours(
+  barberId: string,
+  entries: { weekday: number; startMin: number; endMin: number }[]
+) {
+  const supabase = await createSupabaseServerClient();
+  const { error: delErr } = await supabase.from("working_hours").delete().eq("barber_id", barberId);
+  if (delErr) return { ok: false as const, error: delErr.message };
+  const valid = entries.filter((e) => e.endMin > e.startMin);
+  if (valid.length) {
+    const rows = valid.map((e) => ({
+      barber_id: barberId,
+      weekday: e.weekday,
+      start_min: e.startMin,
+      end_min: e.endMin,
+    }));
+    const { error } = await supabase.from("working_hours").insert(rows);
+    if (error) return { ok: false as const, error: error.message };
+  }
+  revalidatePath("/admin/barbeiros");
+  return { ok: true as const };
+}
+
 /** Marca uma retirada de produto como entregue (PICKED_UP). */
 export async function markReservationPickedUp(id: string) {
   const supabase = await createSupabaseServerClient();
