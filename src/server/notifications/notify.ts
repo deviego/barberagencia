@@ -94,9 +94,9 @@ export async function notifyServiceFinished(appointmentId: string) {
   const msg =
     `✂️ *${BRAND}*\n` +
     `${nome ? `${nome}, ` : ""}*muito obrigado pela preferência!* 🙏\n\n` +
-    (originais.length ? `Serviços:\n${fmtList(originais)}\n` : "") +
-    (adicionais.length ? `\nAdicionais:\n${fmtList(adicionais)}\n` : "") +
-    (total > 0 ? `\nTotal: *${formatBRL(total)}*\n` : "") +
+    (originais.length ? `📋 Serviços:\n${fmtList(originais)}\n` : "") +
+    (adicionais.length ? `\n➕ Adicionais:\n${fmtList(adicionais)}\n` : "") +
+    (total > 0 ? `\n💰 Total pago: *${formatBRL(total)}*\n` : "") +
     `\nO que você achou do atendimento? Sua opinião ajuda muito a gente a melhorar!\n\n` +
     `Volte sempre! ✂️🔥`;
   const w = await sendWhatsApp(phone, msg);
