@@ -116,16 +116,23 @@ export async function notifyPlanRequested(clientId: string, comboPlanId: string)
   const supabase = await createSupabaseServerClient();
   const [{ data: client }, { data: combo }] = await Promise.all([
     supabase.from("clients").select("name, phone, tenant_id").eq("id", clientId).maybeSingle(),
-    supabase.from("combo_plans").select("name").eq("id", comboPlanId).maybeSingle(),
+    supabase.from("combo_plans").select("name, cuts, scope, price_brl").eq("id", comboPlanId).maybeSingle(),
   ]);
   const phone = client?.phone ?? null;
   if (!phone) return;
   const nome = (client?.name ?? "").split(" ")[0];
   const plano = combo?.name ?? "plano";
+  const beneficios = combo
+    ? planBenefits(combo.cuts as number, combo.scope as string | null)
+        .map((b) => `• ${b}`)
+        .join("\n")
+    : "";
 
   const msg =
     `✂️ *${BRAND}*\n` +
     `Olá${nome ? `, ${nome}` : ""}! Recebemos sua *solicitação de assinatura* do *${plano}*. 📋\n\n` +
+    (beneficios ? `${beneficios}\n\n` : "") +
+    (combo ? `💰 Mensalidade: *${formatBRL(combo.price_brl as number)}/mês*\n\n` : "") +
     `Assim que a barbearia confirmar, você recebe a confirmação por aqui. 💈`;
   const w = await sendWhatsApp(phone, msg);
   await supabase.from("notification_log").insert({
