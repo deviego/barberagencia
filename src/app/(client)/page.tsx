@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarClock, CreditCard, Headphones, Scissors, ShoppingBag } from "lucide-react";
+import { CalendarClock, CreditCard, Headphones, Plus, Scissors, ShoppingBag } from "lucide-react";
 import { CutMeter } from "@/components/cut-meter";
 import { StatusBadge, type AppointmentStatus } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,12 @@ export default async function ClientHome() {
             {format(new Date(next.start_at), "EEE, dd MMM · HH:mm", { locale: ptBR })}
             {nextBarber ? ` · com ${nextBarber.name}` : ""}
           </div>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-col gap-3">
+            <Link href="/pedidos">
+              <Button variant="outline" size="sm" className="w-full">
+                <Plus size={15} /> Adicionar serviço
+              </Button>
+            </Link>
             <AppointmentActions appointmentId={next.id} isPlan={!!combo} status={next.status} />
           </div>
         </div>
