@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Building2, ChevronDown, Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
+import { ViewAsClientButton } from "@/components/nav/view-as-client-button";
 import { MobileNav } from "@/components/nav/mobile-nav";
 import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
@@ -108,7 +109,12 @@ export function AdminShell({
         pathname={pathname}
         rootHref="/admin"
         title={name}
-        footer={<LogoutButton variant="sidebar" />}
+        footer={
+          <>
+            <ViewAsClientButton />
+            <LogoutButton variant="sidebar" />
+          </>
+        }
       />
 
       {/* Topbar full-width */}
@@ -202,7 +208,8 @@ export function AdminShell({
               </Link>
             );
           })}
-          <div className="mt-auto">
+          <div className="mt-auto flex flex-col gap-0.5">
+            {open && <ViewAsClientButton />}
             <LogoutButton variant="sidebar" className={open ? "justify-start" : "justify-center"} />
           </div>
         </aside>
