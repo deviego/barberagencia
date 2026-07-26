@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Scissors } from "lucide-react";
+import { Check, Clock, Scissors } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatBRL, cn } from "@/lib/utils";
+import { planBenefits } from "@/lib/plan";
 import { subscribeCombo } from "@/features/client/actions";
 
 interface Service { id: string; name: string; duration_min: number; price_brl: number }
@@ -47,7 +48,7 @@ export function ServicosView({ services, combos }: { services: Service[]; combos
             selected={selected === s.id}
             onSelect={() => setSelected(s.id)}
             title={s.name}
-            subtitle={`${s.duration_min} min`}
+            subtitle={`Tempo médio ~${s.duration_min} min`}
             price={formatBRL(s.price_brl)}
           />
         ))}
@@ -61,7 +62,7 @@ export function ServicosView({ services, combos }: { services: Service[]; combos
             selected={selected === c.id}
             onSelect={() => setSelected(c.id)}
             title={c.name}
-            subtitle={`${c.cuts} cortes/mês${c.scope ? ` · ${c.scope}` : ""}`}
+            benefits={planBenefits(c.cuts, c.scope)}
             price={`${formatBRL(c.price_brl)}/mês`}
             assinatura
           />
@@ -90,13 +91,15 @@ function Card({
   onSelect,
   title,
   subtitle,
+  benefits,
   price,
   assinatura,
 }: {
   selected: boolean;
   onSelect: () => void;
   title: string;
-  subtitle: string;
+  subtitle?: string;
+  benefits?: string[];
   price: string;
   assinatura?: boolean;
 }) {
@@ -105,7 +108,8 @@ function Card({
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex items-center gap-3 rounded-lg border bg-surface p-4 text-left transition-colors",
+        "flex gap-3 rounded-lg border bg-surface p-4 text-left transition-colors",
+        benefits ? "items-start" : "items-center",
         selected ? "border-2 border-accent bg-accent-wash" : "border-border hover:border-accent"
       )}
     >
@@ -113,14 +117,27 @@ function Card({
         <Scissors size={18} />
       </span>
       <div className="flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-body font-semibold text-text">{title}</span>
           {assinatura && <Badge variant="accent">Assinatura</Badge>}
           {selected && <Badge variant="success">Selecionado</Badge>}
         </div>
-        <div className="text-caption text-text-muted">{subtitle}</div>
+        {benefits ? (
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {benefits.map((b, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-caption text-text-2">
+                <Check size={13} className="mt-0.5 flex-shrink-0 text-accent" />
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="flex items-center gap-1 text-caption text-text-muted">
+            <Clock size={12} /> {subtitle}
+          </div>
+        )}
       </div>
-      <div className="text-body font-bold text-accent tabular">{price}</div>
+      <div className="whitespace-nowrap text-body font-bold text-accent tabular">{price}</div>
     </button>
   );
 }

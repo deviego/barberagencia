@@ -44,7 +44,8 @@ begin
 
   -- 4) Planos (combos) — adesão e desconto no texto (scope)
   insert into public.combo_plans (tenant_id, name, cuts, scope, price_brl, active) values
-    (t_id, 'Plano 1', 4, '5% de desconto nos produtos · adesão R$ 90', 140, true),
+    (t_id, 'Plano 1', 4,
+       '1ª mensalidade R$ 90 (adesão) · a partir do 2º mês R$ 140 · 5% de desconto nos produtos (cremes, bálsamos)', 140, true),
     (t_id, 'Plano 2 · Corte + Barba + Sobrancelha', 4,
-       'corte + barba + sobrancelha · 10% de desconto nos produtos · adesão R$ 180', 220, true);
+       'corte + barba + sobrancelha · 1ª mensalidade R$ 180 (adesão) · a partir do 2º mês R$ 220 · 10% de desconto nos produtos (cremes, bálsamos)', 220, true);
 end $$;

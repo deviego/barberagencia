@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { CutMeter } from "@/components/cut-meter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatBRL } from "@/lib/utils";
+import { planBenefits } from "@/lib/plan";
 import { MeuPlanoActions } from "@/features/client/components/meu-plano-actions";
 import { getMyPlan, getCatalog } from "@/features/client/data";
 
@@ -52,10 +54,17 @@ export default async function MeuPlanoPage() {
       )}
 
       <div className="rounded-lg border-2 border-accent bg-surface p-5">
-        <div className="mb-4 flex items-start justify-between">
+        <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="text-h4 font-semibold text-text">{combo.name}</div>
-            <div className="text-caption text-text-muted">{combo.scope}</div>
+            <ul className="mt-2 flex flex-col gap-1">
+              {planBenefits(combo.cuts, combo.scope).map((b, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-caption text-text-2">
+                  <Check size={13} className="mt-0.5 flex-shrink-0 text-accent" />
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
           </div>
           <Badge variant="success">Assinatura ativa</Badge>
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Minus, Package, Plus, Scissors } from "lucide-react";
+import { Check, Clock, Minus, Package, Plus, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBRL, cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -130,6 +130,8 @@ export function AgendarForm({
 
   const coveredIdx = usePlan ? 0 : -1; // 1º serviço
   const total = items.reduce((s, it, idx) => (idx === coveredIdx ? s : s + it.priceBRL * it.qty), 0);
+  // Tempo médio estimado do atendimento = soma da duração dos serviços escolhidos.
+  const estMin = serviceIds.reduce((s, id) => s + (services.find((x) => x.id === id)?.duration_min ?? 0), 0);
 
   function submit() {
     setError(null);
@@ -186,7 +188,8 @@ export function AgendarForm({
         <div className="flex flex-wrap gap-2">
           {services.map((s) => (
             <Chip key={s.id} active={serviceIds.includes(s.id)} onClick={() => toggleService(s.id)}>
-              {s.name} · {formatBRL(s.price_brl)}
+              {s.name}
+              {s.duration_min ? ` · ~${s.duration_min}min` : ""} · {formatBRL(s.price_brl)}
             </Chip>
           ))}
         </div>
@@ -327,6 +330,11 @@ export function AgendarForm({
               <span className="text-body font-semibold text-text">Total no local</span>
               <span className="text-h5 font-bold text-accent tabular">{formatBRL(total)}</span>
             </div>
+            {estMin > 0 && (
+              <p className="flex items-center gap-1 text-caption text-text-muted">
+                <Clock size={12} /> Tempo médio estimado ~{estMin} min
+              </p>
+            )}
             <p className="text-caption text-text-muted">Pagamento feito no local após o atendimento.</p>
           </div>
         )}
