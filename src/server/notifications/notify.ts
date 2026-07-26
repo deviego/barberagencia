@@ -4,6 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { SUPPORT_WHATSAPP_DISPLAY } from "@/lib/contact";
 import { sendEmail } from "./resend";
+import { sendWhatsApp } from "./whatsapp";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -36,14 +37,18 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: appt } = await supabase
     .from("appointments")
-    .select("id, start_at, tenant_id, clients(name, email), services(name), combo_plans(name), barbers(name)")
+    .select("id, start_at, tenant_id, clients(name, email, phone), services(name), combo_plans(name), barbers(name)")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return;
 
-  const client = one(appt.clients as { name: string; email: string | null }[] | { name: string; email: string | null });
+  const client = one(
+    appt.clients as
+      | { name: string; email: string | null; phone: string | null }[]
+      | { name: string; email: string | null; phone: string | null }
+  );
   const email = client?.email ?? null;
-  if (!email) return;
+  const phone = client?.phone ?? null;
 
   const nome = (client?.name ?? "").split(" ")[0];
   const servico =
@@ -53,26 +58,45 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
   const barber = one(appt.barbers as { name: string }[] | { name: string })?.name;
   const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
 
-  const html = emailShell(
-    "Agendamento confirmado ✂️",
-    `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
-       Olá${nome ? `, ${nome}` : ""}! Seu horário está <strong>confirmado</strong>.
-     </p>
-     <p style="color:#4a453d;font-size:15px;line-height:1.6;">
-       <strong>${servico}</strong><br/>${quando}${barber ? ` · com ${barber}` : ""}
-     </p>
-     <p style="color:#8a8578;font-size:13px;line-height:1.6;">
-       O pagamento é feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos
-       10 minutos de antecedência ou avise no WhatsApp.
-     </p>`
-  );
+  // E-mail (Resend)
+  if (email) {
+    const html = emailShell(
+      "Agendamento confirmado ✂️",
+      `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
+         Olá${nome ? `, ${nome}` : ""}! Seu horário está <strong>confirmado</strong>.
+       </p>
+       <p style="color:#4a453d;font-size:15px;line-height:1.6;">
+         <strong>${servico}</strong><br/>${quando}${barber ? ` · com ${barber}` : ""}
+       </p>
+       <p style="color:#8a8578;font-size:13px;line-height:1.6;">
+         O pagamento é feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos
+         10 minutos de antecedência ou avise no WhatsApp.
+       </p>`
+    );
+    const r = await sendEmail({ to: email, subject: `Agendamento confirmado — ${BRAND}`, html });
+    await supabase.from("notification_log").insert({
+      tenant_id: appt.tenant_id,
+      channel: "email",
+      template: "appointment_confirmed",
+      recipient: email,
+      status: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED",
+    });
+  }
 
-  const r = await sendEmail({ to: email, subject: `Agendamento confirmado — ${BRAND}`, html });
-  await supabase.from("notification_log").insert({
-    tenant_id: appt.tenant_id,
-    channel: "email",
-    template: "appointment_confirmed",
-    recipient: email,
-    status: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED",
-  });
+  // WhatsApp automático (Z-API)
+  if (phone) {
+    const waMsg =
+      `✂️ *${BRAND}*\n` +
+      `Olá${nome ? `, ${nome}` : ""}! Seu agendamento foi *confirmado*.\n` +
+      `${servico}\n${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
+      `O pagamento é feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos 10 minutos de antecedência.`;
+    const w = await sendWhatsApp(phone, waMsg);
+    await supabase.from("notification_log").insert({
+      tenant_id: appt.tenant_id,
+      channel: "whatsapp",
+      template: "appointment_confirmed",
+      recipient: phone,
+      status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+    });
+  }
 }
