@@ -2,6 +2,7 @@ import "server-only";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatBRL } from "@/lib/utils";
 import { SUPPORT_WHATSAPP_DISPLAY } from "@/lib/contact";
 import { sendEmail } from "./resend";
 import { sendWhatsApp } from "./whatsapp";
@@ -54,10 +55,14 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: appt } = await supabase
     .from("appointments")
-    .select("id, start_at, tenant_id, clients(name, email, phone), services(name), combo_plans(name), barbers(name)")
+    .select("id, start_at, tenant_id, clients(name, email, phone), services(name), combo_plans(name), barbers(name), appointment_items(price_brl, qty, covered_by_plan)")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return;
+
+  const items = (appt.appointment_items as { price_brl: number; qty: number; covered_by_plan: boolean }[] | null) ?? [];
+  const total = items.reduce((s, i) => (i.covered_by_plan ? s : s + Number(i.price_brl) * i.qty), 0);
+  const valorTxt = items.length === 0 ? "" : total > 0 ? `${formatBRL(total)} (no local)` : "incluído no plano";
 
   const client = one(
     appt.clients as
@@ -83,7 +88,7 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
          Olá${nome ? `, ${nome}` : ""}! Seu horário está <strong>confirmado</strong>.
        </p>
        <p style="color:#4a453d;font-size:15px;line-height:1.6;">
-         <strong>${servico}</strong><br/>${quando}${barber ? ` · com ${barber}` : ""}
+         <strong>${servico}</strong>${valorTxt ? ` — ${valorTxt}` : ""}<br/>${quando}${barber ? ` · com ${barber}` : ""}
        </p>
        <p style="color:#8a8578;font-size:13px;line-height:1.6;">
          O pagamento é feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos
@@ -104,9 +109,11 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
   if (phone) {
     const waMsg =
       `✂️ *${BRAND}*\n` +
-      `Olá${nome ? `, ${nome}` : ""}! Seu agendamento foi *confirmado*.\n` +
-      `${servico}\n${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
-      `O pagamento é feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos 10 minutos de antecedência.`;
+      `Olá${nome ? `, ${nome}` : ""}! *Seu agendamento foi confirmado.*\n\n` +
+      `📋 Serviço: *${servico}*\n` +
+      (valorTxt ? `💰 Valor: *${valorTxt}*\n` : "") +
+      `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
+      `Pagamento feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos 10 minutos de antecedência.`;
     const w = await sendWhatsApp(phone, waMsg);
     await supabase.from("notification_log").insert({
       tenant_id: appt.tenant_id,
