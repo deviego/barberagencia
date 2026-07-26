@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { notifyPlanRequested } from "@/server/notifications/notify";
 import { getMyClient } from "./data";
 
 const itemSchema = z.object({
@@ -88,16 +89,25 @@ export async function requestAppointment(input: RequestAppointmentInput) {
   return { ok: true as const, id: data.id as string };
 }
 
-/** Assina/ativa um combo para o cliente logado (1ª assinatura — imediata; pagamento no local). */
+/** Solicita a assinatura de um combo (aguarda aprovação do admin). Notifica o cliente. */
 export async function subscribeCombo(comboPlanId: string) {
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();
   if (!client) return { ok: false as const, error: "Cliente não encontrado" };
-  const { error } = await supabase.rpc("assign_combo", {
-    p_client_id: client.id,
-    p_combo_plan_id: comboPlanId,
+  if (await hasPendingPlanRequest(client.id))
+    return { ok: false as const, error: "Você já tem um pedido de plano em análise." };
+  const { error } = await supabase.from("plan_requests").insert({
+    tenant_id: client.tenant_id,
+    client_id: client.id,
+    type: "SUBSCRIBE",
+    combo_plan_id: comboPlanId,
   });
   if (error) return { ok: false as const, error: error.message };
+  try {
+    await notifyPlanRequested(client.id, comboPlanId);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
   revalidatePath("/");
   revalidatePath("/meu-plano");
   return { ok: true as const };

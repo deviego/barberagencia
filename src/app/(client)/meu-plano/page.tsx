@@ -33,12 +33,22 @@ export default async function MeuPlanoPage() {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-h3 font-bold text-text">Meu plano</h1>
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface p-8 text-center">
-          <p className="text-body text-text-2">Você ainda não tem um plano ativo.</p>
-          <Link href="/servicos">
-            <Button>Ver planos</Button>
-          </Link>
-        </div>
+        {request ? (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-warning bg-warning-bg p-8 text-center">
+            <p className="text-body text-warning-strong">
+              ⏳ Assinatura do{" "}
+              <strong>{reqCombo?.name ?? "plano"}</strong> solicitada — aguardando a confirmação da barbearia.
+              Você recebe a confirmação no WhatsApp.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface p-8 text-center">
+            <p className="text-body text-text-2">Você ainda não tem um plano ativo.</p>
+            <Link href="/servicos">
+              <Button>Ver planos</Button>
+            </Link>
+          </div>
+        )}
       </div>
     );
   }

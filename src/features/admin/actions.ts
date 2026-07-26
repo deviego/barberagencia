@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getClientDetail } from "./data";
-import { notifyAppointmentConfirmed, notifyServiceStarted, notifyServiceFinished } from "@/server/notifications/notify";
+import { notifyAppointmentConfirmed, notifyServiceStarted, notifyServiceFinished, notifyPlanSubscribed } from "@/server/notifications/notify";
 
 async function setStatus(
   id: string,
@@ -245,12 +245,17 @@ export async function approvePlanRequest(id: string) {
     .maybeSingle();
   if (!req || req.status !== "PENDING") return { ok: false as const, error: "Pedido inválido" };
 
-  if (req.type === "CHANGE" && req.combo_plan_id) {
+  if ((req.type === "CHANGE" || req.type === "SUBSCRIBE") && req.combo_plan_id) {
     const { error } = await supabase.rpc("assign_combo", {
       p_client_id: req.client_id,
       p_combo_plan_id: req.combo_plan_id,
     });
     if (error) return { ok: false as const, error: error.message };
+    try {
+      await notifyPlanSubscribed(req.client_id, req.combo_plan_id);
+    } catch {
+      /* notificação não deve quebrar o fluxo */
+    }
   } else if (req.type === "CANCEL") {
     const { error } = await supabase
       .from("client_subscriptions")

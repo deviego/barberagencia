@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatBRL } from "@/lib/utils";
+import { planBenefits } from "@/lib/plan";
 import { paymentLabel } from "@/lib/payment";
 import { SUPPORT_WHATSAPP_DISPLAY } from "@/lib/contact";
 import { sendEmail } from "./resend";
@@ -105,6 +106,69 @@ export async function notifyServiceFinished(appointmentId: string) {
     tenant_id: appt.tenant_id,
     channel: "whatsapp",
     template: "service_finished",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
+/** Avisa o cliente (WhatsApp) que a solicitação de assinatura foi recebida. */
+export async function notifyPlanRequested(clientId: string, comboPlanId: string) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: client }, { data: combo }] = await Promise.all([
+    supabase.from("clients").select("name, phone, tenant_id").eq("id", clientId).maybeSingle(),
+    supabase.from("combo_plans").select("name").eq("id", comboPlanId).maybeSingle(),
+  ]);
+  const phone = client?.phone ?? null;
+  if (!phone) return;
+  const nome = (client?.name ?? "").split(" ")[0];
+  const plano = combo?.name ?? "plano";
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `Olá${nome ? `, ${nome}` : ""}! Recebemos sua *solicitação de assinatura* do *${plano}*. 📋\n\n` +
+    `Assim que a barbearia confirmar, você recebe a confirmação por aqui. 💈`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: client?.tenant_id ?? null,
+    channel: "whatsapp",
+    template: "plan_requested",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
+/** Confirma ao cliente (WhatsApp) que o plano foi ativado, com os detalhes. */
+export async function notifyPlanSubscribed(clientId: string, comboPlanId: string) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: client }, { data: combo }, { data: sub }] = await Promise.all([
+    supabase.from("clients").select("name, phone, tenant_id").eq("id", clientId).maybeSingle(),
+    supabase.from("combo_plans").select("name, cuts, scope, price_brl").eq("id", comboPlanId).maybeSingle(),
+    supabase
+      .from("client_subscriptions")
+      .select("saldo_cortes, billing_day")
+      .eq("client_id", clientId)
+      .eq("status", "ACTIVE")
+      .maybeSingle(),
+  ]);
+  const phone = client?.phone ?? null;
+  if (!phone || !combo) return;
+  const nome = (client?.name ?? "").split(" ")[0];
+  const beneficios = planBenefits(combo.cuts as number, combo.scope as string | null)
+    .map((b) => `• ${b}`)
+    .join("\n");
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `${nome ? `${nome}, ` : ""}sua assinatura está *ativa!* 🎉\n\n` +
+    `📋 *${combo.name}*\n${beneficios}\n\n` +
+    `💰 Mensalidade: *${formatBRL(combo.price_brl as number)}/mês*\n` +
+    (sub ? `✂️ Saldo: *${sub.saldo_cortes} cortes* neste mês\n📅 Renova todo dia ${sub.billing_day}\n` : "") +
+    `\nÉ só agendar pelo app. Aproveite! 💈`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: client?.tenant_id ?? null,
+    channel: "whatsapp",
+    template: "plan_subscribed",
     recipient: phone,
     status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
   });
