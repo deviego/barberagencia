@@ -1,24 +1,16 @@
 /** Dados mock da plataforma (Master) e da Rede (M8/M9). */
 
 export const TENANTS = [
-  { id: "t1", name: "Barbearia Oliveira 01", logo: "BO", color: "#C9A24B", logoFg: "#171717", domain: "oliveira01.barber.app", plan: "advance", units: 3, status: "ACTIVE" as const },
-  { id: "t2", name: "Vintage Club", logo: "VC", color: "#5556EE", logoFg: "#ffffff", domain: "vintageclub.barber.app", plan: "essencial", units: 1, status: "ACTIVE" as const },
-  { id: "t3", name: "Navalha de Ouro", logo: "NO", color: "#08D48B", logoFg: "#171717", domain: "navalhadeouro.barber.app", plan: "essencial", units: 2, status: "PAYMENT_PENDING" as const },
-  { id: "t4", name: "Barba Negra", logo: "BN", color: "#171717", logoFg: "#C9A24B", domain: "barbanegra.barber.app", plan: "personal", units: 1, status: "ONBOARDING" as const },
-  { id: "t5", name: "Estúdio Kombi", logo: "EK", color: "#FF385C", logoFg: "#ffffff", domain: "kombi.barber.app", plan: "personal", units: 1, status: "SUSPENDED" as const },
+  { id: "t1", name: "Barbearia Oliveira 01", logo: "BO", color: "#C9A24B", logoFg: "#171717", domain: "oliveira01", plan: "advance", units: 1, status: "ACTIVE" as const },
 ];
 
 export const BILLING = {
-  mrr: 4870,
-  tenants: 27,
-  overdue: 2,
-  churnPct: 3.4,
+  mrr: 249.9,
+  tenants: 1,
+  overdue: 0,
+  churnPct: 0,
   invoices: [
     { id: "i1", tenant: "Barbearia Oliveira 01", plan: "Advance", amountBRL: 249.9, status: "PAID" as const, due: "05 Jul" },
-    { id: "i2", tenant: "Vintage Club", plan: "Essencial", amountBRL: 189.9, status: "PAID" as const, due: "05 Jul" },
-    { id: "i3", tenant: "Navalha de Ouro", plan: "Essencial", amountBRL: 189.9, status: "OVERDUE" as const, due: "01 Jul" },
-    { id: "i4", tenant: "Barba Negra", plan: "Personal", amountBRL: 69.9, status: "TRIAL" as const, due: "12 Jul" },
-    { id: "i5", tenant: "Estúdio Kombi", plan: "Personal", amountBRL: 69.9, status: "PENDING" as const, due: "08 Jul" },
   ],
 };
 
