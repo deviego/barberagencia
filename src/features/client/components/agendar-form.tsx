@@ -6,6 +6,7 @@ import { Check, Minus, Package, Plus, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBRL, cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/payment";
 import { requestAppointment } from "@/features/client/actions";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -40,6 +41,7 @@ export function AgendarForm({
   const [dayIdx, setDayIdx] = useState(0);
   const [time, setTime] = useState<string | null>(null);
   const [booked, setBooked] = useState<number[]>([]);
+  const [payment, setPayment] = useState<PaymentMethod | null>(null);
 
   // Plano cobre 1 corte (o 1º serviço) quando há saldo e ao menos um serviço na comanda.
   const usePlan = !!plan && plan.saldo > 0 && serviceIds.length > 0;
@@ -133,6 +135,7 @@ export function AgendarForm({
     setError(null);
     if (!time) return setError("Escolha um horário.");
     if (items.length === 0) return setError("Adicione ao menos um serviço ou produto.");
+    if (!payment) return setError("Escolha a forma de pagamento.");
     const [h, m] = time.split(":").map(Number);
     const d = new Date(days[dayIdx].date);
     d.setHours(h, m, 0, 0);
@@ -142,6 +145,7 @@ export function AgendarForm({
         comboPlanId: usePlan ? plan!.comboPlanId : null,
         startAt: d.toISOString(),
         usePlan,
+        paymentMethod: payment,
         items,
       });
       if (res.ok) router.push("/confirmacao");
@@ -285,6 +289,18 @@ export function AgendarForm({
         )}
       </section>
 
+      {/* Forma de pagamento */}
+      <section className="flex flex-col gap-2">
+        <div className="text-overline uppercase text-text-muted">Forma de pagamento (no local)</div>
+        <div className="flex flex-wrap gap-2">
+          {PAYMENT_METHODS.map((mtd) => (
+            <Chip key={mtd.value} active={payment === mtd.value} onClick={() => setPayment(mtd.value)}>
+              {mtd.label}
+            </Chip>
+          ))}
+        </div>
+      </section>
+
       {/* Resumo da comanda */}
       <div className="rounded-lg border border-border bg-surface p-4">
         <div className="mb-3 flex items-center gap-2 text-overline uppercase text-text-muted">
@@ -319,7 +335,7 @@ export function AgendarForm({
       {error && <p className="text-caption text-danger">{error}</p>}
 
       <div className="sticky bottom-24 md:bottom-4">
-        <Button size="lg" className="w-full" loading={pending} disabled={!time || items.length === 0} onClick={submit}>
+        <Button size="lg" className="w-full" loading={pending} disabled={!time || items.length === 0 || !payment} onClick={submit}>
           Solicitar agendamento
         </Button>
       </div>

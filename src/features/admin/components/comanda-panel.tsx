@@ -32,6 +32,7 @@ interface Comanda {
   status: string;
   service_started_at: string | null;
   service_ended_at: string | null;
+  payment_method: string | null;
   clients: unknown;
   barbers: unknown;
   appointment_items: Item[] | null;
@@ -102,7 +103,10 @@ export function ComandaPanel({
             return (
               <button
                 key={c.id}
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => {
+                  setSelectedId(c.id);
+                  if (c.payment_method) setMethod(c.payment_method);
+                }}
                 className={cn(
                   "flex flex-col gap-2 rounded-lg border bg-surface p-4 text-left transition-colors hover:border-accent",
                   inService ? "border-2 border-accent" : "border-border"

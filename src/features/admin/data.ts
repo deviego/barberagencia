@@ -7,7 +7,7 @@ export async function listRequests() {
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_at, status, request_expires_at, consumed_from_plan, clients(name, phone), barbers(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)"
+      "id, start_at, status, request_expires_at, consumed_from_plan, payment_method, clients(name, phone), barbers(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)"
     )
     .eq("status", "REQUESTED")
     .order("start_at", { ascending: true });
@@ -262,7 +262,7 @@ export async function getComandas() {
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_at, status, service_started_at, service_ended_at, barber_id, clients(name), barbers(name), appointment_items(id, kind, name, price_brl, qty, covered_by_plan, duration_min)"
+      "id, start_at, status, service_started_at, service_ended_at, payment_method, barber_id, clients(name), barbers(name), appointment_items(id, kind, name, price_brl, qty, covered_by_plan, duration_min)"
     )
     .gte("start_at", start.toISOString())
     .lt("start_at", end.toISOString())

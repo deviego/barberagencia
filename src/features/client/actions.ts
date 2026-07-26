@@ -19,6 +19,7 @@ const schema = z.object({
   comboPlanId: z.string().uuid().nullable().optional(),
   startAt: z.string().min(1),
   usePlan: z.boolean(),
+  paymentMethod: z.enum(["PIX", "CARD_CREDIT", "CARD_DEBIT", "CASH"]).nullable().optional(),
   items: z.array(itemSchema).min(1),
 });
 
@@ -28,7 +29,7 @@ export type RequestAppointmentInput = z.infer<typeof schema>;
 export async function requestAppointment(input: RequestAppointmentInput) {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Dados inválidos" };
-  const { barberId, comboPlanId, startAt, usePlan, items } = parsed.data;
+  const { barberId, comboPlanId, startAt, usePlan, paymentMethod, items } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();
@@ -50,6 +51,7 @@ export async function requestAppointment(input: RequestAppointmentInput) {
       status: "REQUESTED",
       request_expires_at: requestExpiresAt,
       consumed_from_plan: usePlan,
+      payment_method: paymentMethod ?? null,
     })
     .select("id")
     .single();

@@ -8,6 +8,7 @@ import { Check, Clock, MessageCircle, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL } from "@/lib/utils";
+import { paymentLabel } from "@/lib/payment";
 import { waLink } from "@/lib/contact";
 import { fillTemplate, getTemplate, APP_LINK } from "@/features/messages/templates";
 import { acceptAppointment, expireAppointment } from "@/features/admin/actions";
@@ -35,6 +36,7 @@ export interface RequestRow {
   services: { name: string } | { name: string }[] | null;
   combo_plans: { name: string } | { name: string }[] | null;
   appointment_items?: ComandaItem[] | null;
+  payment_method?: string | null;
 }
 
 export function RequestCard({ req }: { req: RequestRow }) {
@@ -91,8 +93,15 @@ export function RequestCard({ req }: { req: RequestRow }) {
         {req.consumed_from_plan ? <Badge variant="accent">Plano</Badge> : <Badge>Avulso</Badge>}
       </div>
 
-      <div className="text-body text-text-2 tabular">
-        {format(new Date(req.start_at), "EEE, dd MMM · HH:mm", { locale: ptBR })}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-body text-text-2 tabular">
+          {format(new Date(req.start_at), "EEE, dd MMM · HH:mm", { locale: ptBR })}
+        </span>
+        {req.payment_method && (
+          <span className="rounded-pill border border-border px-2 py-0.5 text-caption text-text-2">
+            💳 {paymentLabel(req.payment_method)}
+          </span>
+        )}
       </div>
 
       {items.length > 0 && (
