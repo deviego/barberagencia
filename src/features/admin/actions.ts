@@ -161,6 +161,21 @@ export async function assignComboToClient(clientId: string, comboPlanId: string)
   return { ok: true as const };
 }
 
+/** Cancela (remove) o plano ativo de um cliente — ação direta do admin. */
+export async function cancelClientSubscription(clientId: string) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido" };
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("client_subscriptions")
+    .update({ status: "CANCELLED" })
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE");
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
 /** Registra um saque/retirada do caixa. */
 export async function registerWithdrawal(amountBRL: number, note?: string) {
   const supabase = await createSupabaseServerClient();

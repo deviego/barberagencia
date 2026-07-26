@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AvatarUpload } from "@/components/avatar-upload";
-import { fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
+import { cancelClientSubscription, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
 import { formatBRL, getInitials } from "@/lib/utils";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -31,6 +32,13 @@ const STATUS: Record<string, string> = {
 
 export function ClientDetail({ clientId }: { clientId: string }) {
   const [data, setData] = useState<Detail | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+
+  function reload() {
+    fetchClientDetail(clientId).then((d) => setData(d as Detail));
+  }
 
   useEffect(() => {
     let alive = true;
@@ -41,6 +49,19 @@ export function ClientDetail({ clientId }: { clientId: string }) {
       alive = false;
     };
   }, [clientId]);
+
+  function doCancel() {
+    setErr(null);
+    startTransition(async () => {
+      const res = await cancelClientSubscription(clientId);
+      if (res.ok) {
+        setConfirming(false);
+        reload();
+      } else {
+        setErr(res.error);
+      }
+    });
+  }
 
   if (!data) {
     return (
@@ -81,15 +102,40 @@ export function ClientDetail({ clientId }: { clientId: string }) {
       <div className="rounded-md border border-border-subtle px-4 py-3">
         <div className="text-overline uppercase text-text-muted">Plano</div>
         {combo ? (
-          <div className="mt-1 flex items-center justify-between">
-            <div>
-              <div className="text-body font-semibold text-text">{combo.name}</div>
-              <div className="text-caption text-text-muted">{formatBRL(combo.price_brl)}/mês</div>
+          <>
+            <div className="mt-1 flex items-center justify-between">
+              <div>
+                <div className="text-body font-semibold text-text">{combo.name}</div>
+                <div className="text-caption text-text-muted">{formatBRL(combo.price_brl)}/mês</div>
+              </div>
+              <Badge variant="accent">
+                {data.sub?.saldo_cortes ?? 0}/{combo.cuts} cortes
+              </Badge>
             </div>
-            <Badge variant="accent">
-              {data.sub?.saldo_cortes ?? 0}/{combo.cuts} cortes
-            </Badge>
-          </div>
+            {confirming ? (
+              <div className="mt-3 rounded-md border border-danger bg-danger-bg px-3 py-2.5">
+                <p className="text-caption text-danger-strong">
+                  Cancelar o plano de <strong>{client.name}</strong>? O cliente perde o saldo de cortes.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="danger" loading={pending} onClick={doCancel}>
+                    Sim, cancelar plano
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                    Voltar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                className="mt-3 text-caption font-medium text-danger hover:underline"
+              >
+                Cancelar plano do cliente
+              </button>
+            )}
+            {err && <p className="mt-2 text-caption text-danger">{err}</p>}
+          </>
         ) : (
           <p className="mt-1 text-body text-text-2">Sem plano ativo.</p>
         )}
