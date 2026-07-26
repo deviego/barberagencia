@@ -359,6 +359,7 @@ export async function addComandaItem(
     qty: item.qty,
     duration_min: item.durationMin ?? 0,
     covered_by_plan: false,
+    added_later: true,
   });
   revalidatePath("/admin/pedidos");
   return { ok: !error, error: error?.message };

@@ -196,6 +196,7 @@ export async function addComandaItemClient(
     qty: item.qty,
     duration_min: item.durationMin ?? 0,
     covered_by_plan: false,
+    added_later: true,
   });
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/pedidos");

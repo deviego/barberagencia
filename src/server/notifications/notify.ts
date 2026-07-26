@@ -58,7 +58,7 @@ export async function notifyServiceStarted(appointmentId: string) {
     `Olá${nome ? `, ${nome}` : ""}! *Seu atendimento foi iniciado.* 💈\n\n` +
     `📋 Serviço: *${servico}*\n` +
     `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
-    `Quer aproveitar e adicionar mais algum serviço? É só avisar o seu barbeiro. 😉`;
+    `Quer aproveitar e adicionar mais algum serviço? É só avisar. 😉`;
   const w = await sendWhatsApp(phone, msg);
   await supabase.from("notification_log").insert({
     tenant_id: appt.tenant_id,
@@ -74,7 +74,7 @@ export async function notifyServiceFinished(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: appt } = await supabase
     .from("appointments")
-    .select("tenant_id, clients(name, phone), appointment_items(name, qty, price_brl, covered_by_plan)")
+    .select("tenant_id, clients(name, phone), appointment_items(name, qty, price_brl, covered_by_plan, added_later)")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return;
@@ -82,15 +82,22 @@ export async function notifyServiceFinished(appointmentId: string) {
   const phone = client?.phone ?? null;
   if (!phone) return;
   const nome = (client?.name ?? "").split(" ")[0];
-  const items = (appt.appointment_items as { name: string; qty: number; price_brl: number; covered_by_plan: boolean }[] | null) ?? [];
-  const lista = items.map((i) => `• ${i.qty > 1 ? `${i.qty}x ` : ""}${i.name}`).join("\n");
+  const items =
+    (appt.appointment_items as
+      | { name: string; qty: number; price_brl: number; covered_by_plan: boolean; added_later: boolean }[]
+      | null) ?? [];
+  const fmtList = (arr: typeof items) => arr.map((i) => `• ${i.qty > 1 ? `${i.qty}x ` : ""}${i.name}`).join("\n");
+  const originais = items.filter((i) => !i.added_later);
+  const adicionais = items.filter((i) => i.added_later);
   const total = items.reduce((s, i) => (i.covered_by_plan ? s : s + Number(i.price_brl) * i.qty), 0);
 
   const msg =
     `✂️ *${BRAND}*\n` +
     `${nome ? `${nome}, ` : ""}*muito obrigado pela preferência!* 🙏\n\n` +
-    (lista ? `Serviços realizados:\n${lista}\n${total > 0 ? `Total: *${formatBRL(total)}*\n` : ""}\n` : "") +
-    `O que você achou do atendimento? Sua opinião ajuda muito a gente a melhorar!\n\n` +
+    (originais.length ? `Serviços:\n${fmtList(originais)}\n` : "") +
+    (adicionais.length ? `\nAdicionais:\n${fmtList(adicionais)}\n` : "") +
+    (total > 0 ? `\nTotal: *${formatBRL(total)}*\n` : "") +
+    `\nO que você achou do atendimento? Sua opinião ajuda muito a gente a melhorar!\n\n` +
     `Volte sempre! ✂️🔥`;
   const w = await sendWhatsApp(phone, msg);
   await supabase.from("notification_log").insert({
