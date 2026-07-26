@@ -257,6 +257,10 @@ export async function cancelAppointment(id: string) {
 export async function rescheduleAppointment(id: string, startAtISO: string) {
   if (!startAtISO) return { ok: false as const, error: "Horário inválido" };
   const supabase = await createSupabaseServerClient();
+  const { data: appt } = await supabase.from("appointments").select("status").eq("id", id).maybeSingle();
+  if (!appt) return { ok: false as const, error: "Agendamento não encontrado" };
+  if (appt.status === "CONFIRMED")
+    return { ok: false as const, error: "Agendamento confirmado não pode ser reagendado, apenas cancelado." };
   const requestExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   const { error } = await supabase
     .from("appointments")

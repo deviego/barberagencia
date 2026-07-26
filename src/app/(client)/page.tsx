@@ -59,7 +59,7 @@ export default async function ClientHome() {
             {nextBarber ? ` · com ${nextBarber.name}` : ""}
           </div>
           <div className="mt-4">
-            <AppointmentActions appointmentId={next.id} isPlan={!!combo} />
+            <AppointmentActions appointmentId={next.id} isPlan={!!combo} status={next.status} />
           </div>
         </div>
       ) : (

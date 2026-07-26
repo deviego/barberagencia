@@ -77,7 +77,7 @@ export function AppointmentCard({ a, highlight, actions }: { a: Appt; highlight?
 
       {actions && ACTIONABLE.includes(a.status) && (
         <div className="mt-3 border-t border-border-subtle pt-3">
-          <AppointmentActions appointmentId={a.id} isPlan={a.consumed_from_plan} />
+          <AppointmentActions appointmentId={a.id} isPlan={a.consumed_from_plan} status={a.status} />
         </div>
       )}
     </div>
