@@ -9,6 +9,7 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { TermsModal } from "./terms-modal";
 import { signUpWithPassword } from "../services/auth-service";
+import { sendWelcomeEmail } from "@/features/auth/actions";
 import { maskDate, maskPhoneBR } from "@/lib/masks";
 
 export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: string }) {
@@ -33,6 +34,7 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
         phone: form.phone,
       });
       if (data.session) {
+        await sendWelcomeEmail().catch(() => {});
         router.push("/");
       } else {
         setSentConfirm(true); // confirmação de e-mail ativa

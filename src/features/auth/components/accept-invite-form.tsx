@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signUpWithPassword } from "../services/auth-service";
+import { sendWelcomeEmail } from "@/features/auth/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { maskPhoneBR } from "@/lib/masks";
 
@@ -43,8 +44,10 @@ export function AcceptInviteForm({
       const data = await signUpWithPassword(mail, pw, { full_name: fullName, phone: tel });
       const supabase = createSupabaseBrowserClient();
       await supabase.rpc("accept_invite", { p_token: token });
-      if (data.session) router.push("/");
-      else setConfirm(true);
+      if (data.session) {
+        await sendWelcomeEmail().catch(() => {});
+        router.push("/");
+      } else setConfirm(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao criar acesso");
     } finally {

@@ -32,6 +32,23 @@ function emailShell(title: string, bodyHtml: string) {
   </div>`;
 }
 
+/** E-mail de boas-vindas ao novo cliente (após o cadastro). */
+export async function notifyWelcome(email: string, name: string, tenantName: string) {
+  if (!email) return;
+  const nome = (name ?? "").split(" ")[0];
+  const html = emailShell(
+    `Bem-vindo${nome ? `, ${nome}` : ""}! ✂️`,
+    `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
+       Que bom ter você na <strong>${tenantName}</strong>! Sua conta já está pronta.
+     </p>
+     <p style="color:#4a453d;font-size:15px;line-height:1.6;">
+       Agende seu próximo corte, acompanhe seus pedidos e aproveite os planos. O pagamento é feito no
+       local após o atendimento.
+     </p>`
+  );
+  await sendEmail({ to: email, subject: `Bem-vindo à ${tenantName}`, html });
+}
+
 /** Avisa o cliente (e-mail) que o agendamento foi confirmado. Registra em notification_log. */
 export async function notifyAppointmentConfirmed(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
