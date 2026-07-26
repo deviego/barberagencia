@@ -1,6 +1,6 @@
 /** Contato de suporte da barbearia (centro de comunicação). */
-export const SUPPORT_WHATSAPP = "5521983120628";
-export const SUPPORT_WHATSAPP_DISPLAY = "(21) 98312-0628";
+export const SUPPORT_WHATSAPP = "5521990883359";
+export const SUPPORT_WHATSAPP_DISPLAY = "(21) 99088-3359";
 
 /** Monta um link wa.me. Adiciona o DDI 55 (Brasil) quando o número vem só com DDD+telefone. */
 export function waLink(phone: string, text?: string) {
