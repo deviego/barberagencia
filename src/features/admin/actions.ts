@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getClientDetail } from "./data";
-import { notifyAppointmentConfirmed } from "@/server/notifications/notify";
+import { notifyAppointmentConfirmed, notifyServiceStarted, notifyServiceFinished } from "@/server/notifications/notify";
 
 async function setStatus(
   id: string,
@@ -322,13 +322,20 @@ export async function cancelReservation(id: string) {
   return { ok: true as const };
 }
 
-/** Inicia o atendimento (comanda) — dispara o cronômetro. */
+/** Inicia o atendimento (comanda) — dispara o cronômetro e avisa o cliente. */
 export async function startService(id: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
     .from("appointments")
     .update({ service_started_at: new Date().toISOString() })
     .eq("id", id);
+  if (!error) {
+    try {
+      await notifyServiceStarted(id);
+    } catch {
+      /* não bloqueia o início se a notificação falhar */
+    }
+  }
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin/agenda");
   return { ok: !error, error: error?.message };
@@ -398,6 +405,12 @@ export async function finalizeComanda(appointmentId: string, method: string) {
     .update({ status: "DONE", service_ended_at: new Date().toISOString() })
     .eq("id", appointmentId);
   if (error) return { ok: false as const, error: error.message };
+
+  try {
+    await notifyServiceFinished(appointmentId);
+  } catch {
+    /* não bloqueia o fechamento se a notificação falhar */
+  }
 
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin/agenda");
