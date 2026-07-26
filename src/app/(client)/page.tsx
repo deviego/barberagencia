@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarClock, CreditCard, Headphones, Plus, Scissors, ShoppingBag } from "lucide-react";
+import { Headphones, Plus, Scissors } from "lucide-react";
 import { CutMeter } from "@/components/cut-meter";
 import { StatusBadge, type AppointmentStatus } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -100,10 +100,7 @@ export default async function ClientHome() {
       </Link>
 
       {/* Atalhos */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {sub && combo && <Shortcut href="/meu-plano" icon={<CreditCard size={22} />} label="Meu plano" />}
-        <Shortcut href="/agendamentos" icon={<CalendarClock size={22} />} label="Agendamentos" />
-        <Shortcut href="/produtos" icon={<ShoppingBag size={22} />} label="Produtos" />
+      <div className="grid grid-cols-1">
         <Shortcut href="/suporte" icon={<Headphones size={22} />} label="Suporte" />
       </div>
     </div>
