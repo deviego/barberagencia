@@ -31,6 +31,8 @@ interface Appt {
   clients: unknown;
   services: unknown;
   combo_plans: unknown;
+  children?: unknown;
+  observations?: string | null;
   appointment_items?: ComandaItem[] | null;
 }
 interface Barber { id: string; name: string }
@@ -206,11 +208,18 @@ export function AgendaBoard({
             </div>
             <dl className="flex flex-col gap-2 rounded-md border border-border-subtle p-3 text-body">
               <Row label="Serviço" value={serviceOf(selected)} />
+              {(() => {
+                const child = one(selected.children as { name: string; age?: number | null }[] | { name: string; age?: number | null } | null);
+                return child ? (
+                  <Row label="Criança" value={`${child.name}${child.age != null ? ` (${child.age} anos)` : ""}`} />
+                ) : null;
+              })()}
               <Row
                 label="Horário"
                 value={format(new Date(selected.start_at), "EEE, dd MMM · HH:mm", { locale: ptBR })}
               />
               <Row label="Falta" value={selected.no_show ? "Sim" : "Não"} />
+              {selected.observations && <Row label="Observações" value={selected.observations} />}
             </dl>
             {(selected.appointment_items?.length ?? 0) > 0 && (
               <div className="flex flex-col gap-1.5 rounded-md border border-border-subtle p-3 text-body">

@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2 } from "lucide-react";
+import { Baby, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AvatarUpload } from "@/components/avatar-upload";
@@ -19,6 +19,7 @@ interface Detail {
   client: { id: string; name: string; email: string | null; phone: string | null; active: boolean; avatar_url: string | null } | null;
   sub: { saldo_cortes: number; combo_plans: unknown } | null;
   history: { id: string; start_at: string; status: string; consumed_from_plan: boolean; services: unknown; combo_plans: unknown }[];
+  children: { id: string; name: string; age: number | null; photo_url: string | null }[];
 }
 
 const STATUS: Record<string, string> = {
@@ -87,7 +88,14 @@ export function ClientDetail({ clientId }: { clientId: string }) {
           onChange={(url) => updateClientAvatar(client.id, url)}
         />
         <div>
-          <div className="text-body font-semibold text-text">{client.name}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-body font-semibold text-text">{client.name}</span>
+            {data.children.length > 0 && (
+              <Badge variant="accent">
+                <Baby size={12} /> {data.children.length}
+              </Badge>
+            )}
+          </div>
           <div className="text-caption text-text-muted">{client.email || client.phone || "—"}</div>
         </div>
       </div>
@@ -140,6 +148,33 @@ export function ClientDetail({ clientId }: { clientId: string }) {
           <p className="mt-1 text-body text-text-2">Sem plano ativo.</p>
         )}
       </div>
+
+      {/* Crianças */}
+      {data.children.length > 0 && (
+        <div className="rounded-md border border-border-subtle px-4 py-3">
+          <div className="flex items-center gap-1.5 text-overline uppercase text-text-muted">
+            <Baby size={13} /> Crianças
+          </div>
+          <div className="mt-2 flex flex-col gap-2">
+            {data.children.map((c) => (
+              <div key={c.id} className="flex items-center gap-3">
+                {c.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.photo_url} alt={c.name} className="h-9 w-9 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-inset text-accent">
+                    <Baby size={16} />
+                  </span>
+                )}
+                <div>
+                  <div className="text-body text-text">{c.name}</div>
+                  {c.age != null && <div className="text-caption text-text-muted">{c.age} anos</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Histórico */}
       <div className="flex flex-col gap-2">

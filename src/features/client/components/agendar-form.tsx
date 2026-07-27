@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Clock, Minus, Package, Plus, Scissors } from "lucide-react";
+import { Baby, Check, Clock, Minus, Package, Plus, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBRL, cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/payment";
 import { requestAppointment } from "@/features/client/actions";
+import { ChildModal, type Child } from "@/features/client/components/child-modal";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const SLOT_MIN = 45;
@@ -24,12 +25,14 @@ export function AgendarForm({
   products,
   workingHours,
   plan,
+  children: initialChildren = [],
 }: {
   barbers: Barber[];
   services: Service[];
   products: Product[];
   workingHours: WorkingHour[];
   plan: PlanInfo | null;
+  children?: Child[];
 }) {
   const router = useRouter();
   const planNoBalance = !!plan && plan.saldo <= 0;
@@ -42,6 +45,13 @@ export function AgendarForm({
   const [time, setTime] = useState<string | null>(null);
   const [booked, setBooked] = useState<number[]>([]);
   const [payment, setPayment] = useState<PaymentMethod | null>(null);
+  const [childList, setChildList] = useState<Child[]>(initialChildren);
+  const [childId, setChildId] = useState<string | null>(null);
+  const [childModal, setChildModal] = useState(false);
+  const [observations, setObservations] = useState("");
+
+  // Precisa escolher criança quando há um serviço "infantil" na comanda.
+  const needsChild = serviceIds.some((id) => services.find((s) => s.id === id)?.name.toLowerCase().includes("infantil"));
 
   // Plano cobre 1 corte (o 1º serviço) quando há saldo e ao menos um serviço na comanda.
   const usePlan = !!plan && plan.saldo > 0 && serviceIds.length > 0;
@@ -137,6 +147,7 @@ export function AgendarForm({
     setError(null);
     if (!time) return setError("Escolha um horário.");
     if (items.length === 0) return setError("Adicione ao menos um serviço ou produto.");
+    if (needsChild && !childId) return setError("Escolha ou registre a criança para o corte infantil.");
     if (!payment) return setError("Escolha a forma de pagamento.");
     const [h, m] = time.split(":").map(Number);
     const d = new Date(days[dayIdx].date);
@@ -148,6 +159,8 @@ export function AgendarForm({
         startAt: d.toISOString(),
         usePlan,
         paymentMethod: payment,
+        childId: needsChild ? childId : null,
+        observations: observations.trim() || null,
         items,
       });
       if (res.ok) router.push(`/confirmacao?id=${res.id}`);
@@ -194,6 +207,48 @@ export function AgendarForm({
           ))}
         </div>
       </section>
+
+      {/* Criança (quando corte infantil) */}
+      {needsChild && (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-overline uppercase text-text-muted">
+            <Baby size={14} /> Para qual criança?
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {childList.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setChildId(c.id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg border p-2 pr-3 text-left transition-colors",
+                  childId === c.id ? "border-2 border-accent bg-accent-wash" : "border-border hover:border-accent"
+                )}
+              >
+                {c.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.photo_url} alt={c.name} className="h-9 w-9 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-inset text-accent">
+                    <Baby size={16} />
+                  </span>
+                )}
+                <span>
+                  <span className="block text-body font-semibold text-text">{c.name}</span>
+                  {c.age != null && <span className="block text-caption text-text-muted">{c.age} anos</span>}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setChildModal(true)}
+              className="flex items-center gap-1 rounded-lg border border-dashed border-border px-3 py-2 text-caption text-text-2 transition-colors hover:border-accent hover:text-accent"
+            >
+              <Plus size={14} /> Registrar criança
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Produtos (opcional) */}
       {products.length > 0 && (
@@ -304,6 +359,19 @@ export function AgendarForm({
         </div>
       </section>
 
+      {/* Observações para o barbeiro */}
+      <section className="flex flex-col gap-2">
+        <div className="text-overline uppercase text-text-muted">Observações (opcional)</div>
+        <textarea
+          value={observations}
+          onChange={(e) => setObservations(e.target.value)}
+          maxLength={500}
+          rows={3}
+          placeholder="Algo específico para o barbeiro? Ex.: máquina 2 nas laterais, alergia a algum produto…"
+          className="w-full rounded-md border border-border bg-surface p-3 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+        />
+      </section>
+
       {/* Resumo da comanda */}
       <div className="rounded-lg border border-border bg-surface p-4">
         <div className="mb-3 flex items-center gap-2 text-overline uppercase text-text-muted">
@@ -347,6 +415,15 @@ export function AgendarForm({
           Solicitar agendamento
         </Button>
       </div>
+
+      <ChildModal
+        open={childModal}
+        onClose={() => setChildModal(false)}
+        onSaved={(c) => {
+          setChildList((cur) => [...cur, c]);
+          setChildId(c.id);
+        }}
+      />
     </div>
   );
 }

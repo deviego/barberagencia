@@ -7,7 +7,7 @@ export async function listRequests() {
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_at, status, request_expires_at, consumed_from_plan, payment_method, clients(name, phone), barbers(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)"
+      "id, start_at, status, request_expires_at, consumed_from_plan, payment_method, observations, clients(name, phone), barbers(name), services(name), combo_plans(name), children(name, age), appointment_items(kind, name, price_brl, qty, covered_by_plan)"
     )
     .eq("status", "REQUESTED")
     .order("start_at", { ascending: true });
@@ -164,9 +164,14 @@ export async function getClients() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("clients")
-    .select("id, name, email, phone, active")
+    .select("id, name, email, phone, active, children(id)")
     .order("name");
-  return data ?? [];
+  return (data ?? []).map((c) => {
+    const kids = (c.children ?? []) as { id: string }[];
+    const { children: _children, ...rest } = c as typeof c & { children?: unknown };
+    void _children;
+    return { ...rest, children_count: kids.length };
+  });
 }
 
 /** Agenda num intervalo [from, to) — usada pela navegação por dia/semana. */
@@ -174,7 +179,7 @@ export async function getAgenda(fromISO: string, toISO: string) {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("appointments")
-    .select("id, start_at, status, no_show, barber_id, clients(name), services(name), combo_plans(name), appointment_items(kind, name, price_brl, qty, covered_by_plan)")
+    .select("id, start_at, status, no_show, barber_id, observations, clients(name), services(name), combo_plans(name), children(name, age), appointment_items(kind, name, price_brl, qty, covered_by_plan)")
     .gte("start_at", fromISO)
     .lt("start_at", toISO)
     .order("start_at", { ascending: true });
@@ -262,7 +267,7 @@ export async function getComandas() {
   const { data } = await supabase
     .from("appointments")
     .select(
-      "id, start_at, status, service_started_at, service_ended_at, payment_method, barber_id, clients(name), barbers(name), appointment_items(id, kind, name, price_brl, qty, covered_by_plan, duration_min)"
+      "id, start_at, status, service_started_at, service_ended_at, payment_method, barber_id, observations, clients(name), barbers(name), children(name, age), appointment_items(id, kind, name, price_brl, qty, covered_by_plan, duration_min)"
     )
     .gte("start_at", start.toISOString())
     .lt("start_at", end.toISOString())
@@ -290,7 +295,12 @@ export async function getClientDetail(id: string) {
       .order("start_at", { ascending: false })
       .limit(20),
   ]);
-  return { client, sub, history: history ?? [] };
+  const { data: children } = await supabase
+    .from("children")
+    .select("id, name, age, photo_url")
+    .eq("client_id", id)
+    .order("created_at", { ascending: true });
+  return { client, sub, history: history ?? [], children: children ?? [] };
 }
 
 /** Agenda do dia (todos os status ativos) do tenant. */

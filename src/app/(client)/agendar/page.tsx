@@ -1,6 +1,7 @@
 import { AgendarForm } from "@/features/client/components/agendar-form";
+import type { Child } from "@/features/client/components/child-modal";
 import { PaymentNotice } from "@/features/client/components/payment-notice";
-import { getCatalog, getClientHome, getProducts, getWorkingHours } from "@/features/client/data";
+import { getCatalog, getClientHome, getMyChildren, getProducts, getWorkingHours } from "@/features/client/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -8,11 +9,12 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 export default async function AgendarPage() {
-  const [catalog, home, workingHours, products] = await Promise.all([
+  const [catalog, home, workingHours, products, children] = await Promise.all([
     getCatalog(),
     getClientHome(),
     getWorkingHours(),
     getProducts(),
+    getMyChildren(),
   ]);
 
   const sub = home?.sub as
@@ -35,6 +37,7 @@ export default async function AgendarPage() {
         products={products}
         workingHours={workingHours}
         plan={plan}
+        children={children as Child[]}
       />
     </div>
   );

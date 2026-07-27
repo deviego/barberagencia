@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Play, Plus, Trash2, Scissors, Package } from "lucide-react";
+import { Baby, NotebookPen, Play, Plus, Trash2, Scissors, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
@@ -33,8 +33,10 @@ interface Comanda {
   service_started_at: string | null;
   service_ended_at: string | null;
   payment_method: string | null;
+  observations: string | null;
   clients: unknown;
   barbers: unknown;
+  children: unknown;
   appointment_items: Item[] | null;
 }
 interface Service { id: string; name: string; price_brl: number; duration_min: number }
@@ -181,6 +183,29 @@ export function ComandaPanel({
       >
         {selected && (
           <div className="flex flex-col gap-4">
+            {(() => {
+              const child = one(selected.children as { name: string; age?: number | null }[] | { name: string; age?: number | null } | null);
+              return child ? (
+                <div className="flex items-center gap-2 rounded-md border border-accent bg-accent-wash px-3 py-2 text-caption text-accent">
+                  <Baby size={15} />
+                  <span>
+                    Corte infantil para <strong>{child.name}</strong>
+                    {child.age != null ? ` (${child.age} anos)` : ""}
+                  </span>
+                </div>
+              ) : null;
+            })()}
+
+            {selected.observations && (
+              <div className="flex items-start gap-2 rounded-md border border-border-subtle bg-inset px-3 py-2 text-caption text-text-2">
+                <NotebookPen size={15} className="mt-0.5 flex-shrink-0 text-text-muted" />
+                <span>
+                  <span className="font-semibold text-text">Observações: </span>
+                  {selected.observations}
+                </span>
+              </div>
+            )}
+
             {selected.service_started_at && selected.status !== "DONE" && (
               <div className="rounded-md border border-accent bg-accent-wash p-3">
                 <ServiceTimer

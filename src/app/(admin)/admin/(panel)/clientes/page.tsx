@@ -7,6 +7,7 @@ const columns: CrudColumn[] = [
   { key: "name", label: "Nome" },
   { key: "phone", label: "Telefone" },
   { key: "email", label: "E-mail" },
+  { key: "children_count", label: "Crianças", format: "childrenBadge" },
   { key: "active", label: "Status", format: "activeBadge" },
 ];
 

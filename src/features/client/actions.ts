@@ -21,6 +21,8 @@ const schema = z.object({
   startAt: z.string().min(1),
   usePlan: z.boolean(),
   paymentMethod: z.enum(["PIX", "CARD_CREDIT", "CARD_DEBIT", "CASH"]).nullable().optional(),
+  childId: z.string().uuid().nullable().optional(),
+  observations: z.string().max(500).nullable().optional(),
   items: z.array(itemSchema).min(1),
 });
 
@@ -30,7 +32,7 @@ export type RequestAppointmentInput = z.infer<typeof schema>;
 export async function requestAppointment(input: RequestAppointmentInput) {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Dados inválidos" };
-  const { barberId, comboPlanId, startAt, usePlan, paymentMethod, items } = parsed.data;
+  const { barberId, comboPlanId, startAt, usePlan, paymentMethod, childId, observations, items } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();
@@ -53,6 +55,8 @@ export async function requestAppointment(input: RequestAppointmentInput) {
       request_expires_at: requestExpiresAt,
       consumed_from_plan: usePlan,
       payment_method: paymentMethod ?? null,
+      child_id: childId ?? null,
+      observations: observations?.trim() || null,
     })
     .select("id")
     .single();
@@ -230,6 +234,40 @@ export async function removeComandaItemClient(itemId: string) {
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/pedidos");
   revalidatePath("/agendamentos");
+  return { ok: true as const };
+}
+
+/** Cadastra uma criança (filho) para o cliente logado. */
+export async function addChild(input: { name: string; age: number | null; photoUrl: string | null }) {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return { ok: false as const, error: "Cliente não encontrado" };
+  const name = input.name.trim();
+  if (!name) return { ok: false as const, error: "Informe o nome da criança." };
+  const { data, error } = await supabase
+    .from("children")
+    .insert({
+      tenant_id: client.tenant_id,
+      client_id: client.id,
+      name,
+      age: input.age ?? null,
+      photo_url: input.photoUrl ?? null,
+    })
+    .select("id, name, age, photo_url")
+    .single();
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/perfil");
+  revalidatePath("/agendar");
+  return { ok: true as const, child: data };
+}
+
+/** Remove uma criança cadastrada. */
+export async function removeChild(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("children").delete().eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/perfil");
+  revalidatePath("/agendar");
   return { ok: true as const };
 }
 

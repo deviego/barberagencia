@@ -361,7 +361,7 @@ export async function notifyAppointmentRequested(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: appt } = await supabase
     .from("appointments")
-    .select("start_at, tenant_id, payment_method, clients(name, phone), services(name), combo_plans(name), barbers(name), appointment_items(price_brl, qty, covered_by_plan)")
+    .select("start_at, tenant_id, payment_method, clients(name, phone), services(name), combo_plans(name), barbers(name), children(name), appointment_items(price_brl, qty, covered_by_plan)")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return;
@@ -374,6 +374,7 @@ export async function notifyAppointmentRequested(appointmentId: string) {
     one(appt.combo_plans as { name: string }[] | { name: string })?.name ??
     "seu atendimento";
   const barber = one(appt.barbers as { name: string }[] | { name: string })?.name;
+  const child = one(appt.children as { name: string }[] | { name: string })?.name;
   const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
   const items = (appt.appointment_items as { price_brl: number; qty: number; covered_by_plan: boolean }[] | null) ?? [];
   const total = items.reduce((s, i) => (i.covered_by_plan ? s : s + Number(i.price_brl) * i.qty), 0);
@@ -386,6 +387,7 @@ export async function notifyAppointmentRequested(appointmentId: string) {
     `${nome ? `${nome}, ` : ""}recebemos o seu pedido de agendamento! 📋\n` +
     `Ele está *aguardando a confirmação* da barbearia — em breve avisamos por aqui.\n\n` +
     `📋 Serviço: *${servico}*\n` +
+    (child ? `👦 Criança: *${child}*\n` : "") +
     (valorTxt ? `💰 Valor: *${valorTxt}*\n` : "") +
     (pagamento ? `💳 Pagamento: *${pagamento}*\n` : "") +
     `📅 ${quando}${barber ? ` · com ${barber}` : ""}`;
@@ -404,7 +406,7 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: appt } = await supabase
     .from("appointments")
-    .select("id, start_at, tenant_id, payment_method, clients(name, email, phone), services(name), combo_plans(name), barbers(name), appointment_items(price_brl, qty, covered_by_plan)")
+    .select("id, start_at, tenant_id, payment_method, clients(name, email, phone), services(name), combo_plans(name), barbers(name), children(name), appointment_items(price_brl, qty, covered_by_plan)")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return;
@@ -428,6 +430,7 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
     one(appt.combo_plans as { name: string }[] | { name: string })?.name ??
     "seu atendimento";
   const barber = one(appt.barbers as { name: string }[] | { name: string })?.name;
+  const child = one(appt.children as { name: string }[] | { name: string })?.name;
   const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
 
   // E-mail (Resend)
@@ -438,7 +441,7 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
          Olá${nome ? `, ${nome}` : ""}! Seu horário está <strong>confirmado</strong>.
        </p>
        <p style="color:#4a453d;font-size:15px;line-height:1.6;">
-         <strong>${servico}</strong>${valorTxt ? ` — ${valorTxt}` : ""}<br/>${quando}${barber ? ` · com ${barber}` : ""}${pagamento ? `<br/>Pagamento: ${pagamento}` : ""}
+         <strong>${servico}</strong>${valorTxt ? ` — ${valorTxt}` : ""}${child ? `<br/>Criança: ${child}` : ""}<br/>${quando}${barber ? ` · com ${barber}` : ""}${pagamento ? `<br/>Pagamento: ${pagamento}` : ""}
        </p>
        <p style="color:#8a8578;font-size:13px;line-height:1.6;">
          O pagamento é feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos
@@ -461,6 +464,7 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
       `✂️ *${BRAND}*\n` +
       `Olá${nome ? `, ${nome}` : ""}! *Seu agendamento foi confirmado.*\n\n` +
       `📋 Serviço: *${servico}*\n` +
+      (child ? `👦 Criança: *${child}*\n` : "") +
       (valorTxt ? `💰 Valor: *${valorTxt}*\n` : "") +
       (pagamento ? `💳 Pagamento: *${pagamento}*\n` : "") +
       `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +

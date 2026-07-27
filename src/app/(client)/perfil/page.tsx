@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/nav/logout-button";
 import { PerfilForm } from "@/features/client/components/perfil-form";
-import { getProfile } from "@/features/client/data";
+import { ChildrenSection } from "@/features/client/components/children-section";
+import type { Child } from "@/features/client/components/child-modal";
+import { getProfile, getMyChildren } from "@/features/client/data";
 
 export default async function PerfilPage() {
-  const data = await getProfile();
+  const [data, children] = await Promise.all([getProfile(), getMyChildren()]);
   if (!data) redirect("/login");
 
   return (
@@ -21,6 +23,8 @@ export default async function PerfilPage() {
         email={data.email}
         avatarUrl={data.avatarUrl}
       />
+
+      <ChildrenSection initial={children as Child[]} />
     </div>
   );
 }

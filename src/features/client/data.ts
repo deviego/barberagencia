@@ -194,6 +194,19 @@ export async function getMyReservations() {
 }
 
 /** Todos os agendamentos do cliente (a página agrupa em hoje/futuros/passados/cancelados). */
+/** Crianças (filhos) cadastradas pelo cliente logado. */
+export async function getMyChildren() {
+  const supabase = await createSupabaseServerClient();
+  const client = await getMyClient();
+  if (!client) return [];
+  const { data } = await supabase
+    .from("children")
+    .select("id, name, age, photo_url")
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: true });
+  return data ?? [];
+}
+
 export async function getMyAppointments() {
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();

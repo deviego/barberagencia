@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Check, Clock, MessageCircle, Scissors } from "lucide-react";
+import { Baby, Check, Clock, MessageCircle, NotebookPen, Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL } from "@/lib/utils";
@@ -35,6 +35,8 @@ export interface RequestRow {
   barbers: { name: string } | { name: string }[] | null;
   services: { name: string } | { name: string }[] | null;
   combo_plans: { name: string } | { name: string }[] | null;
+  children?: { name: string; age?: number | null } | { name: string; age?: number | null }[] | null;
+  observations?: string | null;
   appointment_items?: ComandaItem[] | null;
   payment_method?: string | null;
 }
@@ -45,6 +47,7 @@ export function RequestCard({ req }: { req: RequestRow }) {
   const client = one(req.clients);
   const barber = one(req.barbers);
   const service = one(req.services) ?? one(req.combo_plans);
+  const child = one(req.children ?? null);
   const items = req.appointment_items ?? [];
   const total = items.reduce((s, it) => (it.covered_by_plan ? s : s + it.price_brl * it.qty), 0);
   const phone = (client as { phone?: string | null } | null)?.phone ?? null;
@@ -103,6 +106,26 @@ export function RequestCard({ req }: { req: RequestRow }) {
           </span>
         )}
       </div>
+
+      {child && (
+        <div className="flex items-center gap-2 rounded-md border border-accent bg-accent-wash px-3 py-2 text-caption text-accent">
+          <Baby size={15} />
+          <span>
+            Corte infantil para <strong>{child.name}</strong>
+            {child.age != null ? ` (${child.age} anos)` : ""}
+          </span>
+        </div>
+      )}
+
+      {req.observations && (
+        <div className="flex items-start gap-2 rounded-md border border-border-subtle bg-inset px-3 py-2 text-caption text-text-2">
+          <NotebookPen size={15} className="mt-0.5 flex-shrink-0 text-text-muted" />
+          <span>
+            <span className="font-semibold text-text">Observações: </span>
+            {req.observations}
+          </span>
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className="flex flex-col gap-1 rounded-md border border-border-subtle p-3">
