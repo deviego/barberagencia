@@ -150,7 +150,7 @@ export function AgendarForm({
         paymentMethod: payment,
         items,
       });
-      if (res.ok) router.push("/confirmacao");
+      if (res.ok) router.push(`/confirmacao?id=${res.id}`);
       else setError(res.error);
     });
   }

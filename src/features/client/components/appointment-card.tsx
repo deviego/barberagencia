@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { StatusBadge, type AppointmentStatus } from "@/components/status-badge";
 import { AppointmentActions } from "@/features/client/components/appointment-actions";
 import { formatBRL } from "@/lib/utils";
@@ -76,7 +79,12 @@ export function AppointmentCard({ a, highlight, actions }: { a: Appt; highlight?
       )}
 
       {actions && ACTIONABLE.includes(a.status) && (
-        <div className="mt-3 border-t border-border-subtle pt-3">
+        <div className="mt-3 flex flex-col gap-3 border-t border-border-subtle pt-3">
+          <Link href="/pedidos">
+            <Button variant="outline" size="sm" className="w-full">
+              <Plus size={15} /> Adicionar serviço
+            </Button>
+          </Link>
           <AppointmentActions appointmentId={a.id} isPlan={a.consumed_from_plan} status={a.status} />
         </div>
       )}

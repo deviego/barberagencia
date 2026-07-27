@@ -356,6 +356,49 @@ export async function notifyWelcome(email: string, name: string, tenantName: str
   await sendEmail({ to: email, subject: `Bem-vindo à ${tenantName}`, html });
 }
 
+/** Avisa o cliente (WhatsApp) que o pedido de agendamento foi recebido e aguarda confirmação. */
+export async function notifyAppointmentRequested(appointmentId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select("start_at, tenant_id, payment_method, clients(name, phone), services(name), combo_plans(name), barbers(name), appointment_items(price_brl, qty, covered_by_plan)")
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (!appt) return;
+  const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
+  const phone = client?.phone ?? null;
+  if (!phone) return;
+  const nome = (client?.name ?? "").split(" ")[0];
+  const servico =
+    one(appt.services as { name: string }[] | { name: string })?.name ??
+    one(appt.combo_plans as { name: string }[] | { name: string })?.name ??
+    "seu atendimento";
+  const barber = one(appt.barbers as { name: string }[] | { name: string })?.name;
+  const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
+  const items = (appt.appointment_items as { price_brl: number; qty: number; covered_by_plan: boolean }[] | null) ?? [];
+  const total = items.reduce((s, i) => (i.covered_by_plan ? s : s + Number(i.price_brl) * i.qty), 0);
+  const valorTxt = items.length === 0 ? "" : total > 0 ? `${formatBRL(total)} (no local)` : "incluído no plano";
+  const pagamento = appt.payment_method ? paymentLabel(appt.payment_method as string) : null;
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `*SOLICITAÇÃO DE AGENDAMENTO*\n\n` +
+    `${nome ? `${nome}, ` : ""}recebemos o seu pedido de agendamento! 📋\n` +
+    `Ele está *aguardando a confirmação* da barbearia — em breve avisamos por aqui.\n\n` +
+    `📋 Serviço: *${servico}*\n` +
+    (valorTxt ? `💰 Valor: *${valorTxt}*\n` : "") +
+    (pagamento ? `💳 Pagamento: *${pagamento}*\n` : "") +
+    `📅 ${quando}${barber ? ` · com ${barber}` : ""}`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: appt.tenant_id,
+    channel: "whatsapp",
+    template: "appointment_requested",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
 /** Avisa o cliente (e-mail) que o agendamento foi confirmado. Registra em notification_log. */
 export async function notifyAppointmentConfirmed(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
