@@ -200,7 +200,7 @@ export async function getMyAppointments() {
   if (!client) return [];
   const { data } = await supabase
     .from("appointments")
-    .select("id, start_at, status, consumed_from_plan, service_started_at, barbers(name), services(name), combo_plans(name), appointment_items(id, kind, name, price_brl, qty, covered_by_plan, duration_min)")
+    .select("id, start_at, status, consumed_from_plan, service_started_at, barbers(name), services(name), combo_plans(name), appointment_items(id, kind, ref_id, name, price_brl, qty, covered_by_plan, duration_min)")
     .eq("client_id", client.id)
     .order("start_at", { ascending: false })
     .limit(100);

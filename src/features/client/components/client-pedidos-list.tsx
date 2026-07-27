@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Package, Plus, Scissors, Trash2 } from "lucide-react";
+import { Check, Package, Plus, Scissors, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { StatusBadge, type AppointmentStatus } from "@/components/status-badge";
@@ -20,6 +20,7 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 interface Item {
   id: string;
   kind: string;
+  ref_id: string | null;
   name: string;
   price_brl: number;
   qty: number;
@@ -173,48 +174,80 @@ export function ClientPedidosList({
                 </div>
 
                 {editable ? (
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <div className="mb-1.5 text-overline uppercase text-text-muted">Adicionar serviço</div>
-                      <div className="flex flex-wrap gap-2">
-                        {services.map((s) => (
-                          <button
-                            key={s.id}
-                            disabled={pending}
-                            onClick={() =>
-                              run(() =>
-                                addComandaItemClient(selected.id, { kind: "service", refId: s.id, name: s.name, priceBRL: s.price_brl, qty: 1, durationMin: s.duration_min ?? 0 })
-                              )
-                            }
-                            className="flex items-center gap-1 rounded-pill border border-border px-3 py-1.5 text-caption text-text-2 transition-colors hover:border-accent hover:text-accent"
-                          >
-                            <Plus size={13} /> {s.name} · {formatBRL(s.price_brl)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {products.length > 0 && (
-                      <div>
-                        <div className="mb-1.5 text-overline uppercase text-text-muted">Adicionar produto</div>
-                        <div className="flex flex-wrap gap-2">
-                          {products.map((p) => (
-                            <button
-                              key={p.id}
-                              disabled={pending}
-                              onClick={() =>
-                                run(() => addComandaItemClient(selected.id, { kind: "product", refId: p.id, name: p.name, priceBRL: p.price_brl, qty: 1 }))
-                              }
-                              className="flex items-center gap-1 rounded-pill border border-border px-3 py-1.5 text-caption text-text-2 transition-colors hover:border-accent hover:text-accent"
-                            >
-                              <Plus size={13} /> {p.name} · {formatBRL(p.price_brl)}
-                            </button>
-                          ))}
+                  (() => {
+                    // Itens já na comanda, indexados por ref_id, para marcar como selecionado.
+                    const byRef = new Map(items.filter((i) => i.ref_id).map((i) => [i.ref_id as string, i]));
+                    return (
+                      <div className="flex flex-col gap-3">
+                        <div>
+                          <div className="mb-1.5 text-overline uppercase text-text-muted">Serviços</div>
+                          <div className="flex flex-wrap gap-2">
+                            {services.map((s) => {
+                              const existing = byRef.get(s.id);
+                              const active = !!existing;
+                              return (
+                                <button
+                                  key={s.id}
+                                  disabled={pending}
+                                  onClick={() => {
+                                    if (existing) {
+                                      // Já selecionado → remove (o item coberto pelo plano não é removível).
+                                      if (!existing.covered_by_plan) run(() => removeComandaItemClient(existing.id));
+                                    } else {
+                                      run(() =>
+                                        addComandaItemClient(selected.id, { kind: "service", refId: s.id, name: s.name, priceBRL: s.price_brl, qty: 1, durationMin: s.duration_min ?? 0 })
+                                      );
+                                    }
+                                  }}
+                                  className={cn(
+                                    "flex items-center gap-1 rounded-pill border px-3 py-1.5 text-caption transition-colors disabled:opacity-60",
+                                    active
+                                      ? "border-2 border-accent bg-accent-wash text-accent"
+                                      : "border-border text-text-2 hover:border-accent hover:text-accent"
+                                  )}
+                                >
+                                  {active ? <Check size={13} /> : <Plus size={13} />} {s.name} · {formatBRL(s.price_brl)}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
+                        {products.length > 0 && (
+                          <div>
+                            <div className="mb-1.5 text-overline uppercase text-text-muted">Produtos</div>
+                            <div className="flex flex-wrap gap-2">
+                              {products.map((p) => {
+                                const existing = byRef.get(p.id);
+                                const active = !!existing;
+                                return (
+                                  <button
+                                    key={p.id}
+                                    disabled={pending}
+                                    onClick={() => {
+                                      if (existing) run(() => removeComandaItemClient(existing.id));
+                                      else run(() => addComandaItemClient(selected.id, { kind: "product", refId: p.id, name: p.name, priceBRL: p.price_brl, qty: 1 }));
+                                    }}
+                                    className={cn(
+                                      "flex items-center gap-1 rounded-pill border px-3 py-1.5 text-caption transition-colors disabled:opacity-60",
+                                      active
+                                        ? "border-2 border-accent bg-accent-wash text-accent"
+                                        : "border-border text-text-2 hover:border-accent hover:text-accent"
+                                    )}
+                                  >
+                                    {active ? <Check size={13} /> : <Plus size={13} />} {p.name} · {formatBRL(p.price_brl)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {error && <p className="text-caption text-danger">{error}</p>}
+                        <p className="text-caption text-text-muted">
+                          Toque para adicionar ou remover. O pagamento é feito no local após o atendimento.
+                        </p>
                       </div>
-                    )}
-                    {error && <p className="text-caption text-danger">{error}</p>}
-                    <p className="text-caption text-text-muted">O pagamento é feito no local após o atendimento.</p>
-                  </div>
+                    );
+                  })()
                 ) : (
                   <p className="text-caption text-text-muted">
                     {inService ? "Atendimento em andamento." : "Este pedido não pode mais ser alterado."}

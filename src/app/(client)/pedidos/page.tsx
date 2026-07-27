@@ -4,6 +4,7 @@ import { getMyAppointments, getCatalog, getProducts } from "@/features/client/da
 interface Item {
   id: string;
   kind: string;
+  ref_id: string | null;
   name: string;
   price_brl: number;
   qty: number;
