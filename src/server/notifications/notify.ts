@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatBRL } from "@/lib/utils";
-import { planBenefits } from "@/lib/plan";
 import { paymentLabel } from "@/lib/payment";
 import { SUPPORT_WHATSAPP_DISPLAY } from "@/lib/contact";
 import { sendEmail } from "./resend";
@@ -15,6 +14,27 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 const BRAND = "Barbearia Oliveira 01";
+
+/** Bloco "Descritivo" do plano para as mensagens de WhatsApp (formato do cliente).
+ *  1ª parte do scope vira "- ...", as demais viram "* ..."; mensalidade/saldo/renovação à parte. */
+function planDescritivo(
+  combo: { name: string; cuts: number; scope: string | null; price_brl: number },
+  saldo: number,
+  billingDay: number
+) {
+  const parts = (combo.scope ?? "")
+    .split("·")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const linhas = parts.map((p, i) => (i === 0 ? `- ${p}` : `* ${p}`)).join("\n");
+  return (
+    `📋 *${combo.name}*\n` +
+    (linhas ? `${linhas}\n` : "") +
+    `💰 Mensalidade: *${formatBRL(combo.price_brl)}/mês* (a partir do 2º mês)\n` +
+    `✂️ Saldo: *${saldo} cortes* gratuitos neste mês\n` +
+    `📅 Renova todo dia ${billingDay}`
+  );
+}
 
 function emailShell(title: string, bodyHtml: string) {
   return `
@@ -119,21 +139,20 @@ export async function notifyPlanRequested(clientId: string, comboPlanId: string)
     supabase.from("combo_plans").select("name, cuts, scope, price_brl").eq("id", comboPlanId).maybeSingle(),
   ]);
   const phone = client?.phone ?? null;
-  if (!phone) return;
+  if (!phone || !combo) return;
   const nome = (client?.name ?? "").split(" ")[0];
-  const plano = combo?.name ?? "plano";
-  const beneficios = combo
-    ? planBenefits(combo.cuts as number, combo.scope as string | null)
-        .map((b) => `• ${b}`)
-        .join("\n")
-    : "";
 
   const msg =
     `✂️ *${BRAND}*\n` +
-    `Olá${nome ? `, ${nome}` : ""}! Recebemos sua *solicitação de assinatura* do *${plano}*. 📋\n\n` +
-    (beneficios ? `${beneficios}\n\n` : "") +
-    (combo ? `💰 Mensalidade: *${formatBRL(combo.price_brl as number)}/mês*\n\n` : "") +
-    `Assim que a barbearia confirmar, você recebe a confirmação por aqui. 💈`;
+    `*SOLICITAÇÃO DE ASSINATURA*\n\n` +
+    `${nome ? `${nome}, ` : ""}recebemos o seu pedido de contratação do *${combo.name}*.\n` +
+    `Em breve você receberá a notificação com a confirmação. 💈\n\n` +
+    `*Descritivo:*\n` +
+    planDescritivo(
+      combo as { name: string; cuts: number; scope: string | null; price_brl: number },
+      combo.cuts as number,
+      5
+    );
   const w = await sendWhatsApp(phone, msg);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
@@ -160,17 +179,17 @@ export async function notifyPlanSubscribed(clientId: string, comboPlanId: string
   const phone = client?.phone ?? null;
   if (!phone || !combo) return;
   const nome = (client?.name ?? "").split(" ")[0];
-  const beneficios = planBenefits(combo.cuts as number, combo.scope as string | null)
-    .map((b) => `• ${b}`)
-    .join("\n");
 
   const msg =
     `✂️ *${BRAND}*\n` +
+    `*CONFIRMAÇÃO DE ASSINATURA*\n\n` +
     `${nome ? `${nome}, ` : ""}sua assinatura está *ativa!* 🎉\n\n` +
-    `📋 *${combo.name}*\n${beneficios}\n\n` +
-    `💰 Mensalidade: *${formatBRL(combo.price_brl as number)}/mês*\n` +
-    (sub ? `✂️ Saldo: *${sub.saldo_cortes} cortes* neste mês\n📅 Renova todo dia ${sub.billing_day}\n` : "") +
-    `\nÉ só agendar pelo app. Aproveite! 💈`;
+    planDescritivo(
+      combo as { name: string; cuts: number; scope: string | null; price_brl: number },
+      (sub?.saldo_cortes as number) ?? (combo.cuts as number),
+      (sub?.billing_day as number) ?? 5
+    ) +
+    `\n\nÉ só agendar pelo app. Aproveite! 💈`;
   const w = await sendWhatsApp(phone, msg);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
