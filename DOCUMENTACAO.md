@@ -66,8 +66,9 @@ A plataforma é um aplicativo de **agendamento + fidelização por assinatura** 
 Pontos importantes do modelo:
 
 - **O pagamento é feito no local**, após o atendimento (PIX, crédito, débito ou dinheiro). Não há cobrança online dentro do app.
-- **Os avisos ao cliente são automáticos**, principalmente por **WhatsApp** (e e-mail em alguns casos): confirmação, início/fim de atendimento, assinatura, cancelamentos, etc.
+- **Os avisos ao cliente são automáticos**, principalmente por **WhatsApp** (e e-mail em alguns casos): confirmação, início/fim de atendimento, item adicionado, assinatura, cancelamentos, etc.
 - Várias telas atualizam **em tempo real** (sem precisar recarregar): a fila de solicitações do admin e a tela de acompanhamento do cliente.
+- **Cada barbearia é isolada** (multi-tenant): o cliente entra pela barbearia por um **link próprio** (`/b/nome-da-barbearia`) e fica vinculado a ela; o admin logado só vê os dados da sua barbearia. O app do cliente vive em **`/client`** e o painel em **`/admin`** — dá para ficar logado como cliente numa aba e admin em outra ao mesmo tempo.
 
 ---
 
@@ -89,6 +90,8 @@ Antes dos detalhes, alguns conceitos que se repetem no documento:
 
 ### O que é
 A porta de entrada do cliente: criar conta, entrar e recuperar a senha.
+
+> 💡 **Como o cliente chega à barbearia:** cada barbearia divulga um **link próprio** (ex.: `.../b/oliveira01`). Ao abrir esse link, o app "trava" naquela barbearia e o cadastro fica vinculado a ela. O login do cliente fica em **`/client/login`**.
 
 ### Passo a passo — criar conta
 1. Na tela de login, tocar em **Cadastrar**.
@@ -255,7 +258,8 @@ Canal direto com a barbearia.
 Os avisos são enviados **automaticamente** (WhatsApp e, em alguns casos, e-mail). O cliente recebe mensagem quando:
 
 - **Agendamento solicitado** — "recebemos seu pedido, aguardando confirmação".
-- **Agendamento confirmado** — com serviço, valor, forma de pagamento e data/barbeiro.
+- **Agendamento confirmado** — com serviço, valor, forma de pagamento e data/barbeiro (também quando o **admin cria** o agendamento).
+- **Item adicionado ao pedido** — quando o cliente ou o admin adiciona um serviço/produto.
 - **Atendimento iniciado** — mensagem de boas-vindas com o serviço.
 - **Atendimento finalizado** — agradecimento, lista de serviços/adicionais e **total pago**.
 - **Assinatura** — solicitação recebida, **confirmação** (plano ativo) e **recusa** (quando não aprovada).
@@ -273,7 +277,7 @@ Os avisos são enviados **automaticamente** (WhatsApp e, em alguns casos, e-mail
 A área da equipe da barbearia.
 
 ### Como usar
-- Entrar pela tela de **login do admin** (endereço `/admin/login`).
+- Entrar pela tela de **login do admin** (endereço `/admin/login`) — sessão **separada** da do cliente (dá para ter admin numa aba e cliente em outra no mesmo navegador).
 - **Menu lateral (sidebar)** com todas as áreas: **Dashboard, Solicitações, Agenda, Pedidos, Clientes, Serviços, Produtos, Barbeiros, Financeiro, Marketing, Mensagens, Configurações**.
 - **Badge de Solicitações em tempo real** — quando chega um pedido novo, o número atualiza sozinho **e toca um som**; a lista também aparece na hora, sem recarregar.
 - **Ver como cliente** — permite ao admin visualizar o app como um cliente (modo pré-visualização).
@@ -322,8 +326,9 @@ A grade de horários da barbearia.
 
 ### Como usar
 - Alternar entre visão **Dia** e **Semana** e navegar pelas **setas**.
-- **Novo agendamento** — o admin marca direto para um cliente; nasce **confirmado** e, se for pelo plano, **consome 1 corte**.
-- Tocar em um horário abre o detalhe (serviço, **criança**, **observações**, itens) com ações de **presença/falta/cancelar**.
+- **Novo agendamento** — o admin marca direto para um cliente. O seletor de cliente tem **busca por nome**; se o serviço for **infantil**, escolhe-se a **criança**. Nasce **confirmado**, **consome 1 corte** se for pelo plano, e **dispara o WhatsApp de confirmação** para o cliente.
+- Tocar em um horário abre o detalhe (serviço, **criança**, **observações**, itens).
+- **Confirmar presença** abre a escolha: **Iniciar atendimento** (começa a comanda com cronômetro e leva para **Pedidos** com o cliente "em atendimento") ou **Somente confirmar presença**. Também há **Não compareceu** e **Cancelar**.
 
 > 💡 **Observação:** os horários disponíveis vêm dos **horários de trabalho** cadastrados em Barbeiros (seção 20).
 
@@ -454,7 +459,8 @@ Dados e identidade visual da barbearia.
 
 Vários avisos ao cliente saem **automaticamente** a partir de ações do admin:
 
-- **Aceitar agendamento** → WhatsApp/e-mail de **confirmação**.
+- **Aceitar agendamento** (ou **criar** um novo pelo admin) → WhatsApp/e-mail de **confirmação**.
+- **Adicionar item ao pedido** → WhatsApp de **item adicionado**.
 - **Iniciar atendimento** → WhatsApp de **boas-vindas**.
 - **Finalizar atendimento** → WhatsApp de **agradecimento** (serviços + total).
 - **Aprovar assinatura / troca** → **confirmação detalhada** do plano.

@@ -204,6 +204,7 @@
         <li><strong>Pagamento no local</strong>, após o atendimento (PIX, crédito, débito ou dinheiro) — não há cobrança online.</li>
         <li><strong>Avisos automáticos</strong> ao cliente, principalmente por <strong>WhatsApp</strong> (e e-mail em alguns casos).</li>
         <li>Várias telas atualizam <strong>em tempo real</strong>: a fila de solicitações do admin e a tela de acompanhamento do cliente.</li>
+        <li><strong>Cada barbearia é isolada</strong>: o cliente entra por um <strong>link próprio</strong> (/b/nome-da-barbearia) e fica vinculado a ela; o app do cliente vive em <strong>/client</strong> e o painel em <strong>/admin</strong> — dá para estar logado como cliente e admin ao mesmo tempo, em abas diferentes.</li>
       </ul>
     </section>
 
@@ -221,6 +222,7 @@
 
     <section class="doc-section" id="s3"><div class="num">03</div><h2>Cadastro e acesso</h2>
       <h3>O que é</h3><p>Criar conta, entrar e recuperar a senha.</p>
+      <div class="callout">💡 Cada barbearia divulga um <strong>link próprio</strong> (ex.: /b/oliveira01). Ao abrir o link, o app trava naquela barbearia e o cadastro fica vinculado a ela. O login do cliente fica em <strong>/client/login</strong>.</div>
       <h3>Criar conta</h3>
       <ol><li>Na tela de login, tocar em <strong>Cadastrar</strong>.</li><li>Preencher nome, e-mail, telefone e senha.</li><li><strong>Aceitar Termos de Uso e Política de Privacidade</strong> (obrigatório).</li><li>Concluir — chega um e-mail de boas-vindas.</li></ol>
       <h3>Entrar / Recuperar senha</h3>
@@ -293,7 +295,8 @@
       <p>Enviados automaticamente por WhatsApp (e e-mail em alguns casos):</p>
       <ul>
         <li><strong>Agendamento solicitado</strong> — aguardando confirmação.</li>
-        <li><strong>Agendamento confirmado</strong> — serviço, valor, pagamento, data/barbeiro.</li>
+        <li><strong>Agendamento confirmado</strong> — serviço, valor, pagamento, data/barbeiro (também quando o admin cria o agendamento).</li>
+        <li><strong>Item adicionado ao pedido</strong> — quando o cliente ou o admin adiciona um serviço/produto.</li>
         <li><strong>Atendimento iniciado</strong> e <strong>finalizado</strong> (com total pago).</li>
         <li><strong>Assinatura</strong> — solicitada, confirmada ou recusada.</li>
         <li><strong>Cancelamentos</strong> — assinatura, agendamento ou reserva.</li>
@@ -305,7 +308,7 @@
 
     <section class="doc-section" id="s12"><div class="num">12</div><h2>Acesso e navegação</h2>
       <ul>
-        <li>Login do admin em <strong>/admin/login</strong>.</li>
+        <li>Login do admin em <strong>/admin/login</strong> — sessão <strong>separada</strong> da do cliente (admin numa aba e cliente em outra ao mesmo tempo).</li>
         <li><strong>Menu lateral</strong>: Dashboard, Solicitações, Agenda, Pedidos, Clientes, Serviços, Produtos, Barbeiros, Financeiro, Marketing, Mensagens, Configurações.</li>
         <li><strong>Badge de Solicitações em tempo real + som</strong> quando chega algo novo.</li>
         <li><strong>Ver como cliente</strong>, <strong>Sair</strong>, tema claro/escuro e menu hambúrguer no celular.</li>
@@ -327,7 +330,9 @@
     </section>
 
     <section class="doc-section" id="s15"><div class="num">15</div><h2>Agenda</h2>
-      <p>Visão <strong>Dia/Semana</strong> com navegação por setas. <strong>Novo agendamento</strong> nasce confirmado (consome corte se plano). Tocar num horário mostra detalhes (serviço, criança, observações, itens) e ações de presença/falta/cancelar. Os horários vêm dos <strong>horários de trabalho</strong> dos barbeiros.</p>
+      <p>Visão <strong>Dia/Semana</strong> com navegação por setas. Os horários vêm dos <strong>horários de trabalho</strong> dos barbeiros.</p>
+      <p><strong>Novo agendamento:</strong> seletor de cliente com <strong>busca por nome</strong>; se o serviço for infantil, escolhe-se a <strong>criança</strong>. Nasce confirmado, consome corte se for pelo plano, e <strong>dispara o WhatsApp de confirmação</strong>.</p>
+      <p><strong>Confirmar presença</strong> (ao abrir um horário) abre a escolha: <strong>Iniciar atendimento</strong> (começa a comanda com cronômetro e leva para Pedidos com o cliente "em atendimento") ou <strong>Somente confirmar presença</strong>. Também há Não compareceu e Cancelar.</p>
     </section>
 
     <section class="doc-section" id="s16"><div class="num">16</div><h2>Pedidos (comanda ao vivo)</h2>
@@ -380,7 +385,8 @@
 
     <section class="doc-section" id="s25"><div class="num">25</div><h2>Avisos que o admin dispara</h2>
       <ul>
-        <li><strong>Aceitar agendamento</strong> → confirmação.</li>
+        <li><strong>Aceitar agendamento</strong> (ou criar um novo pelo admin) → confirmação.</li>
+        <li><strong>Adicionar item ao pedido</strong> → item adicionado.</li>
         <li><strong>Iniciar / Finalizar atendimento</strong> → boas-vindas / agradecimento.</li>
         <li><strong>Aprovar assinatura/troca</strong> → confirmação do plano; <strong>Recusar</strong> → aviso.</li>
         <li><strong>Cancelar</strong> assinatura, agendamento ou reserva → aviso.</li>
