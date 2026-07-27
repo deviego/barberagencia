@@ -216,6 +216,7 @@ export async function createAppointmentAdmin(input: {
   comboPlanId: string | null;
   startAt: string;
   usePlan: boolean;
+  childId?: string | null;
 }) {
   if (!input.clientId || !input.startAt) return { ok: false as const, error: "Dados incompletos" };
   const supabase = await createSupabaseServerClient();
@@ -233,6 +234,7 @@ export async function createAppointmentAdmin(input: {
       start_at: input.startAt,
       status: "CONFIRMED",
       consumed_from_plan: input.usePlan,
+      child_id: input.childId ?? null,
     })
     .select("id")
     .single();
@@ -244,6 +246,12 @@ export async function createAppointmentAdmin(input: {
       await supabase.from("appointments").delete().eq("id", data.id);
       return { ok: false as const, error: rpcErr.message };
     }
+  }
+  // Agendamento do admin nasce confirmado → avisa o cliente (WhatsApp/e-mail).
+  try {
+    await notifyAppointmentConfirmed(data.id as string);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
   }
   revalidatePath("/admin/agenda");
   revalidatePath("/admin");

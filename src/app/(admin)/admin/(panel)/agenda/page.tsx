@@ -39,9 +39,9 @@ export default async function AgendaPage({
     getWorkingHours(),
   ]);
   const activeBarbers = barbers.filter((b) => b.active !== false);
-  const activeServices = (services as { id: string; name: string; price_brl: number; active: boolean }[]).filter(
-    (s) => s.active !== false
-  );
+  const activeServices = (
+    services as { id: string; name: string; price_brl: number; is_child_service?: boolean; active: boolean }[]
+  ).filter((s) => s.active !== false);
 
   const step = view === "week" ? 7 : 1;
   const prev = format(addDays(base, -step), "yyyy-MM-dd");

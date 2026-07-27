@@ -19,8 +19,9 @@ interface ClientWithPlan {
   plan: { comboPlanId: string; name: string; saldo: number } | null;
 }
 interface Barber { id: string; name: string }
-interface Service { id: string; name: string; price_brl: number }
+interface Service { id: string; name: string; price_brl: number; is_child_service?: boolean }
 interface WorkingHour { barber_id: string; weekday: number; start_min: number; end_min: number }
+interface Child { id: string; name: string; age: number | null }
 
 export function NewAppointmentDrawer({
   clients,
@@ -39,15 +40,46 @@ export function NewAppointmentDrawer({
   const [error, setError] = useState<string | null>(null);
 
   const [clientId, setClientId] = useState<string>("");
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientOpen, setClientOpen] = useState(false);
   const [barberId, setBarberId] = useState<string | null>(barbers[0]?.id ?? null);
   const [mode, setMode] = useState<"plan" | "service">("service");
   const [serviceId, setServiceId] = useState<string | null>(services[0]?.id ?? null);
+  const [children, setChildren] = useState<Child[]>([]);
+  const [childId, setChildId] = useState<string | null>(null);
   const [dayIdx, setDayIdx] = useState(0);
   const [time, setTime] = useState<string | null>(null);
   const [booked, setBooked] = useState<number[]>([]);
 
   const client = clients.find((c) => c.id === clientId) ?? null;
   const canUsePlan = !!client?.plan && client.plan.saldo > 0;
+  const filteredClients = clients
+    .filter((c) => c.name.toLowerCase().includes(clientQuery.trim().toLowerCase()))
+    .slice(0, 8);
+  // Corte infantil (serviço avulso marcado) → precisa escolher a criança.
+  const needsChild = mode === "service" && !!services.find((s) => s.id === serviceId)?.is_child_service;
+
+  // Carrega as crianças do cliente selecionado (para o corte infantil).
+  useEffect(() => {
+    if (!clientId) {
+      setChildren([]);
+      setChildId(null);
+      return;
+    }
+    const supabase = createSupabaseBrowserClient();
+    let alive = true;
+    supabase
+      .from("children")
+      .select("id, name, age")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (alive) setChildren((data as Child[]) ?? []);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [clientId]);
 
   // Ao trocar de cliente, escolhe automaticamente plano (se houver saldo) ou serviço.
   useEffect(() => {
@@ -109,6 +141,7 @@ export function NewAppointmentDrawer({
     setError(null);
     if (!clientId) return setError("Selecione um cliente.");
     if (!time) return setError("Selecione um horário.");
+    if (needsChild && !childId) return setError("Selecione a criança para o corte infantil.");
     const usePlan = mode === "plan" && canUsePlan;
     const [h, m] = time.split(":").map(Number);
     const d = new Date(days[dayIdx].date);
@@ -121,10 +154,13 @@ export function NewAppointmentDrawer({
         comboPlanId: usePlan ? client!.plan!.comboPlanId : null,
         startAt: d.toISOString(),
         usePlan,
+        childId: needsChild ? childId : null,
       });
       if (res.ok) {
         setOpen(false);
         setClientId("");
+        setClientQuery("");
+        setChildId(null);
         setTime(null);
         router.refresh();
       } else setError(res.error);
@@ -154,22 +190,55 @@ export function NewAppointmentDrawer({
         }
       >
         <div className="flex flex-col gap-5">
-          {/* Cliente */}
+          {/* Cliente (busca + seleção) */}
           <div className="flex flex-col gap-1.5">
             <Label>Cliente</Label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="rounded-md border border-border bg-inset px-3 py-2 text-body text-text focus:border-accent focus:outline-none"
-            >
-              <option value="">Selecione…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.plan ? ` · plano ${c.plan.saldo} cortes` : ""}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                value={clientQuery}
+                onChange={(e) => {
+                  setClientQuery(e.target.value);
+                  setClientId("");
+                  setClientOpen(true);
+                }}
+                onFocus={() => setClientOpen(true)}
+                placeholder="Buscar cliente pelo nome…"
+                className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+              />
+              {clientOpen && clientQuery.trim() && !clientId && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setClientOpen(false)} />
+                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
+                    {filteredClients.length === 0 ? (
+                      <p className="px-3 py-2.5 text-caption text-text-muted">Nenhum cliente encontrado.</p>
+                    ) : (
+                      filteredClients.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setClientId(c.id);
+                            setClientQuery(c.name);
+                            setClientOpen(false);
+                          }}
+                          className="block w-full px-3 py-2.5 text-left text-body text-text transition-colors hover:bg-accent-wash"
+                        >
+                          {c.name}
+                          {c.plan ? (
+                            <span className="text-caption text-text-muted"> · plano {c.plan.saldo} cortes</span>
+                          ) : null}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            {client && (
+              <p className="text-caption text-accent">
+                Selecionado: <strong>{client.name}</strong>
+              </p>
+            )}
           </div>
 
           {/* Vínculo: plano ou serviço */}
@@ -203,6 +272,29 @@ export function NewAppointmentDrawer({
                   </Chip>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Criança (corte infantil) */}
+          {needsChild && (
+            <div className="flex flex-col gap-2">
+              <Label className="mb-0">Criança (corte infantil)</Label>
+              {!clientId ? (
+                <p className="text-caption text-text-muted">Selecione o cliente primeiro.</p>
+              ) : children.length === 0 ? (
+                <p className="text-caption text-warning-strong">
+                  Este cliente não tem criança cadastrada. Peça para cadastrar no app (Perfil → Minhas crianças).
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {children.map((c) => (
+                    <Chip key={c.id} active={childId === c.id} onClick={() => setChildId(c.id)}>
+                      {c.name}
+                      {c.age != null ? ` · ${c.age} anos` : ""}
+                    </Chip>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
