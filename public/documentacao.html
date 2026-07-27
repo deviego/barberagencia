@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Documentação — Plataforma Barbearia</title>
+<meta name="description" content="Manual funcional da plataforma: app do cliente e painel do admin, com busca e download em PDF." />
+<style>
+  :root {
+    --bg: #efeae1; --surface: #ffffff; --surface-2: #f6f3ec;
+    --ink: #1c1917; --ink-2: #4a453d; --muted: #8a8578;
+    --border: #e4ded1; --border-2: #efe9dd;
+    --accent: #a9781f; --accent-strong: #8f6414; --accent-weak: #f2e8d1;
+    --pole-red: #b23a30; --pole-blue: #2f5f9e;
+    --mark: #ffe9a8; --mark-ink: #4a3708;
+    --shadow: 0 1px 2px rgba(28,25,23,.05), 0 8px 24px rgba(28,25,23,.06);
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14110d; --surface: #201c16; --surface-2: #1a1611;
+      --ink: #f3eee4; --ink-2: #cdc5b6; --muted: #968f80;
+      --border: #342f25; --border-2: #2a251d;
+      --accent: #d8b45c; --accent-strong: #e6c877; --accent-weak: #2a2417;
+      --pole-red: #c9564b; --pole-blue: #5b86c4;
+      --mark: #6a531a; --mark-ink: #fdf3d6;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #efeae1; --surface: #ffffff; --surface-2: #f6f3ec;
+    --ink: #1c1917; --ink-2: #4a453d; --muted: #8a8578;
+    --border: #e4ded1; --border-2: #efe9dd;
+    --accent: #a9781f; --accent-strong: #8f6414; --accent-weak: #f2e8d1;
+    --pole-red: #b23a30; --pole-blue: #2f5f9e;
+    --mark: #ffe9a8; --mark-ink: #4a3708;
+    --shadow: 0 1px 2px rgba(28,25,23,.05), 0 8px 24px rgba(28,25,23,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #14110d; --surface: #201c16; --surface-2: #1a1611;
+    --ink: #f3eee4; --ink-2: #cdc5b6; --muted: #968f80;
+    --border: #342f25; --border-2: #2a251d;
+    --accent: #d8b45c; --accent-strong: #e6c877; --accent-weak: #2a2417;
+    --pole-red: #c9564b; --pole-blue: #5b86c4;
+    --mark: #6a531a; --mark-ink: #fdf3d6;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 150px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-body); line-height: 1.65;
+    -webkit-font-smoothing: antialiased; font-size: 16px;
+  }
+
+  /* Top bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: saturate(1.2) blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .pole { height: 3px; background: repeating-linear-gradient(-45deg,
+      var(--pole-red) 0 12px, var(--accent) 12px 24px, var(--pole-blue) 24px 36px); }
+  .topbar-inner {
+    max-width: 1120px; margin: 0 auto; padding: 12px 22px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand .mark {
+    width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--ink);
+    color: var(--bg); display: grid; place-items: center; font-size: 16px;
+  }
+  .brand .name { font-weight: 800; letter-spacing: .04em; font-size: 14px; text-transform: uppercase; }
+  .brand .sub { color: var(--muted); font-size: 12px; }
+  .btn-pdf {
+    display: inline-flex; align-items: center; gap: 8px; flex: none;
+    background: var(--accent); color: #fff; text-decoration: none;
+    font-weight: 700; font-size: 13.5px; padding: 9px 15px; border-radius: 9px;
+    border: 1px solid color-mix(in srgb, var(--accent) 70%, #000); transition: transform .12s, filter .12s;
+  }
+  :root[data-theme="dark"] .btn-pdf, @media (prefers-color-scheme: dark) { }
+  .btn-pdf:hover { filter: brightness(1.05); transform: translateY(-1px); }
+  .btn-pdf:focus-visible { outline: 3px solid var(--accent-weak); outline-offset: 2px; }
+  .btn-pdf svg { width: 16px; height: 16px; }
+
+  /* Hero */
+  .hero { max-width: 1120px; margin: 0 auto; padding: 40px 22px 8px; }
+  .eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .hero h1 { font-size: clamp(28px, 4vw, 42px); line-height: 1.08; margin: 10px 0 8px; letter-spacing: -.02em; text-wrap: balance; font-weight: 800; }
+  .hero p { color: var(--ink-2); max-width: 60ch; margin: 0; font-size: 16.5px; }
+
+  /* Search */
+  .searchwrap { position: sticky; top: 60px; z-index: 40; background: var(--bg); padding: 16px 22px 12px; }
+  .searchwrap .inner { max-width: 1120px; margin: 0 auto; }
+  .searchbox { position: relative; }
+  .searchbox svg.ico { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); width: 19px; height: 19px; color: var(--muted); pointer-events: none; }
+  #q {
+    width: 100%; padding: 15px 110px 15px 44px; font-size: 16px; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    font-family: var(--font-body); box-shadow: var(--shadow);
+  }
+  #q::placeholder { color: var(--muted); }
+  #q:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-weak); }
+  .searchmeta { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+  #count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  #clear { display: none; border: none; background: var(--surface-2); color: var(--ink-2); border-radius: 7px; width: 26px; height: 26px; cursor: pointer; font-size: 15px; }
+  #clear:hover { color: var(--ink); }
+
+  /* Layout */
+  .shell { max-width: 1120px; margin: 0 auto; padding: 8px 22px 80px; display: grid; grid-template-columns: 250px 1fr; gap: 40px; }
+  @media (max-width: 900px) { .shell { grid-template-columns: 1fr; gap: 8px; } }
+
+  nav.toc { position: sticky; top: 150px; align-self: start; max-height: calc(100vh - 170px); overflow-y: auto; padding-right: 8px; }
+  @media (max-width: 900px) { nav.toc { position: static; max-height: none; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--surface); } }
+  nav.toc .toc-title { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin: 4px 0 10px; }
+  nav.toc ul { list-style: none; margin: 0; padding: 0; }
+  nav.toc li { margin: 0; }
+  nav.toc a { display: block; padding: 5px 10px; border-radius: 7px; color: var(--ink-2); text-decoration: none; font-size: 13.5px; border-left: 2px solid transparent; }
+  nav.toc a:hover { background: var(--surface-2); color: var(--ink); }
+  nav.toc a.part { margin-top: 12px; color: var(--accent); font-weight: 700; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+
+  main { min-width: 0; }
+  .doc-section { padding: 22px 0; border-top: 1px solid var(--border-2); scroll-margin-top: 150px; }
+  .doc-section:first-child { border-top: none; }
+  .doc-section > .num { font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 700; }
+  .doc-section h2 { font-size: 22px; line-height: 1.2; margin: 4px 0 12px; letter-spacing: -.01em; text-wrap: balance; }
+  .doc-section h3 { font-size: 14.5px; margin: 18px 0 6px; color: var(--ink); text-transform: uppercase; letter-spacing: .05em; }
+  .doc-section p { margin: 8px 0; color: var(--ink-2); max-width: 66ch; }
+  .doc-section ul, .doc-section ol { margin: 6px 0; padding-left: 22px; color: var(--ink-2); max-width: 66ch; }
+  .doc-section li { margin: 4px 0; }
+  .doc-section strong { color: var(--ink); font-weight: 700; }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-weak); border-radius: 0 10px 10px 0; padding: 10px 14px; margin: 12px 0; font-size: 14.5px; color: var(--ink-2); max-width: 66ch; }
+  .callout.warn { border-left-color: var(--pole-red); background: color-mix(in srgb, var(--pole-red) 12%, transparent); }
+  mark { background: var(--mark); color: var(--mark-ink); border-radius: 3px; padding: 0 1px; }
+  .noresults { display: none; padding: 40px 4px; color: var(--muted); }
+  .noresults strong { color: var(--ink); }
+  .part-head { margin: 30px 0 -6px; }
+  .part-head .k { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .part-head h2 { font-size: 15px; margin: 4px 0 0; color: var(--muted); font-weight: 700; }
+  footer { max-width: 1120px; margin: 0 auto; padding: 24px 22px 60px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="mark">✂️</span>
+      <span>
+        <span class="name">Barbearia · Docs</span><br />
+        <span class="sub">Manual funcional</span>
+      </span>
+    </div>
+    <a class="btn-pdf" href="/Documentacao-Plataforma-Barbearia.pdf" download="Documentacao-Plataforma-Barbearia.pdf">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Baixar PDF
+    </a>
+  </div>
+  <div class="pole"></div>
+</div>
+
+<header class="hero">
+  <div class="eyebrow">Documentação da plataforma</div>
+  <h1>Tudo o que o cliente e o admin podem fazer</h1>
+  <p>Manual funcional passo a passo, dividido em App do Cliente e Painel do Admin. Use a busca abaixo para encontrar uma função ou tela.</p>
+</header>
+
+<div class="searchwrap">
+  <div class="inner">
+    <div class="searchbox">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="q" type="search" autocomplete="off" placeholder="Buscar função ou tela… (ex.: reagendar, comanda, financeiro, criança)" aria-label="Buscar na documentação" />
+      <div class="searchmeta">
+        <span id="count"></span>
+        <button id="clear" aria-label="Limpar busca">✕</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <nav class="toc" aria-label="Sumário">
+    <div class="toc-title">Sumário</div>
+    <ul id="toc"></ul>
+  </nav>
+
+  <main id="content">
+    <p class="noresults" id="noresults">Nenhum resultado para <strong id="nr-term"></strong>. Tente outro termo (ex.: "plano", "pedido", "barbeiro").</p>
+
+    <section class="doc-section" id="s0"><div class="num">00</div><h2>Prefácio</h2>
+      <p>Este documento é o <strong>manual funcional</strong> da plataforma da barbearia, escrito para ser lido por qualquer pessoa — o dono, a equipe do balcão e o cliente — <strong>sem exigir conhecimento técnico</strong>. Serve como material de treinamento, onboarding e consulta do dia a dia.</p>
+      <p>Está dividido em duas partes: o <strong>App do Cliente</strong> (o que a pessoa que agenda vê e faz) e o <strong>Painel do Admin</strong> (o que a barbearia usa para operar). Cada tela é explicada em "O que é", "Passo a passo" e, quando útil, "Observações / Regras". As telas são citadas pelo nome que aparece no aplicativo. O manual reflete o comportamento atual da plataforma.</p>
+    </section>
+
+    <section class="doc-section" id="s1"><div class="num">01</div><h2>Visão geral da plataforma</h2>
+      <p>Aplicativo de <strong>agendamento + fidelização por assinatura</strong> para barbearia, com duas visões: <strong>App do Cliente</strong> e <strong>Painel do Admin</strong>.</p>
+      <ul>
+        <li><strong>Pagamento no local</strong>, após o atendimento (PIX, crédito, débito ou dinheiro) — não há cobrança online.</li>
+        <li><strong>Avisos automáticos</strong> ao cliente, principalmente por <strong>WhatsApp</strong> (e e-mail em alguns casos).</li>
+        <li>Várias telas atualizam <strong>em tempo real</strong>: a fila de solicitações do admin e a tela de acompanhamento do cliente.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="s2"><div class="num">02</div><h2>Conceitos-chave</h2>
+      <ul>
+        <li><strong>Solicitação → Aprovação:</strong> agendar e assinar/trocar/cancelar plano viram <strong>solicitações</strong> que a barbearia aprova no painel.</li>
+        <li><strong>Saldo de cortes:</strong> quem tem plano tem saldo mensal; agendar pelo plano consome 1 corte, cancelar devolve.</li>
+        <li><strong>Pedido / Comanda:</strong> um agendamento pode ter vários itens (serviços e produtos).</li>
+        <li><strong>Avulso × coberto pelo plano:</strong> o plano cobre 1 corte; extras são avulsos, pagos no local.</li>
+        <li><strong>Tempo real:</strong> novas solicitações tocam som e aparecem sozinhas; a confirmação do cliente muda sozinha.</li>
+      </ul>
+    </section>
+
+    <div class="part-head"><div class="k">Parte 1</div><h2>App do Cliente</h2></div>
+
+    <section class="doc-section" id="s3"><div class="num">03</div><h2>Cadastro e acesso</h2>
+      <h3>O que é</h3><p>Criar conta, entrar e recuperar a senha.</p>
+      <h3>Criar conta</h3>
+      <ol><li>Na tela de login, tocar em <strong>Cadastrar</strong>.</li><li>Preencher nome, e-mail, telefone e senha.</li><li><strong>Aceitar Termos de Uso e Política de Privacidade</strong> (obrigatório).</li><li>Concluir — chega um e-mail de boas-vindas.</li></ol>
+      <h3>Entrar / Recuperar senha</h3>
+      <p>Entrar com e-mail e senha. Em <strong>Esqueci minha senha</strong>, informar o e-mail, abrir o link recebido e definir a <strong>nova senha</strong> (já entra logado).</p>
+      <div class="callout">💡 O link de redefinição deve ser aberto no mesmo navegador em que foi solicitado. Termos e Privacidade ficam sempre acessíveis nos rodapés das telas de acesso.</div>
+    </section>
+
+    <section class="doc-section" id="s4"><div class="num">04</div><h2>Tela inicial (Home)</h2>
+      <h3>O que aparece</h3>
+      <ul>
+        <li>Saudação com nome e data.</li>
+        <li><strong>Card do próximo agendamento</strong> com <strong>Adicionar serviço</strong>, <strong>Reagendar</strong> e <strong>Cancelar</strong>.</li>
+        <li><strong>Medidor de cortes</strong> (assinantes): cortes restantes, plano e dia de renovação, com <strong>Ver meu plano</strong>.</li>
+        <li>Botão grande <strong>Agendar</strong> (com plano e saldo, vai direto ao horário) e atalho <strong>Suporte</strong>.</li>
+      </ul>
+      <p>Menu inferior: <strong>Início · Agendar · Pedidos · Meu plano · Perfil</strong>.</p>
+      <div class="callout warn">⚠️ Agendamento já <strong>confirmado</strong> só permite <strong>Cancelar</strong> (não reagenda).</div>
+    </section>
+
+    <section class="doc-section" id="s5"><div class="num">05</div><h2>Agendar (passo a passo)</h2>
+      <h3>1) Escolher em Serviços</h3><p>Ver serviços <strong>avulsos</strong> (preço + tempo médio) ou <strong>planos</strong> (benefícios). Escolher um serviço e tocar em <strong>Continuar</strong> leva ao montador com esse serviço já selecionado.</p>
+      <h3>2) Montar o pedido</h3>
+      <ol>
+        <li><strong>Barbeiro</strong>.</li>
+        <li><strong>Serviços</strong> — quem tem plano vê <strong>"Corte do plano · incluído"</strong> (escolhe qual corte usa o saldo) e <strong>"Adicionar avulso"</strong> abaixo.</li>
+        <li><strong>Produtos</strong> (opcional, com quantidade).</li>
+        <li><strong>Corte infantil → escolher/registrar criança</strong> (nome, idade, foto).</li>
+        <li><strong>Data e horário</strong> — ocupados riscados, horários passados bloqueados.</li>
+        <li><strong>Forma de pagamento</strong> (no local) e <strong>Observações</strong> para o barbeiro.</li>
+      </ol>
+      <h3>3) Enviar e acompanhar</h3><p>O <strong>Resumo</strong> mostra itens, total no local e tempo estimado. Após <strong>Solicitar agendamento</strong>, a tela de acompanhamento muda sozinha: <strong>Confirmado</strong>, <strong>Não confirmado</strong> ou <strong>Outro horário sugerido</strong>.</p>
+      <div class="callout">💡 Com plano e saldo, o corte do plano é <strong>incluído</strong> (consome 1 corte); os extras são avulsos.</div>
+    </section>
+
+    <section class="doc-section" id="s6"><div class="num">06</div><h2>Planos e assinatura</h2>
+      <h3>Ver e assinar</h3>
+      <p>Cada plano mostra os <strong>benefícios</strong> (ex.: 4 cortes/mês, 1ª mensalidade = adesão, valor cheio depois, desconto em produtos). Assinar abre um <strong>modal de confirmação</strong> e cria uma <strong>solicitação com aprovação</strong> do admin; o cliente recebe WhatsApp e, ao ser aprovado, a confirmação detalhada.</p>
+      <h3>Meu plano</h3>
+      <p>Plano ativo, saldo e renovação. <strong>Trocar</strong> e <strong>Cancelar</strong> viram pedido que aguarda aprovação (com aviso de pendência).</p>
+      <div class="callout warn">⚠️ Primeira assinatura, troca e cancelamento sempre passam pela aprovação do admin.</div>
+    </section>
+
+    <section class="doc-section" id="s7"><div class="num">07</div><h2>Meus pedidos</h2>
+      <p>A aba <strong>Pedidos</strong> reúne todos os pedidos (futuros, em atendimento e passados). Tocar em um abre o <strong>detalhamento</strong> (itens, valor, barbeiro, status).</p>
+      <ul>
+        <li>Itens já no pedido ficam <strong>selecionados</strong>; tocar adiciona/remove — <strong>sem duplicar</strong>.</li>
+        <li>O item coberto pelo plano fica travado (não removível).</li>
+        <li>Durante o atendimento: <strong>"Em atendimento" + cronômetro</strong>.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="s8"><div class="num">08</div><h2>Produtos</h2>
+      <p>Catálogo de produtos. O cliente pode <strong>reservar para retirada</strong> (com quantidade) e acompanhar o status. Produtos também podem ser adicionados dentro de um pedido de agendamento.</p>
+    </section>
+
+    <section class="doc-section" id="s9"><div class="num">09</div><h2>Perfil</h2>
+      <ul>
+        <li><strong>Dados pessoais:</strong> nome, telefone e <strong>foto</strong>.</li>
+        <li><strong>Minhas crianças:</strong> registrar/remover criança (nome, idade, foto) — usadas no corte infantil.</li>
+        <li><strong>Sair.</strong></li>
+      </ul>
+      <div class="callout">💡 Manter o telefone correto é importante: é por ele que chegam os avisos no WhatsApp.</div>
+    </section>
+
+    <section class="doc-section" id="s10"><div class="num">10</div><h2>Suporte</h2>
+      <p>Tocar em <strong>Suporte</strong> abre a conversa no <strong>WhatsApp</strong> da barbearia, pronta para enviar.</p>
+    </section>
+
+    <section class="doc-section" id="s11"><div class="num">11</div><h2>Avisos que o cliente recebe</h2>
+      <p>Enviados automaticamente por WhatsApp (e e-mail em alguns casos):</p>
+      <ul>
+        <li><strong>Agendamento solicitado</strong> — aguardando confirmação.</li>
+        <li><strong>Agendamento confirmado</strong> — serviço, valor, pagamento, data/barbeiro.</li>
+        <li><strong>Atendimento iniciado</strong> e <strong>finalizado</strong> (com total pago).</li>
+        <li><strong>Assinatura</strong> — solicitada, confirmada ou recusada.</li>
+        <li><strong>Cancelamentos</strong> — assinatura, agendamento ou reserva.</li>
+      </ul>
+      <div class="callout">💡 Quando o pedido é para uma <strong>criança</strong>, as mensagens incluem o nome dela.</div>
+    </section>
+
+    <div class="part-head"><div class="k">Parte 2</div><h2>Painel do Admin</h2></div>
+
+    <section class="doc-section" id="s12"><div class="num">12</div><h2>Acesso e navegação</h2>
+      <ul>
+        <li>Login do admin em <strong>/admin/login</strong>.</li>
+        <li><strong>Menu lateral</strong>: Dashboard, Solicitações, Agenda, Pedidos, Clientes, Serviços, Produtos, Barbeiros, Financeiro, Marketing, Mensagens, Configurações.</li>
+        <li><strong>Badge de Solicitações em tempo real + som</strong> quando chega algo novo.</li>
+        <li><strong>Ver como cliente</strong>, <strong>Sair</strong>, tema claro/escuro e menu hambúrguer no celular.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="s13"><div class="num">13</div><h2>Dashboard</h2>
+      <p>Indicadores (faturamento do mês, agendamentos de hoje, assinantes ativos, pendências) e a agenda do dia.</p>
+    </section>
+
+    <section class="doc-section" id="s14"><div class="num">14</div><h2>Solicitações</h2>
+      <p>Fila de aprovações em <strong>tempo real</strong>, com três tipos:</p>
+      <h3>Agendamentos (timer de 10 min)</h3>
+      <p>Cliente, serviço, data/hora, itens e total, forma de pagamento e <strong>cronômetro de 10 minutos</strong>. Mostra <strong>corte infantil + criança</strong> e <strong>observações</strong>. Ações: <strong>Aceitar</strong> / <strong>Liberar horário</strong> e botão <strong>Avisar no WhatsApp</strong>.</p>
+      <h3>Pedidos de plano</h3>
+      <p><strong>Nova assinatura</strong>, <strong>Troca</strong> ou <strong>Cancelamento</strong> → <strong>Aprovar</strong> / <strong>Recusar</strong> (cliente é avisado).</p>
+      <h3>Reservas de produto</h3>
+      <p>Marcar como <strong>entregue</strong> ou <strong>cancelar</strong>.</p>
+    </section>
+
+    <section class="doc-section" id="s15"><div class="num">15</div><h2>Agenda</h2>
+      <p>Visão <strong>Dia/Semana</strong> com navegação por setas. <strong>Novo agendamento</strong> nasce confirmado (consome corte se plano). Tocar num horário mostra detalhes (serviço, criança, observações, itens) e ações de presença/falta/cancelar. Os horários vêm dos <strong>horários de trabalho</strong> dos barbeiros.</p>
+    </section>
+
+    <section class="doc-section" id="s16"><div class="num">16</div><h2>Pedidos (comanda ao vivo)</h2>
+      <ol>
+        <li>Lista os atendimentos de hoje.</li>
+        <li><strong>Iniciar atendimento</strong> — dispara cronômetro + WhatsApp de boas-vindas.</li>
+        <li><strong>Adicionar/remover itens</strong> ao vivo (total e tempo se ajustam).</li>
+        <li><strong>Finalizar e lançar</strong> — escolhe pagamento → vira <strong>venda no financeiro</strong> + WhatsApp de agradecimento.</li>
+      </ol>
+      <div class="callout warn">⚠️ Item coberto pelo plano não é cobrado no fechamento — só os avulsos entram no valor.</div>
+    </section>
+
+    <section class="doc-section" id="s17"><div class="num">17</div><h2>Clientes</h2>
+      <ul>
+        <li>Lista com busca, <strong>filtro de status</strong> e coluna <strong>Crianças</strong>.</li>
+        <li><strong>Novo cliente</strong> e <strong>Convite</strong> (link para o cliente definir a senha).</li>
+        <li><strong>Visualizar</strong>: foto, plano + saldo, <strong>histórico de serviços</strong>, <strong>crianças</strong> e <strong>cancelar plano</strong>.</li>
+        <li><strong>Atribuir combo</strong> a um cliente.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="s18"><div class="num">18</div><h2>Serviços e Planos</h2>
+      <h3>Serviços</h3><p>Criar/editar/inativar (nome, duração, preço, categoria, <strong>switch "Serviço infantil"</strong>, ativo). Serviços infantis exibem o selo <strong>Infantil</strong> e pedem a criança no app.</p>
+      <h3>Planos (combos)</h3><p>Criar/editar/inativar (nome, cortes/mês, escopo/benefícios, preço). O <strong>escopo</strong> vira a lista de benefícios mostrada ao cliente.</p>
+    </section>
+
+    <section class="doc-section" id="s19"><div class="num">19</div><h2>Produtos</h2>
+      <p>Criar/editar/inativar produtos com <strong>preço, custo e estoque</strong>. Aparecem para o cliente reservar e podem ser lançados nas comandas.</p>
+    </section>
+
+    <section class="doc-section" id="s20"><div class="num">20</div><h2>Barbeiros</h2>
+      <p>Criar/editar/inativar barbeiros e definir os <strong>horários de trabalho</strong>, que alimentam os horários disponíveis no agendar e a grade da Agenda.</p>
+    </section>
+
+    <section class="doc-section" id="s21"><div class="num">21</div><h2>Financeiro</h2>
+      <p>Receitas e despesas (as vendas das comandas entram aqui), <strong>análise por forma de pagamento</strong>, <strong>registrar saque</strong> e fechamento do mês.</p>
+    </section>
+
+    <section class="doc-section" id="s22"><div class="num">22</div><h2>Marketing</h2>
+      <p>Campanhas por segmento. Módulo <strong>condicionado ao plano da barbearia</strong> (aparece quando habilitado).</p>
+    </section>
+
+    <section class="doc-section" id="s23"><div class="num">23</div><h2>Mensagens</h2>
+      <p>Modelos de WhatsApp prontos (boas-vindas, confirmação, retorno, aviso fora do expediente) com <strong>Copiar</strong> e link <strong>wa.me</strong>. Independentes dos avisos automáticos.</p>
+    </section>
+
+    <section class="doc-section" id="s24"><div class="num">24</div><h2>Configurações</h2>
+      <p>Dados da unidade, horários e <strong>identidade visual</strong> (logo e cor de destaque).</p>
+    </section>
+
+    <section class="doc-section" id="s25"><div class="num">25</div><h2>Avisos que o admin dispara</h2>
+      <ul>
+        <li><strong>Aceitar agendamento</strong> → confirmação.</li>
+        <li><strong>Iniciar / Finalizar atendimento</strong> → boas-vindas / agradecimento.</li>
+        <li><strong>Aprovar assinatura/troca</strong> → confirmação do plano; <strong>Recusar</strong> → aviso.</li>
+        <li><strong>Cancelar</strong> assinatura, agendamento ou reserva → aviso.</li>
+      </ul>
+      <div class="callout">💡 Para o WhatsApp automático funcionar, é preciso as credenciais de envio configuradas e o cliente com telefone no cadastro.</div>
+    </section>
+
+    <section class="doc-section" id="s26"><div class="num">26</div><h2>Regras de negócio (resumo)</h2>
+      <ul>
+        <li>Solicitação de agendamento <strong>expira em 10 minutos</strong> se o admin não responder.</li>
+        <li>Saldo de cortes: agendar consome 1, cancelar devolve; renova no dia de cobrança.</li>
+        <li><strong>Pagamento no local</strong> (PIX/crédito/débito/dinheiro).</li>
+        <li>Plano: <strong>1ª mensalidade = adesão</strong>; assinar/trocar/cancelar passa por aprovação.</li>
+        <li>Cancelamento: pelo app com <strong>10 min</strong> de antecedência; WhatsApp até <strong>30 min</strong> antes.</li>
+        <li><strong>Falta sem aviso</strong> pode restringir novos agendamentos.</li>
+        <li>Agendamento confirmado não é reagendável pelo cliente — apenas cancelado.</li>
+      </ul>
+    </section>
+
+    <section class="doc-section" id="s27"><div class="num">27</div><h2>Glossário</h2>
+      <ul>
+        <li><strong>Solicitação</strong> — pedido que aguarda aprovação do admin.</li>
+        <li><strong>Comanda / Pedido</strong> — agendamento com um ou mais itens.</li>
+        <li><strong>Avulso</strong> — item pago no local, fora do plano.</li>
+        <li><strong>Coberto pelo plano</strong> — item incluído (consome saldo).</li>
+        <li><strong>Adesão</strong> — valor da 1ª mensalidade.</li>
+        <li><strong>Saldo</strong> — cortes disponíveis no mês.</li>
+        <li><strong>No-show</strong> — falta sem aviso.</li>
+        <li><strong>Entitlement</strong> — recurso liberado conforme o plano da barbearia.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer>Documento funcional — reflete o comportamento atual da plataforma. Telas e textos podem evoluir com novas versões.</footer>
+
+<script>
+  (function () {
+    var content = document.getElementById('content');
+    var sections = Array.prototype.slice.call(content.querySelectorAll('.doc-section'));
+    var originals = sections.map(function (s) { return s.innerHTML; });
+    var q = document.getElementById('q');
+    var countEl = document.getElementById('count');
+    var clearBtn = document.getElementById('clear');
+    var noResults = document.getElementById('noresults');
+    var nrTerm = document.getElementById('nr-term');
+
+    // Build TOC from sections + part headers
+    var toc = document.getElementById('toc');
+    var nodes = Array.prototype.slice.call(content.children);
+    nodes.forEach(function (node) {
+      if (node.classList && node.classList.contains('part-head')) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.className = 'part';
+        a.textContent = node.querySelector('h2').textContent;
+        li.appendChild(a); toc.appendChild(li);
+      } else if (node.classList && node.classList.contains('doc-section')) {
+        var li2 = document.createElement('li');
+        var a2 = document.createElement('a');
+        a2.href = '#' + node.id;
+        a2.dataset.target = node.id;
+        a2.textContent = node.querySelector('h2').textContent;
+        li2.appendChild(a2); toc.appendChild(li2);
+      }
+    });
+    var tocLinks = Array.prototype.slice.call(toc.querySelectorAll('a[data-target]'));
+
+    function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+    function highlight(root, re) {
+      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      var textNodes = [], n;
+      while ((n = walker.nextNode())) textNodes.push(n);
+      textNodes.forEach(function (node) {
+        var val = node.nodeValue;
+        re.lastIndex = 0;
+        if (!re.test(val)) return;
+        re.lastIndex = 0;
+        var frag = document.createDocumentFragment();
+        var last = 0, m;
+        while ((m = re.exec(val))) {
+          if (m.index > last) frag.appendChild(document.createTextNode(val.slice(last, m.index)));
+          var mark = document.createElement('mark');
+          mark.textContent = m[0];
+          frag.appendChild(mark);
+          last = m.index + m[0].length;
+          if (m[0].length === 0) re.lastIndex++;
+        }
+        if (last < val.length) frag.appendChild(document.createTextNode(val.slice(last)));
+        node.parentNode.replaceChild(frag, node);
+      });
+    }
+
+    function run(query) {
+      var term = query.trim().toLowerCase();
+      clearBtn.style.display = term ? 'grid' : 'none';
+      if (!term) {
+        sections.forEach(function (s, i) { s.hidden = false; s.innerHTML = originals[i]; });
+        tocLinks.forEach(function (a) { a.parentElement.hidden = false; });
+        countEl.textContent = '';
+        noResults.style.display = 'none';
+        return;
+      }
+      var re = new RegExp('(' + esc(term) + ')', 'gi');
+      var hits = 0;
+      sections.forEach(function (s, i) {
+        s.innerHTML = originals[i];
+        var match = s.textContent.toLowerCase().indexOf(term) !== -1;
+        s.hidden = !match;
+        if (match) { hits++; highlight(s, re); }
+      });
+      tocLinks.forEach(function (a) {
+        var t = document.getElementById(a.dataset.target);
+        a.parentElement.hidden = t ? t.hidden : true;
+      });
+      countEl.textContent = hits + (hits === 1 ? ' seção' : ' seções');
+      if (hits === 0) { nrTerm.textContent = '“' + query.trim() + '”'; noResults.style.display = 'block'; }
+      else noResults.style.display = 'none';
+    }
+
+    var t;
+    q.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { run(q.value); }, 90); });
+    clearBtn.addEventListener('click', function () { q.value = ''; run(''); q.focus(); });
+    q.addEventListener('keydown', function (e) { if (e.key === 'Escape') { q.value = ''; run(''); } });
+
+    // Scrollspy for TOC active state
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          var id = en.target.id;
+          tocLinks.forEach(function (a) { a.classList.toggle('active', a.dataset.target === id); });
+        }
+      });
+    }, { rootMargin: '-150px 0px -70% 0px' });
+    sections.forEach(function (s) { spy.observe(s); });
+  })();
+</script>
+
+</body>
+</html>

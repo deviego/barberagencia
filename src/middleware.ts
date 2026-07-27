@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 /** Rotas públicas (sem sessão). Todo o resto exige login. */
 const PUBLIC_PREFIXES = [
   "/login", "/admin/login", "/master", "/cadastro", "/otp", "/recuperar-senha", "/redefinir-senha",
-  "/design-system", "/auth", "/termos", "/privacidade", "/convite",
+  "/design-system", "/auth", "/termos", "/privacidade", "/convite", "/documentacao",
 ];
 /** Páginas de login: se já logado, redireciona para a home (guardas roteiam por papel). */
 const AUTH_PAGES = ["/login", "/admin/login", "/master/login", "/cadastro", "/otp"];
@@ -73,5 +73,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff2?)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff2?|pdf|html)$).*)"],
 };
