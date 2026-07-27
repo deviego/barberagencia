@@ -200,6 +200,109 @@ export async function notifyPlanSubscribed(clientId: string, comboPlanId: string
   });
 }
 
+/** Avisa o cliente (WhatsApp) que a assinatura foi cancelada. */
+export async function notifyPlanCancelled(clientId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: client } = await supabase
+    .from("clients")
+    .select("name, phone, tenant_id")
+    .eq("id", clientId)
+    .maybeSingle();
+  const phone = client?.phone ?? null;
+  if (!phone) return;
+  const { data: sub } = await supabase
+    .from("client_subscriptions")
+    .select("combo_plans(name)")
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const plano = one(sub?.combo_plans as { name: string }[] | { name: string })?.name ?? "seu plano";
+  const nome = (client?.name ?? "").split(" ")[0];
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `*ASSINATURA CANCELADA*\n\n` +
+    `${nome ? `${nome}, ` : ""}sua assinatura do *${plano}* foi cancelada.\n\n` +
+    `Sentiremos sua falta! Quando quiser voltar, é só assinar de novo pelo app. ` +
+    `Qualquer dúvida, fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY}. 💈`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: client?.tenant_id ?? null,
+    channel: "whatsapp",
+    template: "plan_cancelled",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
+/** Avisa o cliente (WhatsApp) que um agendamento foi cancelado. */
+export async function notifyAppointmentCancelled(appointmentId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select("start_at, tenant_id, clients(name, phone), services(name), combo_plans(name), barbers(name)")
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (!appt) return;
+  const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
+  const phone = client?.phone ?? null;
+  if (!phone) return;
+  const nome = (client?.name ?? "").split(" ")[0];
+  const servico =
+    one(appt.services as { name: string }[] | { name: string })?.name ??
+    one(appt.combo_plans as { name: string }[] | { name: string })?.name ??
+    "seu atendimento";
+  const barber = one(appt.barbers as { name: string }[] | { name: string })?.name;
+  const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `*AGENDAMENTO CANCELADO*\n\n` +
+    `${nome ? `${nome}, ` : ""}seu agendamento foi cancelado.\n\n` +
+    `📋 Serviço: *${servico}*\n` +
+    `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
+    `Quer marcar um novo horário? É só agendar pelo app. 💈`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: appt.tenant_id,
+    channel: "whatsapp",
+    template: "appointment_cancelled",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
+/** Avisa o cliente (WhatsApp) que uma reserva de produto foi cancelada. */
+export async function notifyReservationCancelled(reservationId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data: res } = await supabase
+    .from("product_reservations")
+    .select("qty, tenant_id, clients(name, phone), products(name)")
+    .eq("id", reservationId)
+    .maybeSingle();
+  if (!res) return;
+  const client = one(res.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
+  const phone = client?.phone ?? null;
+  if (!phone) return;
+  const nome = (client?.name ?? "").split(" ")[0];
+  const produto = one(res.products as { name: string }[] | { name: string })?.name ?? "produto";
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `*RESERVA CANCELADA*\n\n` +
+    `${nome ? `${nome}, ` : ""}sua reserva de *${res.qty}x ${produto}* foi cancelada.\n\n` +
+    `Qualquer dúvida, fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY}. 💈`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: res.tenant_id,
+    channel: "whatsapp",
+    template: "reservation_cancelled",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
 /** E-mail de boas-vindas ao novo cliente (após o cadastro). */
 export async function notifyWelcome(email: string, name: string, tenantName: string) {
   if (!email) return;

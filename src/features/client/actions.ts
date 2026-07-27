@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { notifyPlanRequested } from "@/server/notifications/notify";
+import { notifyPlanRequested, notifyAppointmentCancelled } from "@/server/notifications/notify";
 import { getMyClient } from "./data";
 
 const itemSchema = z.object({
@@ -257,6 +257,11 @@ export async function cancelAppointment(id: string) {
 
   if (appt.consumed_from_plan) {
     await supabase.rpc("return_cut", { p_client_id: appt.client_id });
+  }
+  try {
+    await notifyAppointmentCancelled(id);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
   }
   revalidatePath("/");
   revalidatePath("/agendamentos");

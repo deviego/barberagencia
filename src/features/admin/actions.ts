@@ -4,7 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getClientDetail } from "./data";
-import { notifyAppointmentConfirmed, notifyServiceStarted, notifyServiceFinished, notifyPlanSubscribed } from "@/server/notifications/notify";
+import {
+  notifyAppointmentConfirmed,
+  notifyServiceStarted,
+  notifyServiceFinished,
+  notifyPlanSubscribed,
+  notifyPlanCancelled,
+  notifyAppointmentCancelled,
+  notifyReservationCancelled,
+} from "@/server/notifications/notify";
 
 async function setStatus(
   id: string,
@@ -171,6 +179,11 @@ export async function cancelClientSubscription(clientId: string) {
     .eq("client_id", clientId)
     .eq("status", "ACTIVE");
   if (error) return { ok: false as const, error: error.message };
+  try {
+    await notifyPlanCancelled(clientId);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
   revalidatePath("/admin/clientes");
   revalidatePath("/admin");
   return { ok: true as const };
@@ -263,6 +276,11 @@ export async function approvePlanRequest(id: string) {
       .eq("client_id", req.client_id)
       .eq("status", "ACTIVE");
     if (error) return { ok: false as const, error: error.message };
+    try {
+      await notifyPlanCancelled(req.client_id);
+    } catch {
+      /* notificação não deve quebrar o fluxo */
+    }
   }
 
   await supabase
@@ -337,6 +355,11 @@ export async function cancelReservation(id: string) {
     .update({ status: "CANCELLED" })
     .eq("id", id);
   if (error) return { ok: false as const, error: error.message };
+  try {
+    await notifyReservationCancelled(id);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
   revalidatePath("/admin/solicitacoes");
   revalidatePath("/admin");
   return { ok: true as const };
@@ -460,6 +483,13 @@ export async function adminCancelAppointment(id: string) {
   const { error } = await supabase.from("appointments").update({ status: "CANCELLED" }).eq("id", id);
   if (!error && appt?.consumed_from_plan) {
     await supabase.rpc("return_cut", { p_client_id: appt.client_id });
+  }
+  if (!error) {
+    try {
+      await notifyAppointmentCancelled(id);
+    } catch {
+      /* notificação não deve quebrar o fluxo */
+    }
   }
   revalidatePath("/admin/agenda");
   revalidatePath("/admin");
