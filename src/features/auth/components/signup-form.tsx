@@ -12,7 +12,13 @@ import { signUpWithPassword } from "../services/auth-service";
 import { sendWelcomeEmail } from "@/features/auth/actions";
 import { maskDate, maskPhoneBR } from "@/lib/masks";
 
-export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: string }) {
+export function SignupForm({
+  tenantName = "nossa barbearia",
+  tenantSubdomain,
+}: {
+  tenantName?: string;
+  tenantSubdomain?: string;
+}) {
   const router = useRouter();
   const [termsOpen, setTermsOpen] = useState(false);
   const [form, setForm] = useState({ name: "", birth: "", phone: "", email: "", password: "" });
@@ -32,6 +38,7 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
       const data = await signUpWithPassword(form.email, form.password, {
         full_name: form.name,
         phone: form.phone,
+        tenant_subdomain: tenantSubdomain,
       });
       if (data.session) {
         await sendWelcomeEmail().catch(() => {});

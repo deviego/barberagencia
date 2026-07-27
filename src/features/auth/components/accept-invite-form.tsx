@@ -17,11 +17,13 @@ export function AcceptInviteForm({
   email,
   name,
   phone,
+  tenantSubdomain,
 }: {
   token: string;
   email: string;
   name: string;
   phone: string;
+  tenantSubdomain?: string;
 }) {
   const router = useRouter();
   const [fullName, setFullName] = useState(name);
@@ -41,7 +43,7 @@ export function AcceptInviteForm({
     }
     setLoading(true);
     try {
-      const data = await signUpWithPassword(mail, pw, { full_name: fullName, phone: tel });
+      const data = await signUpWithPassword(mail, pw, { full_name: fullName, phone: tel, tenant_subdomain: tenantSubdomain });
       const supabase = createSupabaseBrowserClient();
       await supabase.rpc("accept_invite", { p_token: token });
       if (data.session) {

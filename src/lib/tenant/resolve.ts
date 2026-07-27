@@ -1,53 +1,81 @@
 import "server-only";
-import { headers } from "next/headers";
-import type { ResolvedTenant } from "./types";
+import { cache } from "react";
+import { cookies } from "next/headers";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth/session";
+import type { ResolvedTenant, SaasPlanKey } from "./types";
 
-/**
- * Tenant de referência (mock) enquanto o banco não está conectado.
- * No M3+ isto vira uma query Prisma por subdomain/customDomain, cacheada.
- */
-export const REFERENCE_TENANT: ResolvedTenant = {
-  id: "tenant_oliveira01",
-  name: "Barbearia Oliveira 01",
-  subdomain: "oliveira01",
-  customDomain: null,
-  networkId: null,
-  saasPlan: "advance",
-  branding: {
-    logoText: "BO",
-    logoUrl: "/logo-oliveira.jpeg",
-    // null => herda o accent do tema (dourado). Um tenant white-label sobrescreve aqui.
-    accent: null,
-    accentHover: null,
-    accentDown: null,
-    accentWash: null,
-    focus: null,
-    instagram: "@barbeariaoliveira01",
-  },
-};
+export const TENANT_COOKIE = "bb_tenant";
+const FALLBACK_SUBDOMAIN = "oliveira01";
 
-/** Extrai o subdomínio do host (ex.: "oliveira01.barber.app" -> "oliveira01"). */
-export function subdomainFromHost(host: string | null | undefined): string | null {
-  if (!host) return null;
-  const base = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "barber.app";
-  const clean = host.split(":")[0];
-  if (clean === "localhost" || clean.endsWith(".localhost")) {
-    const parts = clean.split(".");
-    return parts.length > 1 ? parts[0] : null;
-  }
-  if (clean.endsWith(`.${base}`)) {
-    return clean.slice(0, -1 * (base.length + 1)).split(".")[0];
-  }
-  return null; // domínio próprio → resolver por customDomain (futuro)
+function mapPlan(v: string | null | undefined): SaasPlanKey {
+  return v === "personal" || v === "essencial" || v === "advance" ? v : "advance";
 }
 
-/**
- * Resolve o tenant atual pelo host. Por ora retorna o tenant de referência;
- * a resolução real (Prisma + cache) entra quando o banco estiver conectado.
- */
-export async function getCurrentTenant(): Promise<ResolvedTenant> {
-  const h = await headers();
-  const sub = subdomainFromHost(h.get("host"));
-  // TODO(M3): buscar no banco por `sub`/customDomain e cachear.
-  return { ...REFERENCE_TENANT, subdomain: sub ?? REFERENCE_TENANT.subdomain };
+/** Carrega tenant + branding do banco (leitura pública via RLS). */
+async function loadTenant(where: { id?: string; subdomain?: string }): Promise<ResolvedTenant | null> {
+  const supabase = await createSupabaseServerClient();
+  let q = supabase.from("tenants").select("id, name, subdomain, custom_domain, saas_plan");
+  if (where.id) q = q.eq("id", where.id);
+  else if (where.subdomain) q = q.eq("subdomain", where.subdomain);
+  const { data: t } = await q.limit(1).maybeSingle();
+  if (!t) return null;
+
+  const { data: b } = await supabase
+    .from("branding")
+    .select("logo_text, logo_url, accent, accent_hover, accent_down, accent_wash, focus, instagram")
+    .eq("tenant_id", t.id)
+    .maybeSingle();
+
+  return {
+    id: t.id as string,
+    name: t.name as string,
+    subdomain: t.subdomain as string,
+    customDomain: (t.custom_domain as string | null) ?? null,
+    networkId: null,
+    saasPlan: mapPlan(t.saas_plan as string | null),
+    branding: {
+      logoText: (b?.logo_text as string | null) ?? "BO",
+      logoUrl: (b?.logo_url as string | null) ?? null,
+      accent: (b?.accent as string | null) ?? null,
+      accentHover: (b?.accent_hover as string | null) ?? null,
+      accentDown: (b?.accent_down as string | null) ?? null,
+      accentWash: (b?.accent_wash as string | null) ?? null,
+      focus: (b?.focus as string | null) ?? null,
+      instagram: (b?.instagram as string | null) ?? null,
+    },
+  };
 }
+
+export const getTenantBySubdomain = cache((slug: string) => loadTenant({ subdomain: slug }));
+export const getTenantById = cache((id: string) => loadTenant({ id }));
+
+/**
+ * Tenant atual:
+ * 1) logado → tenant do membership;
+ * 2) anônimo → cookie `bb_tenant` (definido pelo link /b/{slug});
+ * 3) fallback → oliveira01.
+ */
+export const getCurrentTenant = cache(async (): Promise<ResolvedTenant> => {
+  const user = await getSessionUser();
+  if (user?.tenantId) {
+    const t = await getTenantById(user.tenantId);
+    if (t) return t;
+  }
+  const slug = (await cookies()).get(TENANT_COOKIE)?.value;
+  if (slug) {
+    const t = await getTenantBySubdomain(slug);
+    if (t) return t;
+  }
+  const fb = await getTenantBySubdomain(FALLBACK_SUBDOMAIN);
+  if (fb) return fb;
+  return {
+    id: "",
+    name: "Barbearia",
+    subdomain: FALLBACK_SUBDOMAIN,
+    customDomain: null,
+    networkId: null,
+    saasPlan: "advance",
+    branding: { logoText: "BO", logoUrl: null, instagram: null },
+  };
+});

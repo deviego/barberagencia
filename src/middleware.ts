@@ -6,7 +6,8 @@ import { AREA_HEADER, areaFromKey, areaKeyFor, type AreaKey } from "@/lib/supaba
 const PUBLIC_PREFIXES = [
   "/client/login", "/client/cadastro", "/client/otp", "/client/recuperar-senha", "/client/redefinir-senha", "/client/auth",
   "/admin/login", "/admin/auth",
-  "/master", "/master/auth",
+  "/master/login", "/master/auth",
+  "/b",
   "/design-system", "/termos", "/privacidade", "/convite", "/documentacao",
 ];
 /** Páginas de login: se já logado (na área), redireciona para a home da área. */

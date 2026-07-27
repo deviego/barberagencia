@@ -12,7 +12,7 @@ export async function signInWithPassword(email: string, password: string) {
 export async function signUpWithPassword(
   email: string,
   password: string,
-  meta: { full_name?: string; phone?: string }
+  meta: { full_name?: string; phone?: string; tenant_subdomain?: string }
 ) {
   const supabase = createSupabaseBrowserClient();
   const emailRedirectTo =

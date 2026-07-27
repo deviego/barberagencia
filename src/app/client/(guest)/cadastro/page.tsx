@@ -11,7 +11,7 @@ export default async function CadastroPage() {
           Falta pouco para agendar seu próximo corte na {tenant.name}.
         </p>
       </div>
-      <SignupForm tenantName={tenant.name} />
+      <SignupForm tenantName={tenant.name} tenantSubdomain={tenant.subdomain} />
     </div>
   );
 }

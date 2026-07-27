@@ -26,7 +26,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
                 Você foi convidado{info.name ? `, ${info.name.split(" ")[0]}` : ""}! Crie seu acesso para
                 agendar seus cortes.
               </p>
-              <AcceptInviteForm token={token} email={info.email ?? ""} name={info.name ?? ""} phone={info.phone ?? ""} />
+              <AcceptInviteForm token={token} email={info.email ?? ""} name={info.name ?? ""} phone={info.phone ?? ""} tenantSubdomain={tenant.subdomain} />
             </>
           ) : (
             <div className="flex flex-col items-center gap-3 text-center">
