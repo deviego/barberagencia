@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
 import { ViewAsClientButton } from "@/components/nav/view-as-client-button";
 import { MobileNav } from "@/components/nav/mobile-nav";
+import { TrialBanner } from "@/components/nav/trial-banner";
 import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { ADMIN_NAV } from "@/features/admin/nav";
@@ -47,6 +48,7 @@ export function AdminShell({
   userEmail,
   avatarUrl,
   pendingCount = 0,
+  trialEndsAt,
   children,
 }: {
   logoText: string;
@@ -57,6 +59,7 @@ export function AdminShell({
   userEmail?: string | null;
   avatarUrl?: string | null;
   pendingCount?: number;
+  trialEndsAt?: string | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -105,6 +108,7 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-screen flex-col">
+      {trialEndsAt && <TrialBanner endsAt={trialEndsAt} />}
       <MobileNav
         open={mobileNav}
         onClose={() => setMobileNav(false)}

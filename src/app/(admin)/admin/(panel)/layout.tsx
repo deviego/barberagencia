@@ -21,6 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       userEmail={user.email}
       avatarUrl={user.avatarUrl}
       pendingCount={pendingCount}
+      trialEndsAt={tenant.subdomain === "oliveira01" ? "2026-08-03T23:59:59-03:00" : null}
     >
       {children}
     </AdminShell>
