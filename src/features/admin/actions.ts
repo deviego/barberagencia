@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getClientDetail } from "./data";
 import {
   notifyAppointmentConfirmed,
@@ -14,6 +16,7 @@ import {
   notifyAppointmentCancelled,
   notifyReservationCancelled,
   notifyServiceAdded,
+  notifyInvite,
 } from "@/server/notifications/notify";
 
 async function setStatus(
@@ -125,6 +128,25 @@ export async function createInvite(values: { name?: string; phone?: string; emai
     expires_at: expiresAt,
   });
   if (error) return { ok: false as const, error: error.message };
+
+  // Dispara o convite (WhatsApp/e-mail) com o link do portal.
+  try {
+    const hdrs = await headers();
+    const host = hdrs.get("host") ?? "";
+    const proto = host.includes("localhost") ? "http" : "https";
+    const link = `${proto}://${host}/convite/${token}`;
+    const tenant = await getCurrentTenant();
+    await notifyInvite({
+      name: values.name ?? null,
+      phone: values.phone ?? null,
+      email: values.email ?? null,
+      tenantName: tenant.name,
+      tenantId: user.tenantId,
+      link,
+    });
+  } catch {
+    /* notificação não deve quebrar o fluxo (admin ainda tem o link/Copiar) */
+  }
   return { ok: true as const, token };
 }
 

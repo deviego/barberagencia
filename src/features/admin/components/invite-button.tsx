@@ -82,6 +82,12 @@ export function InviteButton() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 rounded-md border border-success bg-success-bg px-3 py-2 text-caption text-success-strong">
+              <Check size={15} />
+              {phone || email
+                ? `Convite enviado${phone ? " por WhatsApp" : ""}${phone && email ? " e" : ""}${email ? " e-mail" : ""}. Use os botões abaixo se quiser reenviar.`
+                : "Convite gerado. Envie o link abaixo ao cliente."}
+            </div>
             <div className="rounded-md border border-accent bg-accent-wash p-3 text-caption text-text-2 break-all">
               {link}
             </div>

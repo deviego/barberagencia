@@ -377,21 +377,92 @@ export async function notifyReservationCancelled(reservationId: string) {
   });
 }
 
-/** E-mail de boas-vindas ao novo cliente (após o cadastro). */
-export async function notifyWelcome(email: string, name: string, tenantName: string) {
-  if (!email) return;
+/** Convite para o cliente completar o cadastro (WhatsApp + e-mail com o link do portal). */
+export async function notifyInvite(input: {
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  tenantName: string;
+  tenantId?: string | null;
+  link: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const nome = (input.name ?? "").split(" ")[0];
+
+  if (input.phone) {
+    const msg =
+      `✂️ *${input.tenantName}*\n` +
+      `*BEM-VINDO!*\n\n` +
+      `${nome ? `${nome}, ` : ""}a ${input.tenantName} criou o seu acesso. 💈\n` +
+      `Falta pouco: é só criar sua senha (seu nome e telefone já estão preenchidos).\n\n` +
+      `👉 ${input.link}\n\n` +
+      `O link vale por 48 horas.`;
+    const w = await sendWhatsApp(input.phone, msg);
+    await supabase.from("notification_log").insert({
+      tenant_id: input.tenantId ?? null,
+      channel: "whatsapp",
+      template: "invite",
+      recipient: input.phone,
+      status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+    });
+  }
+
+  if (input.email) {
+    const html = emailShell(
+      `Bem-vindo${nome ? `, ${nome}` : ""}! ✂️`,
+      `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
+         A <strong>${input.tenantName}</strong> criou o seu acesso. Falta pouco: crie sua senha para
+         agendar seus cortes (seu nome e telefone já estão preenchidos).
+       </p>
+       <p style="margin:18px 0;">
+         <a href="${input.link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Criar meu acesso</a>
+       </p>
+       <p style="color:#8a8578;font-size:13px;line-height:1.6;">O link vale por 48 horas. Se o botão não abrir: ${input.link}</p>`
+    );
+    const r = await sendEmail({ to: input.email, subject: `Seu acesso na ${input.tenantName}`, html });
+    await supabase.from("notification_log").insert({
+      tenant_id: input.tenantId ?? null,
+      channel: "email",
+      template: "invite",
+      recipient: input.email,
+      status: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED",
+    });
+  }
+}
+
+/** E-mail (e WhatsApp) de boas-vindas ao novo cliente (após o cadastro). */
+export async function notifyWelcome(
+  email: string,
+  name: string,
+  tenantName: string,
+  opts?: { phone?: string | null; link?: string | null }
+) {
   const nome = (name ?? "").split(" ")[0];
-  const html = emailShell(
-    `Bem-vindo${nome ? `, ${nome}` : ""}! ✂️`,
-    `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
-       Que bom ter você na <strong>${tenantName}</strong>! Sua conta já está pronta.
-     </p>
-     <p style="color:#4a453d;font-size:15px;line-height:1.6;">
-       Agende seu próximo corte, acompanhe seus pedidos e aproveite os planos. O pagamento é feito no
-       local após o atendimento.
-     </p>`
-  );
-  await sendEmail({ to: email, subject: `Bem-vindo à ${tenantName}`, html });
+
+  if (email) {
+    const html = emailShell(
+      `Bem-vindo${nome ? `, ${nome}` : ""}! ✂️`,
+      `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
+         Que bom ter você na <strong>${tenantName}</strong>! Sua conta já está pronta.
+       </p>
+       <p style="color:#4a453d;font-size:15px;line-height:1.6;">
+         Agende seu próximo corte, acompanhe seus pedidos e aproveite os planos. O pagamento é feito no
+         local após o atendimento.
+       </p>
+       ${opts?.link ? `<p style="margin:16px 0;"><a href="${opts.link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Abrir o app</a></p>` : ""}`
+    );
+    await sendEmail({ to: email, subject: `Bem-vindo à ${tenantName}`, html });
+  }
+
+  if (opts?.phone) {
+    const msg =
+      `✂️ *${tenantName}*\n` +
+      `*BEM-VINDO!* 🎉\n\n` +
+      `${nome ? `${nome}, ` : ""}sua conta está pronta. Agende seu próximo corte, acompanhe seus pedidos e aproveite os planos.\n` +
+      (opts.link ? `\n👉 ${opts.link}\n` : "") +
+      `\nO pagamento é feito no local após o atendimento. 💈`;
+    await sendWhatsApp(opts.phone, msg);
+  }
 }
 
 /** Avisa o cliente (WhatsApp) que o pedido de agendamento foi recebido e aguarda confirmação. */

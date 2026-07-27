@@ -26,11 +26,16 @@ export async function sendWelcomeEmail() {
   } = await supabase.auth.getUser();
   if (!user?.email) return { ok: false as const };
   const name = (user.user_metadata?.full_name as string | undefined) ?? "";
+  const phone = (user.user_metadata?.phone as string | undefined) ?? null;
   const tenant = await getCurrentTenant();
   try {
-    await notifyWelcome(user.email, name, tenant.name);
+    const hdrs = await headers();
+    const host = hdrs.get("host") ?? "";
+    const proto = host.includes("localhost") ? "http" : "https";
+    const link = host ? `${proto}://${host}/client` : null;
+    await notifyWelcome(user.email, name, tenant.name, { phone, link });
   } catch {
-    /* não bloqueia o cadastro se o e-mail falhar */
+    /* não bloqueia o cadastro se a boas-vindas falhar */
   }
   return { ok: true as const };
 }
