@@ -11,7 +11,7 @@ export default function MasterLoginPage() {
           <h1 className="font-display text-h2 uppercase leading-none text-text">Admin Master</h1>
           <p className="mt-2 text-body text-text-2">Painel da plataforma.</p>
         </div>
-        <LoginForm showSignup={false} />
+        <LoginForm showSignup={false} showForgot={false} dest="/master" basePath="/master" />
       </div>
     </AuthScreen>
   );

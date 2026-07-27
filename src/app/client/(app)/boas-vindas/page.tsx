@@ -29,7 +29,7 @@ export default function BoasVindasPage() {
         <Facebook size={22} />
         <Send size={22} />
       </div>
-      <Link href="/" className="w-full max-w-xs">
+      <Link href="/client" className="w-full max-w-xs">
         <Button size="lg" className="w-full">
           Ir para o início
         </Button>

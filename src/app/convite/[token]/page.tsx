@@ -31,7 +31,7 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
           ) : (
             <div className="flex flex-col items-center gap-3 text-center">
               <p className="text-body text-text-2">Este convite é inválido ou expirou.</p>
-              <Link href="/cadastro" className="text-body font-semibold text-accent hover:underline">
+              <Link href="/client/cadastro" className="text-body font-semibold text-accent hover:underline">
                 Criar conta
               </Link>
             </div>

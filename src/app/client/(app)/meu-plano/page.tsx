@@ -44,7 +44,7 @@ export default async function MeuPlanoPage() {
         ) : (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-surface p-8 text-center">
             <p className="text-body text-text-2">Você ainda não tem um plano ativo.</p>
-            <Link href="/servicos">
+            <Link href="/client/servicos">
               <Button>Ver planos</Button>
             </Link>
           </div>

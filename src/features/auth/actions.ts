@@ -1,19 +1,21 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { notifyWelcome } from "@/server/notifications/notify";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
+import { AREA_HEADER } from "@/lib/supabase/area";
 
-/** Encerra a sessão no servidor (limpa cookies) e volta ao login. */
+/** Encerra a sessão da ÁREA atual (limpa o cookie dela) e volta ao login da área. */
 export async function logout() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   (await cookies()).delete(VIEW_AS_CLIENT_COOKIE);
-  redirect("/login");
+  const area = (await headers()).get(AREA_HEADER) ?? "client";
+  redirect(area === "admin" ? "/admin/login" : area === "master" ? "/master/login" : "/client/login");
 }
 
 /** Envia o e-mail de boas-vindas ao usuário logado (chamado logo após o cadastro). */
@@ -36,7 +38,7 @@ export async function sendWelcomeEmail() {
 /** Admin entra no modo "ver como cliente" (visualiza o app do cliente). */
 export async function enterClientPreview() {
   (await cookies()).set(VIEW_AS_CLIENT_COOKIE, "1", { path: "/", sameSite: "lax" });
-  redirect("/");
+  redirect("/client/login");
 }
 
 /** Sai do modo "ver como cliente" e volta ao painel do papel. */

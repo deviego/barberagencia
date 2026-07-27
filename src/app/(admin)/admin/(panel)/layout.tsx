@@ -7,8 +7,8 @@ import { isUnitAdmin } from "@/lib/rbac";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
-  if (!user.role || !isUnitAdmin(user.role)) redirect("/");
+  if (!user) redirect("/admin/login");
+  if (!user.role || !isUnitAdmin(user.role)) redirect("/admin/login");
 
   const [tenant, pendingCount] = await Promise.all([getCurrentTenant(), getPendingCount()]);
   return (

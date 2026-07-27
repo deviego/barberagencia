@@ -28,7 +28,7 @@ export function ServicosView({ services, combos }: { services: Service[]; combos
       setError(null);
       setConfirmOpen(true);
     } else {
-      router.push(`/agendar?service=${selected}`);
+      router.push(`/client/agendar?service=${selected}`);
     }
   }
 
@@ -59,7 +59,7 @@ export function ServicosView({ services, combos }: { services: Service[]; combos
             confirmação no WhatsApp.
           </p>
         </div>
-        <Button onClick={() => router.push("/")}>Voltar ao início</Button>
+        <Button onClick={() => router.push("/client")}>Voltar ao início</Button>
       </div>
     );
   }

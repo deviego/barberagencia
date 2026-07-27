@@ -70,7 +70,7 @@ export function ResetPasswordForm() {
           Este link é inválido ou expirou. Abra o link mais recente no mesmo navegador ou solicite
           um novo.
         </p>
-        <Link href="/recuperar-senha">
+        <Link href="/client/recuperar-senha">
           <Button className="w-full">Solicitar novo link</Button>
         </Link>
       </div>

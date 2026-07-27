@@ -11,7 +11,7 @@ import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/client/login");
 
   const preview = (await cookies()).get(VIEW_AS_CLIENT_COOKIE)?.value === "1";
   const isAdmin =
@@ -24,7 +24,7 @@ export default async function ClientLayout({ children }: { children: React.React
   const [tenant, balance] = await Promise.all([getCurrentTenant(), getActivePlanBalance()]);
   const hasPlan = balance !== null; // sem assinatura ativa → oculta "Meu plano"
   // Com plano e saldo > 0, "Agendar" vai direto ao horário; senão, escolhe serviço.
-  const agendarHref = (balance ?? 0) > 0 ? "/agendar" : "/servicos";
+  const agendarHref = (balance ?? 0) > 0 ? "/client/agendar" : "/client/servicos";
   return (
     <div className="min-h-screen">
       {isAdmin && preview && (

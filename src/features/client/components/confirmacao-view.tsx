@@ -106,13 +106,13 @@ export function ConfirmacaoView({ appointmentId }: { appointmentId: string | nul
       )}
 
       {refused ? (
-        <Link href="/agendar" className="w-full max-w-xs">
+        <Link href="/client/agendar" className="w-full max-w-xs">
           <Button size="lg" className="w-full">
             Agendar novamente
           </Button>
         </Link>
       ) : (
-        <Link href="/agendamentos" className="w-full max-w-xs">
+        <Link href="/client/agendamentos" className="w-full max-w-xs">
           <Button size="lg" className="w-full" variant={confirmed ? "primary" : "outline"}>
             Ver meus agendamentos
           </Button>

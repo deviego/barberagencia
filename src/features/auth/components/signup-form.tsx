@@ -35,7 +35,7 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
       });
       if (data.session) {
         await sendWelcomeEmail().catch(() => {});
-        router.push("/");
+        router.push("/client");
       } else {
         setSentConfirm(true); // confirmação de e-mail ativa
       }
@@ -73,7 +73,7 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
           <MailCheck size={15} className="text-accent" />
           Não recebeu? Verifique o spam ou aguarde alguns instantes.
         </div>
-        <Link href="/login" className="text-body font-semibold text-accent hover:underline">
+        <Link href="/client/login" className="text-body font-semibold text-accent hover:underline">
           Já confirmei — ir para o login
         </Link>
       </div>
@@ -140,7 +140,7 @@ export function SignupForm({ tenantName = "nossa barbearia" }: { tenantName?: st
 
         <p className="text-center text-body text-text-2">
           Já tem conta?{" "}
-          <Link href="/login" className="font-semibold text-accent hover:underline">
+          <Link href="/client/login" className="font-semibold text-accent hover:underline">
             Entrar
           </Link>
         </p>

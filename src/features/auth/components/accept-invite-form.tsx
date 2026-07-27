@@ -46,7 +46,7 @@ export function AcceptInviteForm({
       await supabase.rpc("accept_invite", { p_token: token });
       if (data.session) {
         await sendWelcomeEmail().catch(() => {});
-        router.push("/");
+        router.push("/client");
       } else setConfirm(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao criar acesso");
@@ -64,7 +64,7 @@ export function AcceptInviteForm({
         <p className="text-body text-text-2">
           Acesso criado! Confirme seu e-mail (<strong className="text-text">{mail}</strong>) para entrar.
         </p>
-        <Link href="/login" className="text-body font-semibold text-accent hover:underline">
+        <Link href="/client/login" className="text-body font-semibold text-accent hover:underline">
           Ir para o login
         </Link>
       </div>

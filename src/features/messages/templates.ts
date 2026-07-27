@@ -3,7 +3,7 @@
  * Oliveira 01. Placeholders: {nome}, {link}. Use fillTemplate() para preencher.
  */
 
-export const APP_LINK = "https://barberagencia.vercel.app/";
+export const APP_LINK = "https://barberagencia.vercel.app/client";
 
 export interface MessageTemplate {
   id: string;

@@ -10,7 +10,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
     <div className="flex min-h-screen flex-col">
       {/* Topbar */}
       <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-8 py-3">
-        <Link href="/login" className="flex items-center gap-3 text-text">
+        <Link href="/client/login" className="flex items-center gap-3 text-text">
           <LogoMark text={tenant.branding.logoText} src={tenant.branding.logoUrl} />
           <div>
             <div className="font-display text-h5 font-extrabold uppercase tracking-wide">

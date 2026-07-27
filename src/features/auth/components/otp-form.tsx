@@ -25,7 +25,7 @@ export function OtpForm() {
 
       <button
         type="button"
-        onClick={() => router.push("/")}
+        onClick={() => router.push("/client")}
         disabled={code.length !== 6}
         className="rounded-md bg-accent py-3 text-body-lg font-bold text-text-inverse transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -50,7 +50,7 @@ export function OtpForm() {
       </div>
 
       <Link
-        href="/login"
+        href="/client/login"
         className="text-center text-caption text-text-muted hover:text-accent"
       >
         ← Voltar ao login

@@ -59,7 +59,7 @@ export default async function ClientHome() {
             {nextBarber ? ` · com ${nextBarber.name}` : ""}
           </div>
           <div className="mt-4 flex flex-col gap-3">
-            <Link href="/pedidos">
+            <Link href="/client/pedidos">
               <Button variant="outline" size="sm" className="w-full">
                 <Plus size={15} /> Adicionar serviço
               </Button>
@@ -83,7 +83,7 @@ export default async function ClientHome() {
               {sub.saldo_cortes} de {combo.cuts} cortes neste mês · renova dia {sub.billing_day}
             </div>
           </div>
-          <Link href="/meu-plano">
+          <Link href="/client/meu-plano">
             <Button variant="outline" size="sm">
               Ver meu plano
             </Button>
@@ -92,7 +92,7 @@ export default async function ClientHome() {
       )}
 
       {/* CTA AGENDAR — com plano e saldo, vai direto ao horário */}
-      <Link href={sub && combo && sub.saldo_cortes > 0 ? "/agendar" : "/servicos"}>
+      <Link href={sub && combo && sub.saldo_cortes > 0 ? "/client/agendar" : "/client/servicos"}>
         <button className="flex h-16 w-full items-center justify-center gap-3 rounded-lg bg-accent font-display text-h2 uppercase text-text-inverse shadow-md transition-colors hover:bg-accent-hover">
           <Scissors size={26} />
           Agendar
@@ -101,7 +101,7 @@ export default async function ClientHome() {
 
       {/* Atalhos */}
       <div className="grid grid-cols-1">
-        <Shortcut href="/suporte" icon={<Headphones size={22} />} label="Suporte" />
+        <Shortcut href="/client/suporte" icon={<Headphones size={22} />} label="Suporte" />
       </div>
     </div>
   );

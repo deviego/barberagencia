@@ -104,7 +104,7 @@ export function RescheduleForm({
     d.setHours(h, m, 0, 0);
     startTransition(async () => {
       const res = await rescheduleAppointment(appointmentId, d.toISOString());
-      if (res.ok) router.push("/agendamentos");
+      if (res.ok) router.push("/client/agendamentos");
       else setError(res.error);
     });
   }

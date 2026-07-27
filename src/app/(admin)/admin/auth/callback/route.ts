@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-/**
- * Callback do fluxo PKCE (confirmação de e-mail / reset de senha).
- * Troca o `code` por uma sessão (lendo o code_verifier do cookie) e redireciona.
- */
+/** Callback PKCE da ÁREA DO ADMIN (reset de senha da equipe). */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const next = searchParams.get("next") ?? "/admin";
 
   if (code) {
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return NextResponse.redirect(`${origin}${next}`);
   }
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(`${origin}/admin/login?error=auth`);
 }

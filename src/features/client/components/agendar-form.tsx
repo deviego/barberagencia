@@ -177,7 +177,7 @@ export function AgendarForm({
         observations: observations.trim() || null,
         items,
       });
-      if (res.ok) router.push(`/confirmacao?id=${res.id}`);
+      if (res.ok) router.push(`/client/confirmacao?id=${res.id}`);
       else setError(res.error);
     });
   }

@@ -16,7 +16,7 @@ export default function RecuperarSenhaPage() {
       </div>
       <ForgotForm />
       <Link
-        href="/login"
+        href="/client/login"
         className="text-center text-caption text-text-muted hover:text-accent"
       >
         ← Voltar ao login

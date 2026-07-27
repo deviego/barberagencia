@@ -7,8 +7,8 @@ import { isNetworkAdmin } from "@/lib/rbac";
 
 export default async function NetworkLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
-  if (!user.role || !isNetworkAdmin(user.role)) redirect("/");
+  if (!user) redirect("/admin/login");
+  if (!user.role || !isNetworkAdmin(user.role)) redirect("/admin/login");
 
   const tenant = await getCurrentTenant();
   return (

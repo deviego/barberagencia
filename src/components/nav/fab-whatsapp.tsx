@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 
 /** Botão flutuante de suporte via WhatsApp (verde da marca WhatsApp). */
-export function FabWhatsApp({ href = "/suporte" }: { href?: string }) {
+export function FabWhatsApp({ href = "/client/suporte" }: { href?: string }) {
   return (
     <Link
       href={href}

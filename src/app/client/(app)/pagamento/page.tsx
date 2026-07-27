@@ -102,10 +102,10 @@ export default function PagamentoPage() {
         <span className="text-h3 text-accent tabular">{formatBRL(total)}</span>
       </div>
 
-      <Button size="lg" onClick={() => router.push("/boas-vindas")}>
+      <Button size="lg" onClick={() => router.push("/client/boas-vindas")}>
         Pagar {formatBRL(total)}
       </Button>
-      <Link href="/suporte" className="text-center text-caption text-text-muted hover:text-accent">
+      <Link href="/client/suporte" className="text-center text-caption text-text-muted hover:text-accent">
         Precisa de ajuda? Falar com o suporte
       </Link>
     </div>

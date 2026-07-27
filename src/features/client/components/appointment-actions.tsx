@@ -50,7 +50,7 @@ export function AppointmentActions({
           <Button
             variant="outline"
             size={size}
-            onClick={() => router.push(appointmentId ? `/reagendar/${appointmentId}` : "/agendar")}
+            onClick={() => router.push(appointmentId ? `/client/reagendar/${appointmentId}` : "/client/agendar")}
           >
             Reagendar
           </Button>

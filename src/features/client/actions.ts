@@ -94,8 +94,8 @@ export async function requestAppointment(input: RequestAppointmentInput) {
     /* notificação não deve quebrar o fluxo */
   }
 
-  revalidatePath("/");
-  revalidatePath("/agendamentos");
+  revalidatePath("/client");
+  revalidatePath("/client/agendamentos");
   return { ok: true as const, id: data.id as string };
 }
 
@@ -118,8 +118,8 @@ export async function subscribeCombo(comboPlanId: string) {
   } catch {
     /* notificação não deve quebrar o fluxo */
   }
-  revalidatePath("/");
-  revalidatePath("/meu-plano");
+  revalidatePath("/client");
+  revalidatePath("/client/meu-plano");
   return { ok: true as const };
 }
 
@@ -148,7 +148,7 @@ export async function requestPlanChange(comboPlanId: string) {
     combo_plan_id: comboPlanId,
   });
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath("/meu-plano");
+  revalidatePath("/client/meu-plano");
   return { ok: true as const };
 }
 
@@ -165,7 +165,7 @@ export async function requestPlanCancel() {
     type: "CANCEL",
   });
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath("/meu-plano");
+  revalidatePath("/client/meu-plano");
   return { ok: true as const };
 }
 
@@ -184,8 +184,8 @@ export async function updateProfile(values: { fullName: string; phone: string; a
   }
   await supabase.from("profiles").update(profilePatch).eq("id", user.id);
   await supabase.from("clients").update(clientPatch).eq("user_id", user.id);
-  revalidatePath("/perfil");
-  revalidatePath("/");
+  revalidatePath("/client/perfil");
+  revalidatePath("/client");
   return { ok: true as const };
 }
 
@@ -221,9 +221,9 @@ export async function addComandaItemClient(
     added_later: true,
   });
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath("/pedidos");
-  revalidatePath("/agendamentos");
-  revalidatePath("/");
+  revalidatePath("/client/pedidos");
+  revalidatePath("/client/agendamentos");
+  revalidatePath("/client");
   return { ok: true as const };
 }
 
@@ -232,8 +232,8 @@ export async function removeComandaItemClient(itemId: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("appointment_items").delete().eq("id", itemId);
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath("/pedidos");
-  revalidatePath("/agendamentos");
+  revalidatePath("/client/pedidos");
+  revalidatePath("/client/agendamentos");
   return { ok: true as const };
 }
 
@@ -256,8 +256,8 @@ export async function addChild(input: { name: string; age: number | null; photoU
     .select("id, name, age, photo_url")
     .single();
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath("/perfil");
-  revalidatePath("/agendar");
+  revalidatePath("/client/perfil");
+  revalidatePath("/client/agendar");
   return { ok: true as const, child: data };
 }
 
@@ -266,8 +266,8 @@ export async function removeChild(id: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("children").delete().eq("id", id);
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath("/perfil");
-  revalidatePath("/agendar");
+  revalidatePath("/client/perfil");
+  revalidatePath("/client/agendar");
   return { ok: true as const };
 }
 
@@ -307,8 +307,8 @@ export async function cancelAppointment(id: string) {
   } catch {
     /* notificação não deve quebrar o fluxo */
   }
-  revalidatePath("/");
-  revalidatePath("/agendamentos");
+  revalidatePath("/client");
+  revalidatePath("/client/agendamentos");
   return { ok: true as const };
 }
 
@@ -332,7 +332,7 @@ export async function rescheduleAppointment(id: string, startAtISO: string) {
     })
     .eq("id", id);
   if (error) return { ok: false as const, error: error.message };
-  revalidatePath("/");
-  revalidatePath("/agendamentos");
+  revalidatePath("/client");
+  revalidatePath("/client/agendamentos");
   return { ok: true as const };
 }

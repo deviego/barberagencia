@@ -15,7 +15,7 @@ export function ClientHeader({
   userName,
   userEmail,
   avatarUrl,
-  agendarHref = "/servicos",
+  agendarHref = "/client/servicos",
   hasPlan = true,
 }: {
   logoText: string;
@@ -29,17 +29,17 @@ export function ClientHeader({
 }) {
   const pathname = usePathname();
   const initials = getInitials(userName, userEmail);
-  const navItems = CLIENT_NAV.filter((i) => hasPlan || i.href !== "/meu-plano");
+  const navItems = CLIENT_NAV.filter((i) => hasPlan || i.href !== "/client/meu-plano");
   return (
     <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-5 py-3 md:px-8">
-      <Link href="/" className="flex items-center gap-3 text-text">
+      <Link href="/client" className="flex items-center gap-3 text-text">
         <LogoMark text={logoText} src={logoUrl} />
         <span className="font-display text-h5 font-extrabold uppercase tracking-wide">{name}</span>
       </Link>
 
       <nav className="hidden items-center gap-1 md:flex">
         {navItems.map(({ href, label, icon: Icon }) => {
-          const target = href === "/servicos" ? agendarHref : href;
+          const target = href === "/client/servicos" ? agendarHref : href;
           const active = pathname === target;
           return (
             <Link
@@ -59,7 +59,7 @@ export function ClientHeader({
 
       <div className="flex items-center gap-2">
         <ThemeToggle />
-        <Link href="/perfil" aria-label="Perfil" className="flex">
+        <Link href="/client/perfil" aria-label="Perfil" className="flex">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt={initials} className="h-9 w-9 rounded-full object-cover" />

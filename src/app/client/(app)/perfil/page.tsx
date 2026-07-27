@@ -7,7 +7,7 @@ import { getProfile, getMyChildren } from "@/features/client/data";
 
 export default async function PerfilPage() {
   const [data, children] = await Promise.all([getProfile(), getMyChildren()]);
-  if (!data) redirect("/login");
+  if (!data) redirect("/client/login");
 
   return (
     <div className="flex flex-col gap-6">

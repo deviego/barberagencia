@@ -80,7 +80,7 @@ export function AppointmentCard({ a, highlight, actions }: { a: Appt; highlight?
 
       {actions && ACTIONABLE.includes(a.status) && (
         <div className="mt-3 flex flex-col gap-3 border-t border-border-subtle pt-3">
-          <Link href="/pedidos">
+          <Link href="/client/pedidos">
             <Button variant="outline" size="sm" className="w-full">
               <Plus size={15} /> Adicionar serviço
             </Button>

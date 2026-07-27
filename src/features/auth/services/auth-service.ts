@@ -16,7 +16,7 @@ export async function signUpWithPassword(
 ) {
   const supabase = createSupabaseBrowserClient();
   const emailRedirectTo =
-    typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
+    typeof window !== "undefined" ? `${window.location.origin}/client/auth/callback` : undefined;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -31,7 +31,7 @@ export async function sendPasswordReset(email: string) {
   // O link do e-mail passa pelo callback (troca code→sessão) e cai na tela de nova senha.
   const redirectTo =
     typeof window !== "undefined"
-      ? `${window.location.origin}/auth/callback?next=/redefinir-senha`
+      ? `${window.location.origin}/client/auth/callback?next=/client/redefinir-senha`
       : undefined;
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) throw new Error(error.message);

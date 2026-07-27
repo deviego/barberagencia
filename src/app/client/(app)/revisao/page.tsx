@@ -23,12 +23,12 @@ export default function RevisaoPage() {
       </div>
 
       <div className="flex gap-3">
-        <Link href="/servicos" className="flex-1">
+        <Link href="/client/servicos" className="flex-1">
           <Button variant="secondary" size="lg" className="w-full">
             Voltar
           </Button>
         </Link>
-        <Link href="/pagamento" className="flex-[2]">
+        <Link href="/client/pagamento" className="flex-[2]">
           <Button size="lg" className="w-full">
             Ir para pagamento
           </Button>

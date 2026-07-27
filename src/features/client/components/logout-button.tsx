@@ -12,7 +12,7 @@ export function LogoutButton() {
       variant="ghost"
       onClick={async () => {
         await signOut();
-        router.push("/login");
+        router.push("/client/login");
       }}
     >
       <LogOut size={16} />
