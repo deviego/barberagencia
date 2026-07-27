@@ -10,6 +10,7 @@ import {
   notifyServiceFinished,
   notifyPlanSubscribed,
   notifyPlanCancelled,
+  notifyPlanRejected,
   notifyAppointmentCancelled,
   notifyReservationCancelled,
 } from "@/server/notifications/notify";
@@ -295,12 +296,23 @@ export async function approvePlanRequest(id: string) {
 /** Recusa um pedido de plano (nada muda no plano). */
 export async function rejectPlanRequest(id: string) {
   const supabase = await createSupabaseServerClient();
+  const { data: req } = await supabase
+    .from("plan_requests")
+    .select("client_id, type, combo_plan_id, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!req || req.status !== "PENDING") return { ok: false as const, error: "Pedido inválido" };
   const { error } = await supabase
     .from("plan_requests")
     .update({ status: "REJECTED", resolved_at: new Date().toISOString() })
     .eq("id", id)
     .eq("status", "PENDING");
   if (error) return { ok: false as const, error: error.message };
+  try {
+    await notifyPlanRejected(req.client_id, req.combo_plan_id, req.type);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
   revalidatePath("/admin/solicitacoes");
   revalidatePath("/admin");
   return { ok: true as const };

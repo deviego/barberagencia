@@ -200,6 +200,42 @@ export async function notifyPlanSubscribed(clientId: string, comboPlanId: string
   });
 }
 
+/** Avisa o cliente (WhatsApp) que um pedido de plano foi recusado pela barbearia. */
+export async function notifyPlanRejected(clientId: string, comboPlanId: string | null, type: string) {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: client }, { data: combo }] = await Promise.all([
+    supabase.from("clients").select("name, phone, tenant_id").eq("id", clientId).maybeSingle(),
+    comboPlanId
+      ? supabase.from("combo_plans").select("name").eq("id", comboPlanId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const phone = client?.phone ?? null;
+  if (!phone) return;
+  const nome = (client?.name ?? "").split(" ")[0];
+  const plano = one(combo as { name: string }[] | { name: string } | null)?.name ?? "plano";
+
+  const corpo =
+    type === "CANCEL"
+      ? `seu pedido de *cancelamento* não foi aprovado — sua assinatura continua ativa.`
+      : type === "CHANGE"
+        ? `seu pedido de *troca* para o *${plano}* não foi aprovado no momento.`
+        : `seu pedido de *assinatura* do *${plano}* não foi aprovado no momento.`;
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `*SOLICITAÇÃO NÃO APROVADA*\n\n` +
+    `${nome ? `${nome}, ` : ""}${corpo}\n\n` +
+    `Ficou com dúvida? Fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY} que a gente te ajuda. 💈`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: client?.tenant_id ?? null,
+    channel: "whatsapp",
+    template: "plan_rejected",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
 /** Avisa o cliente (WhatsApp) que a assinatura foi cancelada. */
 export async function notifyPlanCancelled(clientId: string) {
   const supabase = await createSupabaseServerClient();
