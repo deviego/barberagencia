@@ -13,6 +13,7 @@ import {
   notifyPlanRejected,
   notifyAppointmentCancelled,
   notifyReservationCancelled,
+  notifyServiceAdded,
 } from "@/server/notifications/notify";
 
 async function setStatus(
@@ -416,6 +417,18 @@ export async function addComandaItem(
     covered_by_plan: false,
     added_later: true,
   });
+  if (!error) {
+    try {
+      await notifyServiceAdded(appointmentId, {
+        kind: item.kind,
+        name: item.name,
+        qty: item.qty,
+        priceBRL: item.priceBRL,
+      });
+    } catch {
+      /* notificação não deve quebrar o fluxo */
+    }
+  }
   revalidatePath("/admin/pedidos");
   return { ok: !error, error: error?.message };
 }

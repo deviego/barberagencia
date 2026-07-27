@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { notifyPlanRequested, notifyAppointmentRequested, notifyAppointmentCancelled } from "@/server/notifications/notify";
+import { notifyPlanRequested, notifyAppointmentRequested, notifyAppointmentCancelled, notifyServiceAdded } from "@/server/notifications/notify";
 import { getMyClient } from "./data";
 
 const itemSchema = z.object({
@@ -221,6 +221,16 @@ export async function addComandaItemClient(
     added_later: true,
   });
   if (error) return { ok: false as const, error: error.message };
+  try {
+    await notifyServiceAdded(appointmentId, {
+      kind: item.kind,
+      name: item.name,
+      qty: item.qty,
+      priceBRL: item.priceBRL,
+    });
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
   revalidatePath("/client/pedidos");
   revalidatePath("/client/agendamentos");
   revalidatePath("/client");

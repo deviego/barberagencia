@@ -91,6 +91,44 @@ export async function notifyServiceStarted(appointmentId: string) {
   });
 }
 
+/** Avisa o cliente (WhatsApp) que um item foi adicionado ao seu pedido. */
+export async function notifyServiceAdded(
+  appointmentId: string,
+  item: { kind: "service" | "product"; name: string; qty: number; priceBRL: number }
+) {
+  const supabase = await createSupabaseServerClient();
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select("start_at, tenant_id, clients(name, phone), barbers(name)")
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (!appt) return;
+  const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
+  const phone = client?.phone ?? null;
+  if (!phone) return;
+  const nome = (client?.name ?? "").split(" ")[0];
+  const barber = one(appt.barbers as { name: string }[] | { name: string })?.name;
+  const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
+  const titulo = item.kind === "product" ? "PRODUTO ADICIONADO" : "SERVIÇO ADICIONADO";
+  const valor = item.priceBRL > 0 ? ` — *${formatBRL(item.priceBRL * item.qty)}* (no local)` : "";
+
+  const msg =
+    `✂️ *${BRAND}*\n` +
+    `*${titulo}*\n\n` +
+    `${nome ? `${nome}, ` : ""}adicionamos ao seu atendimento:\n` +
+    `➕ *${item.qty > 1 ? `${item.qty}x ` : ""}${item.name}*${valor}\n\n` +
+    `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n` +
+    `O pagamento é feito no local após o atendimento.`;
+  const w = await sendWhatsApp(phone, msg);
+  await supabase.from("notification_log").insert({
+    tenant_id: appt.tenant_id,
+    channel: "whatsapp",
+    template: "service_added",
+    recipient: phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+}
+
 /** Agradece o cliente (WhatsApp) ao fim do atendimento, lista os serviços e pede opinião. */
 export async function notifyServiceFinished(appointmentId: string) {
   const supabase = await createSupabaseServerClient();
