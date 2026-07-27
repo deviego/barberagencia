@@ -3,11 +3,12 @@
 import { useEffect, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Baby, Loader2 } from "lucide-react";
+import { Baby, Loader2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input, Label } from "@/components/ui/input";
 import { AvatarUpload } from "@/components/avatar-upload";
-import { cancelClientSubscription, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
+import { adminAddChild, cancelClientSubscription, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
 import { formatBRL, getInitials } from "@/lib/utils";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -36,9 +37,34 @@ export function ClientDetail({ clientId }: { clientId: string }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  // Cadastro de criança (admin)
+  const [childOpen, setChildOpen] = useState(false);
+  const [childName, setChildName] = useState("");
+  const [childAge, setChildAge] = useState("");
+  const [childPhoto, setChildPhoto] = useState<string | null>(null);
+  const [childErr, setChildErr] = useState<string | null>(null);
 
   function reload() {
     fetchClientDetail(clientId).then((d) => setData(d as Detail));
+  }
+
+  function addChild() {
+    setChildErr(null);
+    if (!childName.trim()) return setChildErr("Informe o nome da criança.");
+    startTransition(async () => {
+      const res = await adminAddChild(clientId, {
+        name: childName.trim(),
+        age: childAge ? Number(childAge) : null,
+        photoUrl: childPhoto,
+      });
+      if (res.ok) {
+        setChildOpen(false);
+        setChildName("");
+        setChildAge("");
+        setChildPhoto(null);
+        reload();
+      } else setChildErr(res.error);
+    });
   }
 
   useEffect(() => {
@@ -150,31 +176,72 @@ export function ClientDetail({ clientId }: { clientId: string }) {
       </div>
 
       {/* Crianças */}
-      {data.children.length > 0 && (
-        <div className="rounded-md border border-border-subtle px-4 py-3">
+      <div className="rounded-md border border-border-subtle px-4 py-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-overline uppercase text-text-muted">
             <Baby size={13} /> Crianças
           </div>
-          <div className="mt-2 flex flex-col gap-2">
-            {data.children.map((c) => (
-              <div key={c.id} className="flex items-center gap-3">
-                {c.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.photo_url} alt={c.name} className="h-9 w-9 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-inset text-accent">
-                    <Baby size={16} />
-                  </span>
-                )}
-                <div>
-                  <div className="text-body text-text">{c.name}</div>
-                  {c.age != null && <div className="text-caption text-text-muted">{c.age} anos</div>}
-                </div>
-              </div>
-            ))}
-          </div>
+          {!childOpen && (
+            <button
+              onClick={() => setChildOpen(true)}
+              className="flex items-center gap-1 text-caption font-semibold text-accent hover:underline"
+            >
+              <Plus size={13} /> Adicionar criança
+            </button>
+          )}
         </div>
-      )}
+
+        <div className="mt-2 flex flex-col gap-2">
+          {data.children.length === 0 && !childOpen && (
+            <p className="text-caption text-text-muted">Nenhuma criança cadastrada.</p>
+          )}
+          {data.children.map((c) => (
+            <div key={c.id} className="flex items-center gap-3">
+              {c.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.photo_url} alt={c.name} className="h-9 w-9 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-inset text-accent">
+                  <Baby size={16} />
+                </span>
+              )}
+              <div>
+                <div className="text-body text-text">{c.name}</div>
+                {c.age != null && <div className="text-caption text-text-muted">{c.age} anos</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {childOpen && (
+          <div className="mt-3 flex flex-col gap-3 rounded-md border border-border-subtle bg-inset p-3">
+            <AvatarUpload
+              current={childPhoto}
+              fallback={getInitials(childName || "C")}
+              folder="children"
+              size={48}
+              onChange={setChildPhoto}
+            />
+            <div className="flex flex-col gap-1.5">
+              <Label>Nome da criança</Label>
+              <Input value={childName} onChange={(e) => setChildName(e.target.value)} placeholder="Ex.: Miguel" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Idade</Label>
+              <Input type="number" min={0} max={17} value={childAge} onChange={(e) => setChildAge(e.target.value)} placeholder="Ex.: 7" />
+            </div>
+            {childErr && <p className="text-caption text-danger">{childErr}</p>}
+            <div className="flex gap-2">
+              <Button size="sm" loading={pending} onClick={addChild}>
+                Salvar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setChildOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Histórico */}
       <div className="flex flex-col gap-2">

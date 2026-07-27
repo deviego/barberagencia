@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getClientDetail } from "./data";
+import { sendEmail } from "@/server/notifications/resend";
 import {
   notifyAppointmentConfirmed,
   notifyServiceStarted,
@@ -197,6 +198,29 @@ export async function assignComboToClient(clientId: string, comboPlanId: string)
   return { ok: true as const };
 }
 
+/** Admin cadastra uma criança para um cliente. */
+export async function adminAddChild(
+  clientId: string,
+  input: { name: string; age: number | null; photoUrl: string | null }
+) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido" };
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const name = input.name.trim();
+  if (!name) return { ok: false as const, error: "Informe o nome da criança." };
+  const { error } = await supabase.from("children").insert({
+    tenant_id: user.tenantId,
+    client_id: clientId,
+    name,
+    age: input.age ?? null,
+    photo_url: input.photoUrl ?? null,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/clientes");
+  return { ok: true as const };
+}
+
 /** Cancela (remove) o plano ativo de um cliente — ação direta do admin. */
 export async function cancelClientSubscription(clientId: string) {
   if (!clientId) return { ok: false as const, error: "Cliente inválido" };
@@ -214,6 +238,41 @@ export async function cancelClientSubscription(clientId: string) {
   }
   revalidatePath("/admin/clientes");
   revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Envia uma mensagem de suporte do admin para a plataforma (e-mail via Resend). */
+export async function sendSupportMessage(input: { category: string; subject: string; message: string }) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const message = (input.message ?? "").trim();
+  if (!message) return { ok: false as const, error: "Escreva a sua mensagem." };
+
+  const tenant = await getCurrentTenant();
+  const cat = input.category === "administrativo" ? "Administrativo (William)" : "Técnico (Diego)";
+  const assunto = (input.subject ?? "").trim();
+  const subject = `[Suporte ${cat}] ${tenant.name}${assunto ? ` — ${assunto}` : ""}`;
+  const html =
+    `<p style="font-family:Arial,sans-serif;color:#4a453d;font-size:15px;line-height:1.6;">` +
+    `<b>Barbearia:</b> ${tenant.name}<br/>` +
+    `<b>Admin:</b> ${user.email ?? "—"}<br/>` +
+    `<b>Categoria:</b> ${cat}<br/>` +
+    `<b>Assunto:</b> ${assunto || "—"}</p>` +
+    `<hr/><p style="font-family:Arial,sans-serif;color:#171412;font-size:15px;line-height:1.6;white-space:pre-wrap;">${message.replace(/</g, "&lt;")}</p>`;
+
+  const r = await sendEmail({ to: "deviego4@gmail.com", subject, html });
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("notification_log").insert({
+    tenant_id: user.tenantId,
+    channel: "email",
+    template: "support",
+    recipient: "deviego4@gmail.com",
+    status: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED",
+  });
+
+  if (r.skipped) return { ok: false as const, error: "Envio de e-mail não configurado no servidor (RESEND_API_KEY)." };
+  if (!r.ok) return { ok: false as const, error: "Falha ao enviar. Tente novamente em instantes." };
   return { ok: true as const };
 }
 

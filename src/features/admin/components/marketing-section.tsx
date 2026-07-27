@@ -13,7 +13,8 @@ const STATUS: Record<string, { label: string; variant: React.ComponentProps<type
   ENDED: { label: "Encerrada", variant: "neutral" },
 };
 
-export default async function MarketingPage() {
+/** Seção de Marketing (campanhas) — usada dentro da aba Marketing Place. */
+export async function MarketingSection() {
   const tenant = await getCurrentTenant();
   if (!hasEntitlement(tenant.saasPlan, "marketing.basic")) {
     return (
@@ -21,7 +22,7 @@ export default async function MarketingPage() {
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-wash">
           <Lock size={24} className="text-accent" />
         </div>
-        <h1 className="text-h4 font-semibold text-text">Marketing indisponível</h1>
+        <h2 className="text-h4 font-semibold text-text">Marketing indisponível</h2>
         <p className="text-body text-text-2">Campanhas estão disponíveis a partir do plano Essencial.</p>
         <Button>Ver planos</Button>
       </div>
@@ -32,8 +33,6 @@ export default async function MarketingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-h3 font-bold text-text">Marketing</h1>
-
       <MarketingForm canSegmented={hasEntitlement(tenant.saasPlan, "marketing.segmented")} />
 
       <div className="overflow-x-auto rounded-lg border border-border">

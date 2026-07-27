@@ -253,12 +253,17 @@ export function AgendarForm({
         </section>
       )}
 
-      {/* Criança (quando corte infantil) */}
+      {/* Criança (quando corte infantil) — destacado */}
       {needsChild && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-overline uppercase text-text-muted">
-            <Baby size={14} /> Para qual criança?
+        <section className="flex flex-col gap-3 rounded-lg border-2 border-accent bg-accent-wash p-4">
+          <div className="flex items-center gap-2 text-body font-bold text-accent">
+            <Baby size={18} /> Para qual criança é o corte?
           </div>
+          {!childId && (
+            <p className="text-caption font-semibold text-accent">
+              Selecione a criança abaixo (ou registre uma nova) para continuar.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {childList.map((c) => (
               <button

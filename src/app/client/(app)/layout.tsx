@@ -6,6 +6,7 @@ import { BottomNav } from "@/components/nav/bottom-nav";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getSessionUser } from "@/lib/auth/session";
 import { getActivePlanBalance } from "@/features/client/data";
+import { Copyright } from "@/components/brand/copyright";
 import { exitClientPreview } from "@/features/auth/actions";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 
@@ -49,7 +50,8 @@ export default async function ClientLayout({ children }: { children: React.React
         agendarHref={agendarHref}
         hasPlan={hasPlan}
       />
-      <main className="mx-auto w-full max-w-3xl px-5 pb-28 pt-6 md:pb-10">{children}</main>
+      <main className="mx-auto w-full max-w-3xl px-5 pt-6">{children}</main>
+      <Copyright className="mx-auto w-full max-w-3xl px-5 pb-28 pt-8 md:pb-10" />
       <BottomNav agendarHref={agendarHref} hasPlan={hasPlan} />
     </div>
   );

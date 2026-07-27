@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { Copyright } from "@/components/brand/copyright";
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const tenant = await getCurrentTenant();
@@ -39,6 +40,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
           }}
         />
         <div className="relative w-full max-w-[440px]">{children}</div>
+        <Copyright className="absolute inset-x-0 bottom-4" />
       </main>
     </div>
   );

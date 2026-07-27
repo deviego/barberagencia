@@ -9,6 +9,7 @@ import { LogoutButton } from "@/components/nav/logout-button";
 import { ViewAsClientButton } from "@/components/nav/view-as-client-button";
 import { MobileNav } from "@/components/nav/mobile-nav";
 import { TrialBanner } from "@/components/nav/trial-banner";
+import { Copyright } from "@/components/brand/copyright";
 import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
 import { ADMIN_NAV } from "@/features/admin/nav";
@@ -122,7 +123,7 @@ export function AdminShell({
               href="/documentacao"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-caption text-text-muted transition-colors hover:text-accent"
+              className="flex w-full items-center gap-3 rounded-md border border-accent bg-accent-wash px-3 py-2.5 text-body font-semibold text-accent transition-colors hover:brightness-95"
             >
               <BookOpen size={18} /> Documentação
             </a>
@@ -223,14 +224,14 @@ export function AdminShell({
               </Link>
             );
           })}
-          <div className="mt-auto flex flex-col gap-0.5">
+          <div className="mt-auto flex flex-col gap-1.5">
             <a
               href="/documentacao"
               target="_blank"
               rel="noopener noreferrer"
               title="Documentação"
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2.5 text-caption text-text-muted transition-colors hover:text-accent",
+                "flex items-center gap-3 rounded-md border border-accent bg-accent-wash px-3 py-2.5 text-body font-semibold text-accent transition-colors hover:brightness-95",
                 open ? "justify-start" : "justify-center"
               )}
             >
@@ -242,7 +243,10 @@ export function AdminShell({
           </div>
         </aside>
 
-        <main className="flex-1 overflow-x-hidden p-6">{children}</main>
+        <main className="flex flex-1 flex-col overflow-x-hidden">
+          <div className="flex-1 p-6">{children}</div>
+          <Copyright className="border-t border-border py-3" />
+        </main>
       </div>
     </div>
   );

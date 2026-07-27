@@ -1,5 +1,6 @@
 import { LogoMark } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { Copyright } from "@/components/brand/copyright";
 
 /** Casca visual das telas de login (topbar + faixa barber-pole + centro). */
 export function AuthScreen({
@@ -44,6 +45,7 @@ export function AuthScreen({
           }}
         />
         <div className="relative w-full max-w-[400px]">{children}</div>
+        <Copyright className="absolute inset-x-0 bottom-4" />
       </main>
     </div>
   );
