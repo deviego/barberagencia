@@ -16,8 +16,9 @@ export async function sendEmail({
   html,
 }: SendEmailInput): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.NOTIFICATIONS_FROM;
-  if (!key || !from) return { ok: false, skipped: true };
+  // Sem remetente configurado, usa o sandbox do Resend (entrega só para o dono da conta).
+  const from = process.env.NOTIFICATIONS_FROM || "Barbearia <onboarding@resend.dev>";
+  if (!key) return { ok: false, skipped: true };
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
