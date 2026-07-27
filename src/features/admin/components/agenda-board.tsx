@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
-import { adminCancelAppointment, markDone, markNoShow } from "@/features/admin/actions";
+import { adminCancelAppointment, markDone, markNoShow, startService } from "@/features/admin/actions";
 import { cn, formatBRL } from "@/lib/utils";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -70,15 +70,36 @@ export function AgendaBoard({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Appt | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  function open(a: Appt) {
+    setConfirming(false);
+    setSelected(a);
+  }
+  function close() {
+    setConfirming(false);
+    setSelected(null);
+  }
 
   function act(fn: (id: string) => Promise<unknown>) {
     if (!selected) return;
     const id = selected.id;
     startTransition(async () => {
       await fn(id);
-      setSelected(null);
+      close();
       router.refresh();
+    });
+  }
+
+  // Inicia o atendimento e leva para a comanda (Pedidos) já aberta naquele cliente.
+  function iniciarAtendimento() {
+    if (!selected) return;
+    const id = selected.id;
+    startTransition(async () => {
+      await startService(id);
+      close();
+      router.push(`/admin/pedidos?open=${id}`);
     });
   }
 
@@ -87,7 +108,7 @@ export function AgendaBoard({
     return (
       <button
         key={a.id}
-        onClick={() => setSelected(a)}
+        onClick={() => open(a)}
         className={cn("w-full rounded-md border px-3 py-2 text-left transition-transform hover:scale-[1.01]", st.cls)}
       >
         <div className="flex items-center justify-between">
@@ -175,23 +196,38 @@ export function AgendaBoard({
     return (
       <Drawer
         open={selected !== null}
-        onClose={() => setSelected(null)}
+        onClose={close}
         title="Detalhe do agendamento"
         footer={
           selected && (selected.status === "REQUESTED" || selected.status === "CONFIRMED") ? (
-            <div className="flex flex-col gap-2">
-              <Button className="w-full" loading={pending} onClick={() => act(markDone)}>
-                Confirmar presença
-              </Button>
-              <div className="flex gap-2">
-                <Button variant="secondary" className="flex-1" disabled={pending} onClick={() => act(markNoShow)}>
-                  Não compareceu
+            confirming ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-caption text-text-muted">O cliente chegou. O que deseja fazer?</p>
+                <Button className="w-full" loading={pending} onClick={iniciarAtendimento}>
+                  Iniciar atendimento
                 </Button>
-                <Button variant="ghost" className="flex-1" disabled={pending} onClick={() => act(adminCancelAppointment)}>
-                  Cancelar
+                <Button variant="secondary" className="w-full" disabled={pending} onClick={() => act(markDone)}>
+                  Somente confirmar presença
+                </Button>
+                <Button variant="ghost" className="w-full" disabled={pending} onClick={() => setConfirming(false)}>
+                  Voltar
                 </Button>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Button className="w-full" disabled={pending} onClick={() => setConfirming(true)}>
+                  Confirmar presença
+                </Button>
+                <div className="flex gap-2">
+                  <Button variant="secondary" className="flex-1" disabled={pending} onClick={() => act(markNoShow)}>
+                    Não compareceu
+                  </Button>
+                  <Button variant="ghost" className="flex-1" disabled={pending} onClick={() => act(adminCancelAppointment)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )
           ) : undefined
         }
       >

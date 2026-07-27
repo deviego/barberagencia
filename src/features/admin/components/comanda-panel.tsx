@@ -63,13 +63,17 @@ export function ComandaPanel({
   comandas,
   services,
   products,
+  initialOpenId = null,
 }: {
   comandas: Comanda[];
   services: Service[];
   products: Product[];
+  initialOpenId?: string | null;
 }) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialOpenId && comandas.some((c) => c.id === initialOpenId) ? initialOpenId : null
+  );
   const [method, setMethod] = useState("PIX");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
