@@ -8,7 +8,12 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
 }
 
-export default async function AgendarPage() {
+export default async function AgendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ service?: string }>;
+}) {
+  const { service: preselectId } = await searchParams;
   const [catalog, home, workingHours, products, children] = await Promise.all([
     getCatalog(),
     getClientHome(),
@@ -37,6 +42,7 @@ export default async function AgendarPage() {
         products={products}
         workingHours={workingHours}
         plan={plan}
+        preselectId={preselectId ?? null}
         children={children as Child[]}
       />
     </div>

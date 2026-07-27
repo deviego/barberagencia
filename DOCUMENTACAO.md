@@ -4,7 +4,21 @@ Manual funcional completo, separado em **App do Cliente** e **Painel do Admin**.
 
 ---
 
+## Prefácio
+
+Este documento é o **manual funcional** da plataforma da barbearia. Ele foi escrito para ser lido por qualquer pessoa — o dono, a equipe do balcão e também o cliente — **sem exigir conhecimento técnico**. O objetivo é servir como material de **treinamento, onboarding e consulta do dia a dia**: sempre que surgir a dúvida "como faço isso?" ou "o que essa tela faz?", a resposta deve estar aqui.
+
+**Como o documento está organizado.** Ele é dividido em duas grandes partes — o **App do Cliente** (o que a pessoa que agenda vê e faz) e o **Painel do Admin** (o que a barbearia usa para operar). Cada tela é explicada em três blocos: **"O que é"** (para que serve), **"Passo a passo / como usar"** (a sequência de ações) e, quando faz sentido, **"Observações / Regras"** (detalhes e limites importantes). Use o **Sumário** logo abaixo para saltar direto ao assunto.
+
+**Como ler.** As telas são citadas pelo **nome que aparece no aplicativo** (Home, Agendar, Meu plano, Pedidos, Solicitações, Agenda, etc.), não por termos de programação. Os ícones 💡 marcam observações úteis e ⚠️ marcam regras que precisam de atenção.
+
+**Sobre o conteúdo.** O manual reflete o **comportamento atual** da plataforma. Como o produto evolui, telas e textos podem mudar em novas versões; havendo divergência entre o manual e o aplicativo, vale o que está no aplicativo — e este documento deve ser atualizado em seguida.
+
+---
+
 ## Sumário
+
+0. [Prefácio](#prefácio)
 
 1. [Visão geral da plataforma](#1-visão-geral-da-plataforma)
 2. [Conceitos-chave](#2-conceitos-chave)

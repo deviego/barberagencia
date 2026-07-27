@@ -28,7 +28,7 @@ export function ServicosView({ services, combos }: { services: Service[]; combos
       setError(null);
       setConfirmOpen(true);
     } else {
-      router.push("/agendar");
+      router.push(`/agendar?service=${selected}`);
     }
   }
 
