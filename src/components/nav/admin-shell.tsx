@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Building2, ChevronDown, Menu, Search } from "lucide-react";
+import { Bell, BookOpen, Building2, ChevronDown, Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
 import { ViewAsClientButton } from "@/components/nav/view-as-client-button";
@@ -114,6 +114,14 @@ export function AdminShell({
         title={name}
         footer={
           <>
+            <a
+              href="/documentacao"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-caption text-text-muted transition-colors hover:text-accent"
+            >
+              <BookOpen size={18} /> Documentação
+            </a>
             <ViewAsClientButton />
             <LogoutButton variant="sidebar" />
           </>
@@ -212,6 +220,19 @@ export function AdminShell({
             );
           })}
           <div className="mt-auto flex flex-col gap-0.5">
+            <a
+              href="/documentacao"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Documentação"
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2.5 text-caption text-text-muted transition-colors hover:text-accent",
+                open ? "justify-start" : "justify-center"
+              )}
+            >
+              <BookOpen size={18} className="shrink-0" />
+              {open && <span>Documentação</span>}
+            </a>
             {open && <ViewAsClientButton />}
             <LogoutButton variant="sidebar" className={open ? "justify-start" : "justify-center"} />
           </div>
