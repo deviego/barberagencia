@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, Building2, ChevronDown, Menu, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
@@ -60,6 +60,7 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(true);
   const [mobileNav, setMobileNav] = useState(false);
   const [count, setCount] = useState(pendingCount);
@@ -88,6 +89,8 @@ export function AdminShell({
       if (next > prevCount.current) playBeep();
       prevCount.current = next;
       setCount(next);
+      // Re-busca os server components (lista de solicitações etc.) sem F5.
+      router.refresh();
     }
     const channel = supabase
       .channel("admin-pending")
@@ -98,7 +101,7 @@ export function AdminShell({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [router]);
 
   return (
     <div className="flex min-h-screen flex-col">
