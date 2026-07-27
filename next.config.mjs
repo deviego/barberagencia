@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    // Logos/branding e avatares vêm do Supabase Storage (URLs públicas).
+    remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
+  },
   experimental: {
     // Server Actions are enabled by default in Next 15
   },

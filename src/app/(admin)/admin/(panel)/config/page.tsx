@@ -1,16 +1,13 @@
 import { Input, Label } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogoMark } from "@/components/brand/logo";
-import { Gate } from "@/components/gate";
 import { BrandingForm } from "@/features/admin/components/branding-form";
+import { LogoUpload } from "@/features/admin/components/logo-upload";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getBranding } from "@/features/admin/data";
 
 export default async function ConfigPage() {
   const tenant = await getCurrentTenant();
   const branding = await getBranding();
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "barber.app";
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,41 +54,15 @@ export default async function ConfigPage() {
           <Badge variant="accent">Marca</Badge>
         </div>
 
-        <div className="flex items-center gap-4">
-          <LogoMark text={tenant.branding.logoText} size={56} className="rounded-lg" />
-          <Button variant="outline" size="sm">
-            Enviar logo
-          </Button>
-        </div>
+        <LogoUpload
+          current={branding?.logo_url ?? tenant.branding.logoUrl ?? null}
+          logoText={tenant.branding.logoText}
+        />
 
         <BrandingForm
           initialAccent={branding?.accent ?? "#C9A24B"}
           initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
         />
-
-        <div className="flex flex-col gap-1.5">
-          <Label>Subdomínio</Label>
-          <div className="flex items-center">
-            <Input defaultValue={tenant.subdomain} className="rounded-r-none" />
-            <span className="flex h-10 items-center rounded-r-md border border-l-0 border-border bg-inset px-3 text-body text-text-muted">
-              .{appDomain}
-            </span>
-          </div>
-        </div>
-
-        <Gate
-          feature="site.customDomain"
-          fallback={
-            <div className="flex items-center gap-2 rounded-md border border-border-subtle bg-inset px-3 py-2.5 text-caption text-text-muted">
-              Domínio próprio disponível no plano <strong className="text-text-2">Advanced</strong>.
-            </div>
-          }
-        >
-          <div className="flex flex-col gap-1.5">
-            <Label>Domínio próprio</Label>
-            <Input placeholder="www.suabarbearia.com.br" />
-          </div>
-        </Gate>
       </section>
     </div>
   );

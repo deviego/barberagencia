@@ -146,16 +146,20 @@ export async function createCampaign(values: { name: string; segment: string; me
 }
 
 /** Salva o branding (white-label) da unidade. */
-export async function saveBranding(values: { accent?: string; instagram?: string }) {
+export async function saveBranding(values: { accent?: string; instagram?: string; logoUrl?: string | null }) {
   const supabase = await createSupabaseServerClient();
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
-  const { error } = await supabase
-    .from("branding")
-    .update({ accent: values.accent ?? null, instagram: values.instagram ?? null })
-    .eq("tenant_id", user.tenantId);
+  // Atualiza só os campos informados (não apaga logo ao salvar cor/instagram).
+  const patch: Record<string, unknown> = {};
+  if (values.accent !== undefined) patch.accent = values.accent ?? null;
+  if (values.instagram !== undefined) patch.instagram = values.instagram ?? null;
+  if (values.logoUrl !== undefined) patch.logo_url = values.logoUrl;
+  if (Object.keys(patch).length === 0) return { ok: true as const };
+  const { error } = await supabase.from("branding").update(patch).eq("tenant_id", user.tenantId);
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin/config");
+  revalidatePath("/admin");
   return { ok: true as const };
 }
 
