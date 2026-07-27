@@ -23,6 +23,7 @@ export default async function ClientesPage() {
         table="clients"
         title="Clientes"
         newLabel="Novo cliente"
+        hideNew
         rows={rows}
         detail="client"
         searchKeys={["name", "phone", "email"]}

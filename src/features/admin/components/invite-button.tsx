@@ -38,9 +38,9 @@ export function InviteButton() {
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button onClick={() => setOpen(true)}>
         <UserPlus size={16} />
-        Convidar cliente
+        Novo cliente
       </Button>
       <Drawer
         open={open}
@@ -48,11 +48,11 @@ export function InviteButton() {
           setOpen(false);
           reset();
         }}
-        title="Convidar cliente"
+        title="Novo cliente"
         footer={
           !link ? (
             <Button className="w-full" loading={pending} onClick={submit}>
-              Gerar convite
+              Cadastrar e enviar acesso
             </Button>
           ) : (
             <Button variant="secondary" className="w-full" onClick={reset}>

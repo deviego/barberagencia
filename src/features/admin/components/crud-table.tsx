@@ -65,6 +65,7 @@ export function CrudTable({
   inviteBlock,
   saveLabel = "Salvar",
   detail,
+  hideNew,
 }: {
   table: string;
   title: string;
@@ -77,6 +78,8 @@ export function CrudTable({
   saveLabel?: string;
   /** Habilita o "olho" com uma view de detalhe dedicada. */
   detail?: "client";
+  /** Esconde o botão de criar (quando a criação é feita por outro fluxo, ex.: convite). */
+  hideNew?: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -147,10 +150,12 @@ export function CrudTable({
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-h3 font-bold text-text">{title}</h1>
-        <Button onClick={openNew}>
-          <Plus size={16} />
-          {newLabel}
-        </Button>
+        {!hideNew && (
+          <Button onClick={openNew}>
+            <Plus size={16} />
+            {newLabel}
+          </Button>
+        )}
       </div>
 
       {/* Toolbar */}
