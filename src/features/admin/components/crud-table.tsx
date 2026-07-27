@@ -11,7 +11,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { ConfirmModal } from "@/components/ui/modal";
 import { ClientDetail } from "@/features/admin/components/client-detail";
 import { formatBRL, cn } from "@/lib/utils";
-import { maskBRL, brlInputFromNumber } from "@/lib/masks";
+import { maskBRL, brlInputFromNumber, maskPhoneBR } from "@/lib/masks";
 import { saveRow, deleteRow } from "@/features/admin/crud-actions";
 
 type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "childrenBadge" | "childService";
@@ -310,16 +310,21 @@ export function CrudTable({
               );
             }
             const isCurrency = f.type === "currency";
+            const isPhone = f.type === "phone";
             return (
               <div key={f.name} className="flex flex-col gap-1.5">
                 <Label>{f.label}</Label>
                 <Input
-                  type={isCurrency ? "text" : f.type ?? "text"}
-                  inputMode={isCurrency ? "numeric" : undefined}
+                  type={isCurrency || isPhone ? "text" : f.type ?? "text"}
+                  inputMode={isCurrency ? "numeric" : isPhone ? "tel" : undefined}
+                  maxLength={isPhone ? 15 : undefined}
                   placeholder={isCurrency ? "R$ 0,00" : f.placeholder}
                   value={form[f.name] ?? ""}
                   onChange={(e) =>
-                    setForm((s) => ({ ...s, [f.name]: isCurrency ? maskBRL(e.target.value) : e.target.value }))
+                    setForm((s) => ({
+                      ...s,
+                      [f.name]: isCurrency ? maskBRL(e.target.value) : isPhone ? maskPhoneBR(e.target.value) : e.target.value,
+                    }))
                   }
                 />
               </div>

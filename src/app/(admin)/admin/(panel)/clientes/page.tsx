@@ -29,7 +29,7 @@ export default async function ClientesPage() {
         columns={columns}
         fields={[
           { name: "name", label: "Nome completo" },
-          { name: "phone", label: "Telefone", placeholder: "(11) 91234-5678" },
+          { name: "phone", label: "Telefone", type: "phone", placeholder: "(11) 91234-5678" },
           { name: "email", label: "E-mail", type: "email" },
         ]}
       />
