@@ -8,14 +8,16 @@ import { parseBRLToNumber } from "@/lib/masks";
 interface CrudSchema {
   fields: string[];
   numeric: string[];
+  boolean?: string[];
   path: string;
 }
 
 /** Whitelist de tabelas/campos permitidos no CRUD do admin. */
 const SCHEMAS: Record<string, CrudSchema> = {
   services: {
-    fields: ["name", "duration_min", "price_brl", "category", "active"],
+    fields: ["name", "duration_min", "price_brl", "category", "is_child_service", "active"],
     numeric: ["duration_min", "price_brl"],
+    boolean: ["is_child_service"],
     path: "/admin/servicos",
   },
   products: {
@@ -45,6 +47,8 @@ export async function saveRow(table: string, id: string | null, values: Record<s
       if (v === "" || v == null) v = null;
       else if (typeof v === "string" && /[,R$]/.test(v)) v = parseBRLToNumber(v); // string mascarada em BRL
       else v = Number(v);
+    } else if (schema.boolean?.includes(f)) {
+      v = v === true || v === "true" || v === "on" || v === "1";
     }
     payload[f] = v;
   }

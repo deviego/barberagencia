@@ -24,3 +24,6 @@ create policy children_admin on public.children
 
 alter table public.appointments add column if not exists child_id uuid references public.children(id) on delete set null;
 alter table public.appointments add column if not exists observations text;
+
+-- Marca um serviço como "infantil" (mostra o seletor de criança no agendar).
+alter table public.services add column if not exists is_child_service boolean not null default false;

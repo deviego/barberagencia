@@ -5,6 +5,7 @@ const serviceColumns: CrudColumn[] = [
   { key: "name", label: "Serviço" },
   { key: "duration_min", label: "Duração", format: "minutes" },
   { key: "price_brl", label: "Preço", format: "price" },
+  { key: "is_child_service", label: "Infantil", format: "childService" },
   { key: "active", label: "Status", format: "activeBadge" },
 ];
 
@@ -33,6 +34,7 @@ export default async function ServicosAdminPage() {
           { name: "duration_min", label: "Duração (min)", type: "number" },
           { name: "price_brl", label: "Preço (R$)", type: "currency" },
           { name: "category", label: "Categoria" },
+          { name: "is_child_service", label: "Serviço infantil", type: "switch" },
         ]}
       />
 

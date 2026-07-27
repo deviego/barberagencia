@@ -72,7 +72,7 @@ export async function getActivePlanBalance(): Promise<number | null> {
 export async function getCatalog() {
   const supabase = await createSupabaseServerClient();
   const [services, combos, barbers] = await Promise.all([
-    supabase.from("services").select("id, name, duration_min, price_brl").eq("active", true).order("price_brl"),
+    supabase.from("services").select("id, name, duration_min, price_brl, is_child_service").eq("active", true).order("price_brl"),
     supabase.from("combo_plans").select("id, name, cuts, scope, price_brl").eq("active", true).order("price_brl"),
     supabase.from("barbers").select("id, name").eq("active", true).order("name"),
   ]);

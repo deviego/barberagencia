@@ -14,7 +14,7 @@ const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const SLOT_MIN = 45;
 
 interface Barber { id: string; name: string }
-interface Service { id: string; name: string; price_brl: number; duration_min?: number }
+interface Service { id: string; name: string; price_brl: number; duration_min?: number; is_child_service?: boolean }
 interface Product { id: string; name: string; price_brl: number }
 interface PlanInfo { comboPlanId: string; name: string; saldo: number }
 interface WorkingHour { barber_id: string; weekday: number; start_min: number; end_min: number }
@@ -50,8 +50,8 @@ export function AgendarForm({
   const [childModal, setChildModal] = useState(false);
   const [observations, setObservations] = useState("");
 
-  // Precisa escolher criança quando há um serviço "infantil" na comanda.
-  const needsChild = serviceIds.some((id) => services.find((s) => s.id === id)?.name.toLowerCase().includes("infantil"));
+  // Precisa escolher criança quando há um serviço marcado como infantil na comanda.
+  const needsChild = serviceIds.some((id) => services.find((s) => s.id === id)?.is_child_service);
 
   // Plano cobre 1 corte (o 1º serviço) quando há saldo e ao menos um serviço na comanda.
   const usePlan = !!plan && plan.saldo > 0 && serviceIds.length > 0;

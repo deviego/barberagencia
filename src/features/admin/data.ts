@@ -135,7 +135,7 @@ export async function getServices() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("services")
-    .select("id, name, duration_min, price_brl, category, active")
+    .select("id, name, duration_min, price_brl, category, is_child_service, active")
     .order("name");
   return data ?? [];
 }

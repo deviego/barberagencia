@@ -14,7 +14,7 @@ import { formatBRL, cn } from "@/lib/utils";
 import { maskBRL, brlInputFromNumber } from "@/lib/masks";
 import { saveRow, deleteRow } from "@/features/admin/crud-actions";
 
-type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "childrenBadge";
+type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "childrenBadge" | "childService";
 export interface CrudColumn {
   key: string;
   label: string;
@@ -47,6 +47,8 @@ function renderCell(col: CrudColumn, row: Row) {
       return v ? <Badge variant="success">Ativo</Badge> : <Badge>Inativo</Badge>;
     case "childrenBadge":
       return Number(v ?? 0) > 0 ? <Badge variant="accent">👶 {Number(v)}</Badge> : <span className="text-text-muted">—</span>;
+    case "childService":
+      return v ? <Badge variant="accent">Infantil</Badge> : <span className="text-text-muted">—</span>;
     default:
       return <span>{v == null || v === "" ? "—" : String(v)}</span>;
   }
@@ -295,6 +297,18 @@ export function CrudTable({
           }}
         >
           {fields.map((f) => {
+            if (f.type === "switch") {
+              return (
+                <div key={f.name} className="flex items-center justify-between">
+                  <Label className="mb-0">{f.label}</Label>
+                  <Switch
+                    key={`${editing === "new" ? "new" : editing?.id ?? "x"}-${f.name}`}
+                    defaultChecked={form[f.name] === "true"}
+                    onChange={(v) => setForm((s) => ({ ...s, [f.name]: v ? "true" : "false" }))}
+                  />
+                </div>
+              );
+            }
             const isCurrency = f.type === "currency";
             return (
               <div key={f.name} className="flex flex-col gap-1.5">
