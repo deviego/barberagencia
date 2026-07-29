@@ -2,6 +2,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { BrandingForm } from "@/features/admin/components/branding-form";
 import { LogoUpload } from "@/features/admin/components/logo-upload";
+import { WhatsAppConnect } from "@/features/admin/components/whatsapp-connect";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getBranding } from "@/features/admin/data";
 
@@ -64,6 +65,8 @@ export default async function ConfigPage() {
           initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
         />
       </section>
+
+      <WhatsAppConnect />
     </div>
   );
 }

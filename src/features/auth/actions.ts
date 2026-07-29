@@ -33,7 +33,7 @@ export async function sendWelcomeEmail() {
     const host = hdrs.get("host") ?? "";
     const proto = host.includes("localhost") ? "http" : "https";
     const link = host ? `${proto}://${host}/client` : null;
-    await notifyWelcome(user.email, name, tenant.name, { phone, link });
+    await notifyWelcome(user.email, name, tenant.name, { phone, link, tenantId: tenant.id });
   } catch {
     /* não bloqueia o cadastro se a boas-vindas falhar */
   }

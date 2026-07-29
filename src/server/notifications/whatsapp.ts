@@ -1,37 +1,26 @@
 import "server-only";
 
-/** Normaliza telefone BR para o formato do WhatsApp (só dígitos, com DDI 55). */
-function toWhatsPhone(phone: string) {
-  let n = String(phone).replace(/\D/g, "");
-  if (n.length <= 11) n = `55${n}`;
-  return n;
-}
-
 /**
- * Envia mensagem de WhatsApp via Z-API (não-oficial). Ativa quando ZAPI_INSTANCE +
- * ZAPI_TOKEN estão setados; sem eles, apenas ignora (não quebra o fluxo).
- * Docs: POST {base}/instances/{instance}/token/{token}/send-text  { phone, message }
+ * Envia WhatsApp pelo gateway próprio (Baileys/Render), pelo número da própria
+ * barbearia. Requer WA_SERVICE_URL + WA_SERVICE_TOKEN e o tenantId (sessão da
+ * barbearia). Sem isso, apenas ignora (não quebra o fluxo).
  */
 export async function sendWhatsApp(
   phone: string,
-  message: string
+  message: string,
+  tenantId?: string | null
 ): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
-  const instance = process.env.ZAPI_INSTANCE;
-  const token = process.env.ZAPI_TOKEN;
-  const clientToken = process.env.ZAPI_CLIENT_TOKEN;
-  const base = process.env.ZAPI_BASE_URL || "https://api.z-api.io";
-  if (!instance || !token) return { ok: false, skipped: true };
-  if (!phone) return { ok: false, skipped: true };
+  const base = process.env.WA_SERVICE_URL;
+  const token = process.env.WA_SERVICE_TOKEN;
+  if (!base || !token || !tenantId || !phone) return { ok: false, skipped: true };
   try {
-    const res = await fetch(`${base}/instances/${instance}/token/${token}/send-text`, {
+    const res = await fetch(`${base}/sessions/${tenantId}/send`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(clientToken ? { "Client-Token": clientToken } : {}),
-      },
-      body: JSON.stringify({ phone: toWhatsPhone(phone), message }),
+      headers: { "Content-Type": "application/json", "x-wa-token": token },
+      body: JSON.stringify({ phone, message }),
     });
-    if (!res.ok) return { ok: false, error: `Z-API ${res.status}` };
+    if (res.status === 409) return { ok: false, skipped: true }; // barbearia não conectada
+    if (!res.ok) return { ok: false, error: `WA ${res.status}` };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "erro de rede" };

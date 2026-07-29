@@ -81,7 +81,7 @@ export async function notifyServiceStarted(appointmentId: string) {
     `📋 Serviço: *${servico}*\n` +
     `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
     `Quer aproveitar e adicionar mais algum serviço? É só avisar. 😉`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, appt.tenant_id);
   await supabase.from("notification_log").insert({
     tenant_id: appt.tenant_id,
     channel: "whatsapp",
@@ -119,7 +119,7 @@ export async function notifyServiceAdded(
     `➕ *${item.qty > 1 ? `${item.qty}x ` : ""}${item.name}*${valor}\n\n` +
     `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n` +
     `O pagamento é feito no local após o atendimento.`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, appt.tenant_id);
   await supabase.from("notification_log").insert({
     tenant_id: appt.tenant_id,
     channel: "whatsapp",
@@ -159,7 +159,7 @@ export async function notifyServiceFinished(appointmentId: string) {
     (total > 0 ? `\n💰 Total pago: *${formatBRL(total)}*\n` : "") +
     `\nO que você achou do atendimento? Sua opinião ajuda muito a gente a melhorar!\n\n` +
     `Volte sempre! ✂️🔥`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, appt.tenant_id);
   await supabase.from("notification_log").insert({
     tenant_id: appt.tenant_id,
     channel: "whatsapp",
@@ -191,7 +191,7 @@ export async function notifyPlanRequested(clientId: string, comboPlanId: string)
       combo.cuts as number,
       5
     );
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, client?.tenant_id ?? null);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
     channel: "whatsapp",
@@ -228,7 +228,7 @@ export async function notifyPlanSubscribed(clientId: string, comboPlanId: string
       (sub?.billing_day as number) ?? 5
     ) +
     `\n\nÉ só agendar pelo app. Aproveite! 💈`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, client?.tenant_id ?? null);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
     channel: "whatsapp",
@@ -264,7 +264,7 @@ export async function notifyPlanRejected(clientId: string, comboPlanId: string |
     `*SOLICITAÇÃO NÃO APROVADA*\n\n` +
     `${nome ? `${nome}, ` : ""}${corpo}\n\n` +
     `Ficou com dúvida? Fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY} que a gente te ajuda. 💈`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, client?.tenant_id ?? null);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
     channel: "whatsapp",
@@ -300,7 +300,7 @@ export async function notifyPlanCancelled(clientId: string) {
     `${nome ? `${nome}, ` : ""}sua assinatura do *${plano}* foi cancelada.\n\n` +
     `Sentiremos sua falta! Quando quiser voltar, é só assinar de novo pelo app. ` +
     `Qualquer dúvida, fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY}. 💈`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, client?.tenant_id ?? null);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
     channel: "whatsapp",
@@ -337,7 +337,7 @@ export async function notifyAppointmentCancelled(appointmentId: string) {
     `📋 Serviço: *${servico}*\n` +
     `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
     `Quer marcar um novo horário? É só agendar pelo app. 💈`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, appt.tenant_id);
   await supabase.from("notification_log").insert({
     tenant_id: appt.tenant_id,
     channel: "whatsapp",
@@ -367,7 +367,7 @@ export async function notifyReservationCancelled(reservationId: string) {
     `*RESERVA CANCELADA*\n\n` +
     `${nome ? `${nome}, ` : ""}sua reserva de *${res.qty}x ${produto}* foi cancelada.\n\n` +
     `Qualquer dúvida, fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY}. 💈`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, res.tenant_id);
   await supabase.from("notification_log").insert({
     tenant_id: res.tenant_id,
     channel: "whatsapp",
@@ -397,7 +397,7 @@ export async function notifyInvite(input: {
       `Falta pouco: é só criar sua senha (seu nome e telefone já estão preenchidos).\n\n` +
       `👉 ${input.link}\n\n` +
       `O link vale por 48 horas.`;
-    const w = await sendWhatsApp(input.phone, msg);
+    const w = await sendWhatsApp(input.phone, msg, input.tenantId ?? null);
     await supabase.from("notification_log").insert({
       tenant_id: input.tenantId ?? null,
       channel: "whatsapp",
@@ -435,7 +435,7 @@ export async function notifyWelcome(
   email: string,
   name: string,
   tenantName: string,
-  opts?: { phone?: string | null; link?: string | null }
+  opts?: { phone?: string | null; link?: string | null; tenantId?: string | null }
 ) {
   const nome = (name ?? "").split(" ")[0];
 
@@ -461,7 +461,7 @@ export async function notifyWelcome(
       `${nome ? `${nome}, ` : ""}sua conta está pronta. Agende seu próximo corte, acompanhe seus pedidos e aproveite os planos.\n` +
       (opts.link ? `\n👉 ${opts.link}\n` : "") +
       `\nO pagamento é feito no local após o atendimento. 💈`;
-    await sendWhatsApp(opts.phone, msg);
+    await sendWhatsApp(opts.phone, msg, opts?.tenantId ?? null);
   }
 }
 
@@ -500,7 +500,7 @@ export async function notifyAppointmentRequested(appointmentId: string) {
     (valorTxt ? `💰 Valor: *${valorTxt}*\n` : "") +
     (pagamento ? `💳 Pagamento: *${pagamento}*\n` : "") +
     `📅 ${quando}${barber ? ` · com ${barber}` : ""}`;
-  const w = await sendWhatsApp(phone, msg);
+  const w = await sendWhatsApp(phone, msg, appt.tenant_id);
   await supabase.from("notification_log").insert({
     tenant_id: appt.tenant_id,
     channel: "whatsapp",
@@ -578,7 +578,7 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
       (pagamento ? `💳 Pagamento: *${pagamento}*\n` : "") +
       `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
       `Pagamento feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos 10 minutos de antecedência.`;
-    const w = await sendWhatsApp(phone, waMsg);
+    const w = await sendWhatsApp(phone, waMsg, appt.tenant_id);
     await supabase.from("notification_log").insert({
       tenant_id: appt.tenant_id,
       channel: "whatsapp",
