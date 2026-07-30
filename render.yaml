@@ -12,7 +12,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: "20"
+        value: "22"
       - key: WA_SERVICE_TOKEN
         sync: false            # cole no dashboard (mesmo valor do app/Vercel)
       - key: SUPABASE_URL
