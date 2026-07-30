@@ -121,6 +121,19 @@ export async function getBranding() {
   return data;
 }
 
+/** Configurações da unidade (contato/horários) + flag de onboarding, do tenant do admin. */
+export async function getUnitSettings() {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return null;
+  const { data } = await supabase
+    .from("tenant_settings")
+    .select("phone, address, hours_weekday, hours_saturday, onboarded_at")
+    .eq("tenant_id", user.tenantId)
+    .maybeSingle();
+  return data;
+}
+
 /** Cancelamentos recentes (para o painel de cancelamentos/reembolsos). */
 export async function getRecentCancellations() {
   const supabase = await createSupabaseServerClient();

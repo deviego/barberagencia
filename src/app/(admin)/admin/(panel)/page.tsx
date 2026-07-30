@@ -5,8 +5,10 @@ import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PosButton } from "@/features/admin/components/pos-drawer";
+import { OnboardingModal } from "@/features/admin/components/onboarding-modal";
 import { formatBRL } from "@/lib/utils";
-import { getClients, getDashboard, getProducts, getServices } from "@/features/admin/data";
+import { getClients, getDashboard, getProducts, getServices, getUnitSettings } from "@/features/admin/data";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -22,17 +24,20 @@ const STATUS: Record<string, { label: string; variant: React.ComponentProps<type
 };
 
 export default async function AdminDashboard() {
-  const [d, services, products, clients] = await Promise.all([
+  const [d, services, products, clients, tenant, unit] = await Promise.all([
     getDashboard(),
     getServices(),
     getProducts(),
     getClients(),
+    getCurrentTenant(),
+    getUnitSettings(),
   ]);
   const max = Math.max(1, ...d.revenue6m.map((m) => m.value));
   const today = d.today as { id: string; start_at: string; status: string; clients: unknown; services: unknown; combo_plans: unknown }[];
 
   return (
     <div className="flex flex-col gap-6">
+      <OnboardingModal show={!unit?.onboarded_at} barbershop={tenant.name} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-h3 font-bold text-text">Dashboard</h1>

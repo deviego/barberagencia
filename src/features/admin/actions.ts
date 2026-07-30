@@ -241,6 +241,50 @@ export async function cancelClientSubscription(clientId: string) {
   return { ok: true as const };
 }
 
+/** Salva as configurações da unidade (contato/horários) e marca o onboarding como feito. */
+export async function saveUnitSettings(input: {
+  phone?: string;
+  address?: string;
+  hoursWeekday?: string;
+  hoursSaturday?: string;
+}) {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const { data: existing } = await supabase
+    .from("tenant_settings")
+    .select("onboarded_at")
+    .eq("tenant_id", user.tenantId)
+    .maybeSingle();
+  const { error } = await supabase.from("tenant_settings").upsert({
+    tenant_id: user.tenantId,
+    phone: input.phone?.trim() || null,
+    address: input.address?.trim() || null,
+    hours_weekday: input.hoursWeekday?.trim() || null,
+    hours_saturday: input.hoursSaturday?.trim() || null,
+    onboarded_at: existing?.onboarded_at ?? new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/config");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Marca o onboarding como concluído (quando o admin dispensa o modal). */
+export async function markOnboarded() {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const };
+  await supabase.from("tenant_settings").upsert({
+    tenant_id: user.tenantId,
+    onboarded_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
 /** Envia uma mensagem de suporte do admin para a plataforma (e-mail via Resend). */
 export async function sendSupportMessage(input: { category: string; subject: string; message: string }) {
   const user = await getSessionUser();

@@ -1,51 +1,22 @@
-import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { BrandingForm } from "@/features/admin/components/branding-form";
 import { LogoUpload } from "@/features/admin/components/logo-upload";
+import { UnitSettingsForm } from "@/features/admin/components/unit-settings-form";
 import { WhatsAppConnect } from "@/features/admin/components/whatsapp-connect";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
-import { getBranding } from "@/features/admin/data";
+import { getBranding, getUnitSettings } from "@/features/admin/data";
 
 export default async function ConfigPage() {
-  const tenant = await getCurrentTenant();
-  const branding = await getBranding();
+  const [tenant, branding, unit] = await Promise.all([getCurrentTenant(), getBranding(), getUnitSettings()]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6" id="unidade">
       <h1 className="text-h3 font-bold text-text">Configurações & Branding</h1>
 
-      {/* Dados da unidade */}
+      {/* Dados da unidade + horários (salvam de verdade) */}
       <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
         <div className="text-overline uppercase text-text-muted">Dados da unidade</div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Nome da barbearia</Label>
-            <Input defaultValue={tenant.name} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Telefone</Label>
-            <Input defaultValue="+55 (21) 99088-3359" />
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label>Endereço</Label>
-          <Input placeholder="Rua, número, bairro, cidade" />
-        </div>
-      </section>
-
-      {/* Horários */}
-      <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
-        <div className="text-overline uppercase text-text-muted">Horário de funcionamento</div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>Segunda a Sexta</Label>
-            <Input defaultValue="09:00 – 20:00" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Sábado</Label>
-            <Input defaultValue="09:00 – 18:00" />
-          </div>
-        </div>
+        <UnitSettingsForm tenantName={tenant.name} initial={unit} />
       </section>
 
       {/* White-label */}
