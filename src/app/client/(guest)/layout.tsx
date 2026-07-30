@@ -1,22 +1,19 @@
 import Link from "next/link";
-import { LogoMark } from "@/components/brand/logo";
+import { Scissors } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { Copyright } from "@/components/brand/copyright";
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
-  const tenant = await getCurrentTenant();
-
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Topbar */}
+      {/* Topbar — marca fixa "barberagencia" (a barbearia aparece só após logar) */}
       <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-8 py-3">
         <Link href="/client/login" className="flex items-center gap-3 text-text">
-          <LogoMark text={tenant.branding.logoText} src={tenant.branding.logoUrl} />
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-text-inverse">
+            <Scissors size={18} />
+          </span>
           <div>
-            <div className="font-display text-h5 font-extrabold uppercase tracking-wide">
-              {tenant.name}
-            </div>
+            <div className="font-display text-h5 font-extrabold lowercase tracking-wide">barberagencia</div>
             <div className="text-caption text-text-muted">Acesso à sua conta</div>
           </div>
         </Link>

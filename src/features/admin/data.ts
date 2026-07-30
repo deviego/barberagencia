@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth/session";
 
 /** Solicitações de agendamento (REQUESTED) do tenant do admin. */
 export async function listRequests() {
@@ -110,10 +111,12 @@ export async function getCombos() {
 
 export async function getBranding() {
   const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return null;
   const { data } = await supabase
     .from("branding")
     .select("logo_text, logo_url, accent, instagram")
-    .limit(1)
+    .eq("tenant_id", user.tenantId)
     .maybeSingle();
   return data;
 }

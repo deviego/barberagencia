@@ -1,18 +1,19 @@
-import { LogoMark } from "@/components/brand/logo";
+import { Scissors } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Copyright } from "@/components/brand/copyright";
 
-/** Casca visual das telas de login (topbar + faixa barber-pole + centro). */
+/**
+ * Casca visual das telas de login. Marca FIXA "barberagencia" — a identidade
+ * da barbearia só aparece após o login. (Props de tenant são aceitas por
+ * compatibilidade, mas não são exibidas aqui.)
+ */
 export function AuthScreen({
-  logoText,
-  logoUrl,
-  name,
   subtitle,
   children,
 }: {
-  logoText: string;
+  logoText?: string;
   logoUrl?: string | null;
-  name: string;
+  name?: string;
   subtitle?: string;
   children: React.ReactNode;
 }) {
@@ -20,9 +21,11 @@ export function AuthScreen({
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-8 py-3">
         <div className="flex items-center gap-3 text-text">
-          <LogoMark text={logoText} src={logoUrl} />
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-text-inverse">
+            <Scissors size={18} />
+          </span>
           <div>
-            <div className="font-display text-h5 font-extrabold uppercase tracking-wide">{name}</div>
+            <div className="font-display text-h5 font-extrabold lowercase tracking-wide">barberagencia</div>
             {subtitle && <div className="text-caption text-text-muted">{subtitle}</div>}
           </div>
         </div>

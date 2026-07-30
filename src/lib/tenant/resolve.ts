@@ -2,19 +2,22 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import type { ResolvedTenant, SaasPlanKey } from "./types";
 
 export const TENANT_COOKIE = "bb_tenant";
 const FALLBACK_SUBDOMAIN = "oliveira01";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SB = any;
+
 function mapPlan(v: string | null | undefined): SaasPlanKey {
   return v === "personal" || v === "essencial" || v === "advance" ? v : "advance";
 }
 
-/** Carrega tenant + branding do banco (leitura pública via RLS). */
-async function loadTenant(where: { id?: string; subdomain?: string }): Promise<ResolvedTenant | null> {
-  const supabase = await createSupabaseServerClient();
+/** Carrega tenant + branding do banco usando o client informado (RLS ou service-role). */
+async function loadTenantWith(supabase: SB, where: { id?: string; subdomain?: string }): Promise<ResolvedTenant | null> {
   let q = supabase.from("tenants").select("id, name, subdomain, custom_domain, saas_plan");
   if (where.id) q = q.eq("id", where.id);
   else if (where.subdomain) q = q.eq("subdomain", where.subdomain);
@@ -47,8 +50,22 @@ async function loadTenant(where: { id?: string; subdomain?: string }): Promise<R
   };
 }
 
-export const getTenantBySubdomain = cache((slug: string) => loadTenant({ subdomain: slug }));
-export const getTenantById = cache((id: string) => loadTenant({ id }));
+/** Público/anônimo: usa service-role (RLS não permite mais leitura cross-tenant). */
+export const getTenantBySubdomain = cache(async (slug: string): Promise<ResolvedTenant | null> => {
+  let admin: SB;
+  try {
+    admin = createSupabaseAdminClient();
+  } catch {
+    return null; // sem service-role configurada
+  }
+  return loadTenantWith(admin, { subdomain: slug });
+});
+
+/** Usuário logado: client normal, RLS restringe ao próprio tenant. */
+export const getTenantById = cache(async (id: string): Promise<ResolvedTenant | null> => {
+  const supabase = await createSupabaseServerClient();
+  return loadTenantWith(supabase, { id });
+});
 
 /**
  * Tenant atual:
