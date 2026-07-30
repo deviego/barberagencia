@@ -2,6 +2,7 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
@@ -17,6 +18,7 @@ export async function createTenant(input: {
   plan: string;
   adminEmail: string;
   adminName?: string;
+  phone?: string;
 }) {
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
@@ -47,6 +49,12 @@ export async function createTenant(input: {
     logo_text: name.slice(0, 2).toUpperCase(),
   });
 
+  // telefone da barbearia (opcional) — guarda em tenant_settings
+  const phone = input.phone?.trim();
+  if (phone) {
+    await admin.from("tenant_settings").upsert({ tenant_id: tenant.id, phone }, { onConflict: "tenant_id" });
+  }
+
   // 2) usuário admin (o trigger cria client+membership no tenant novo via tenant_subdomain)
   const password = tempPassword();
   const { data: created, error: uErr } = await admin.auth.admin.createUser({
@@ -68,11 +76,21 @@ export async function createTenant(input: {
     .eq("user_id", created.user.id)
     .eq("tenant_id", tenant.id);
 
+  // Link do painel admin (o tenant é resolvido pela membership no login) + link do cliente
+  const h = await headers();
+  const host = h.get("host") ?? "";
+  const proto = host.includes("localhost") ? "http" : "https";
+  const origin = host ? `${proto}://${host}` : "";
+
   revalidatePath("/master");
+  revalidatePath("/master/barbearias");
   return {
     ok: true as const,
-    link: `/b/${subdomain}`,
+    adminLoginUrl: `${origin}/admin/login`,
+    clientLink: `${origin}/b/${subdomain}`,
     adminEmail,
     password,
+    name,
+    phone: phone ?? "",
   };
 }

@@ -1,68 +1,48 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Plus, Building2 } from "lucide-react";
+import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
-import { getTenants } from "@/features/platform/data";
+import { BarChart } from "@/features/platform/components/bar-chart";
+import { getPlatformStats } from "@/features/platform/data";
+import { formatBRL } from "@/lib/utils";
 
-const PLAN_LABEL: Record<string, string> = {
-  personal: "Personal",
-  essencial: "Essencial",
-  advance: "Advance",
-};
-
-export default async function BarbeariasPage() {
-  const tenants = await getTenants();
+export default async function MasterDashboard() {
+  const s = await getPlatformStats();
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-h3 font-bold text-text">Barbearias</h1>
-        <Link href="/master/onboarding">
-          <Button>
-            <Plus size={16} />
-            Nova barbearia
-          </Button>
-        </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-h3 font-bold text-text">Painel da plataforma</h1>
+          <p className="text-caption text-text-muted">Visão geral da barberagencia — o avanço de todas as barbearias</p>
+        </div>
+        <div className="flex gap-3">
+          <Link href="/master/barbearias">
+            <Button variant="outline">
+              <Building2 size={16} />
+              Ver barbearias
+            </Button>
+          </Link>
+          <Link href="/master/onboarding">
+            <Button>
+              <Plus size={16} />
+              Nova barbearia
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-body">
-          <thead>
-            <tr className="border-b border-border bg-surface text-left text-caption uppercase text-text-muted">
-              <th className="px-4 py-3 font-semibold">Barbearia</th>
-              <th className="px-4 py-3 font-semibold">Link</th>
-              <th className="px-4 py-3 font-semibold">Plano</th>
-              <th className="px-4 py-3 font-semibold">Clientes</th>
-              <th className="px-4 py-3 font-semibold">Barbeiros</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tenants.map((t) => (
-              <tr key={t.id} className="border-b border-border-subtle transition-colors hover:bg-accent-wash">
-                <td className="px-4 py-3 text-text">{t.name}</td>
-                <td className="px-4 py-3 text-text-2 tabular">/b/{t.subdomain}</td>
-                <td className="px-4 py-3">
-                  <Badge variant="accent">{PLAN_LABEL[t.saasPlan] ?? t.saasPlan}</Badge>
-                </td>
-                <td className="px-4 py-3 text-text tabular">{t.clients}</td>
-                <td className="px-4 py-3 text-text tabular">{t.barbers}</td>
-                <td className="px-4 py-3">
-                  <Badge variant={t.status === "ACTIVE" ? "success" : "warning"}>
-                    {t.status === "ACTIVE" ? "Ativa" : t.status}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-            {tenants.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-text-muted">
-                  Nenhuma barbearia ainda.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Barbearias" value={String(s.barbershops)} delta={`${s.activeBarbershops} ativas`} accent />
+        <KpiCard label="Assinantes ativos" value={String(s.subscribers)} />
+        <KpiCard label="Faturamento (mês)" value={formatBRL(s.revenueMonth)} />
+        <KpiCard label="Receita recorrente (MRR)" value={formatBRL(s.mrr)} tone="success" />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <BarChart title="Barbearias — crescimento (6m)" data={s.barbershops6m} />
+        <BarChart title="Assinantes — crescimento (6m)" data={s.subscribers6m} />
+        <BarChart title="Faturamento — 6 meses" data={s.revenue6m} format={formatBRL} />
       </div>
     </div>
   );
