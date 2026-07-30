@@ -1,0 +1,21 @@
+# Render Blueprint — deploy do gateway de WhatsApp (wa-gateway/).
+# Render → New → Blueprint → conecte este repositório. Depois preencha os 3 segredos.
+services:
+  - type: web
+    name: wa-gateway
+    runtime: node
+    rootDir: wa-gateway
+    plan: free                 # free dorme após 15 min (derruba a conexão); troque p/ "starter" p/ sempre online
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: WA_SERVICE_TOKEN
+        sync: false            # cole no dashboard (mesmo valor do app/Vercel)
+      - key: SUPABASE_URL
+        sync: false            # https://tusfxbnnrypjtzqcvpov.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false            # service_role (secret)
