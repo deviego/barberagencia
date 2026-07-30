@@ -128,7 +128,7 @@ export async function getUnitSettings() {
   if (!user?.tenantId) return null;
   const { data } = await supabase
     .from("tenant_settings")
-    .select("phone, address, hours_weekday, hours_saturday, onboarded_at")
+    .select("phone, address, hours_weekday, hours_saturday, onboarded_at, onboarding_snoozed_at")
     .eq("tenant_id", user.tenantId)
     .maybeSingle();
   return data;

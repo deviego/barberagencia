@@ -271,17 +271,16 @@ export async function saveUnitSettings(input: {
   return { ok: true as const };
 }
 
-/** Marca o onboarding como concluído (quando o admin dispensa o modal). */
-export async function markOnboarded() {
+/** Adia o modal de onboarding por 24h (quando o admin dispensa ou vai configurar sem concluir). */
+export async function snoozeOnboarding() {
   const supabase = await createSupabaseServerClient();
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const };
   await supabase.from("tenant_settings").upsert({
     tenant_id: user.tenantId,
-    onboarded_at: new Date().toISOString(),
+    onboarding_snoozed_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
-  revalidatePath("/admin");
   return { ok: true as const };
 }
 

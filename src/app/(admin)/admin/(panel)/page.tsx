@@ -35,9 +35,13 @@ export default async function AdminDashboard() {
   const max = Math.max(1, ...d.revenue6m.map((m) => m.value));
   const today = d.today as { id: string; start_at: string; status: string; clients: unknown; services: unknown; combo_plans: unknown }[];
 
+  // Onboarding: mostra se ainda não configurou (onboarded_at nulo) e não foi adiado nas últimas 24h.
+  const snoozedAt = unit?.onboarding_snoozed_at ? new Date(unit.onboarding_snoozed_at).getTime() : 0;
+  const showOnboarding = !unit?.onboarded_at && Date.now() - snoozedAt > 24 * 60 * 60 * 1000;
+
   return (
     <div className="flex flex-col gap-6">
-      <OnboardingModal show={!unit?.onboarded_at} barbershop={tenant.name} />
+      <OnboardingModal show={showOnboarding} barbershop={tenant.name} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-h3 font-bold text-text">Dashboard</h1>

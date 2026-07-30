@@ -1,18 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Settings, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { snoozeOnboarding } from "@/features/admin/actions";
 
 /** Modal de boas-vindas no primeiro acesso — leva o admin para as configurações iniciais. */
 export function OnboardingModal({ show, barbershop }: { show: boolean; barbershop: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(show);
+  const [, startTransition] = useTransition();
   if (!open) return null;
 
+  // Adia por 24h (só não aparece de vez quando o admin realmente salvar as configurações).
+  function snooze() {
+    startTransition(() => {
+      snoozeOnboarding();
+    });
+  }
+  function goConfigure() {
+    snooze();
+    router.push("/admin/config");
+  }
+  function dismiss() {
+    snooze();
+    setOpen(false);
+  }
+
   return (
-    <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 p-6" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/60 p-6" onClick={dismiss}>
       <div
         className="w-[440px] max-w-full rounded-lg border border-border bg-elevated p-7 text-center shadow-lg"
         onClick={(e) => e.stopPropagation()}
@@ -26,10 +43,10 @@ export function OnboardingModal({ show, barbershop }: { show: boolean; barbersho
           <strong> horários</strong>, <strong>logo/cor</strong> e conecta o <strong>WhatsApp</strong>.
         </p>
         <div className="mt-6 flex flex-col gap-2">
-          <Button onClick={() => router.push("/admin/config")}>
+          <Button onClick={goConfigure}>
             <Settings size={16} /> Configurar minha barbearia
           </Button>
-          <button onClick={() => setOpen(false)} className="text-caption text-text-muted transition-colors hover:text-text">
+          <button onClick={dismiss} className="text-caption text-text-muted transition-colors hover:text-text">
             Agora não
           </button>
         </div>
