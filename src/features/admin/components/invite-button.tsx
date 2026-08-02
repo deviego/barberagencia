@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Copy, MessageCircle, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -8,7 +9,8 @@ import { Drawer } from "@/components/ui/drawer";
 import { maskPhoneBR } from "@/lib/masks";
 import { createInvite } from "@/features/admin/actions";
 
-export function InviteButton() {
+export function InviteButton({ tenantName = "nossa barbearia" }: { tenantName?: string }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -22,8 +24,10 @@ export function InviteButton() {
     setError(null);
     startTransition(async () => {
       const res = await createInvite({ name, phone, email });
-      if (res.ok) setLink(`${window.location.origin}/convite/${res.token}`);
-      else setError(res.error);
+      if (res.ok) {
+        setLink(`${window.location.origin}/convite/${res.token}`);
+        router.refresh(); // o convidado já aparece na lista
+      } else setError(res.error);
     });
   }
   function reset() {
@@ -105,7 +109,7 @@ export function InviteButton() {
                 {copied ? "Copiado" : "Copiar link"}
               </Button>
               <a
-                href={`https://wa.me/${waPhone ? (waPhone.startsWith("55") ? waPhone : "55" + waPhone) : ""}?text=${encodeURIComponent(`Olá! Crie seu acesso na Barbearia Oliveira 01: ${link}`)}`}
+                href={`https://wa.me/${waPhone ? (waPhone.startsWith("55") ? waPhone : "55" + waPhone) : ""}?text=${encodeURIComponent(`Olá! Crie seu acesso na ${tenantName}: ${link}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-caption font-semibold text-white"

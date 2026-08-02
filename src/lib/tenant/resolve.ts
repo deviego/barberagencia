@@ -7,7 +7,17 @@ import { getSessionUser } from "@/lib/auth/session";
 import type { ResolvedTenant, SaasPlanKey } from "./types";
 
 export const TENANT_COOKIE = "bb_tenant";
-const FALLBACK_SUBDOMAIN = "oliveira01";
+
+/** Tenant neutro para visitantes anônimos SEM contexto de barbearia (nunca expõe outra barbearia). */
+const NEUTRAL_TENANT: ResolvedTenant = {
+  id: "",
+  name: "barberagencia",
+  subdomain: "",
+  customDomain: null,
+  networkId: null,
+  saasPlan: "advance",
+  branding: { logoText: "BB", logoUrl: null, instagram: null },
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SB = any;
@@ -71,7 +81,7 @@ export const getTenantById = cache(async (id: string): Promise<ResolvedTenant | 
  * Tenant atual:
  * 1) logado → tenant do membership;
  * 2) anônimo → cookie `bb_tenant` (definido pelo link /b/{slug});
- * 3) fallback → oliveira01.
+ * 3) sem contexto → marca neutra "barberagencia" (NUNCA a de outra barbearia).
  */
 export const getCurrentTenant = cache(async (): Promise<ResolvedTenant> => {
   const user = await getSessionUser();
@@ -84,15 +94,5 @@ export const getCurrentTenant = cache(async (): Promise<ResolvedTenant> => {
     const t = await getTenantBySubdomain(slug);
     if (t) return t;
   }
-  const fb = await getTenantBySubdomain(FALLBACK_SUBDOMAIN);
-  if (fb) return fb;
-  return {
-    id: "",
-    name: "Barbearia",
-    subdomain: FALLBACK_SUBDOMAIN,
-    customDomain: null,
-    networkId: null,
-    saasPlan: "advance",
-    branding: { logoText: "BO", logoUrl: null, instagram: null },
-  };
+  return NEUTRAL_TENANT;
 });

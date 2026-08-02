@@ -180,7 +180,7 @@ export async function getClients() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("clients")
-    .select("id, name, email, phone, active, children(id)")
+    .select("id, name, email, phone, active, status, children(id)")
     .order("name");
   return (data ?? []).map((c) => {
     const kids = (c.children ?? []) as { id: string }[];

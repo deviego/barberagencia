@@ -41,7 +41,7 @@ export interface RequestRow {
   payment_method?: string | null;
 }
 
-export function RequestCard({ req }: { req: RequestRow }) {
+export function RequestCard({ req, tenantName = "nossa barbearia" }: { req: RequestRow; tenantName?: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const client = one(req.clients);
@@ -51,7 +51,7 @@ export function RequestCard({ req }: { req: RequestRow }) {
   const items = req.appointment_items ?? [];
   const total = items.reduce((s, it) => (it.covered_by_plan ? s : s + it.price_brl * it.qty), 0);
   const phone = (client as { phone?: string | null } | null)?.phone ?? null;
-  const waText = fillTemplate(getTemplate("confirmed")?.body ?? "", { nome: client?.name ?? "", link: APP_LINK });
+  const waText = fillTemplate(getTemplate("confirmed")?.body ?? "", { nome: client?.name ?? "", link: APP_LINK, barbearia: tenantName });
 
   const expiresMs = req.request_expires_at ? new Date(req.request_expires_at).getTime() : 0;
   const [now, setNow] = useState(() => Date.now());

@@ -1,12 +1,9 @@
 /**
- * Conteúdo dos documentos legais (fiel aos .docx da Barbearia Oliveira 01).
- * White-label: por ora fixo; futuramente por tenant.
+ * Conteúdo dos documentos legais — genérico/plataforma (white-label).
+ * Sem dados de nenhuma barbearia específica; o contato é feito pelos canais da própria barbearia.
  */
 
 export const LEGAL_CONTACT = {
-  whatsapp: "(21) 99088-3359",
-  whatsappLink: "https://wa.me/5521990883359",
-  instagram: "@oliveira_01_barbearia",
   updatedAt: "20 de julho de 2026",
 };
 
@@ -24,7 +21,7 @@ export interface LegalDocument {
 
 export const TERMS: LegalDocument = {
   title: "Termos de Uso",
-  subtitle: "Barbearia Oliveira 01",
+  subtitle: "Plataforma de agendamentos",
   intro:
     "Bem-vindo à nossa plataforma de agendamentos. Ao reservar um horário, você concorda com as regras de funcionamento da nossa barbearia descritas abaixo.",
   sections: [
@@ -58,14 +55,14 @@ export const TERMS: LegalDocument = {
     {
       title: "5. Alterações nas regras",
       paragraphs: [
-        "A Barbearia Oliveira 01 pode atualizar estas regras de funcionamento sempre que necessário.",
+        "A barbearia pode atualizar estas regras de funcionamento sempre que necessário.",
         "As novas regras passam a valer assim que publicadas na plataforma.",
       ],
     },
     {
       title: "6. Canais de suporte",
       paragraphs: [
-        `Se tiver qualquer dúvida sobre o seu agendamento ou precisar de ajuda, entre em contato: WhatsApp ${LEGAL_CONTACT.whatsapp} · Instagram ${LEGAL_CONTACT.instagram}.`,
+        "Se tiver qualquer dúvida sobre o seu agendamento ou precisar de ajuda, entre em contato pelos canais oficiais da barbearia (a página de Suporte no app mostra o WhatsApp de atendimento).",
       ],
     },
   ],
@@ -73,9 +70,9 @@ export const TERMS: LegalDocument = {
 
 export const PRIVACY: LegalDocument = {
   title: "Política de Privacidade",
-  subtitle: "Barbearia Oliveira 01",
+  subtitle: "Plataforma de agendamentos",
   intro:
-    "Este documento explica como a Barbearia Oliveira 01 coleta, utiliza, armazena e protege os dados pessoais dos clientes na plataforma de agendamento, em total conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 – LGPD).",
+    "Este documento explica como a barbearia coleta, utiliza, armazena e protege os dados pessoais dos clientes na plataforma de agendamento, em total conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 – LGPD).",
   sections: [
     {
       title: "1. Dados coletados e finalidade (Art. 7º, V da LGPD)",
@@ -101,7 +98,7 @@ export const PRIVACY: LegalDocument = {
     {
       title: "4. Compartilhamento de dados com terceiros",
       paragraphs: [
-        "A Barbearia Oliveira 01 não vende e não comercializa seus dados pessoais.",
+        "A barbearia não vende e não comercializa seus dados pessoais.",
         "O compartilhamento ocorre única e exclusivamente com a empresa parceira desenvolvedora da plataforma de agendamento (operadora dos dados), submetida a rígidas cláusulas contratuais de confidencialidade.",
       ],
     },
@@ -121,7 +118,7 @@ export const PRIVACY: LegalDocument = {
     {
       title: "7. Canal de atendimento",
       paragraphs: [
-        `Para exercer seus direitos ou tirar dúvidas sobre a sua privacidade, fale com a nossa administração: WhatsApp ${LEGAL_CONTACT.whatsapp} · Instagram ${LEGAL_CONTACT.instagram}.`,
+        "Para exercer seus direitos ou tirar dúvidas sobre a sua privacidade, fale com a administração da barbearia pelos canais oficiais (o WhatsApp de atendimento aparece na página de Suporte no app).",
       ],
     },
   ],

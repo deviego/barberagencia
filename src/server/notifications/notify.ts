@@ -1,10 +1,11 @@
 import "server-only";
+import { cache } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatBRL } from "@/lib/utils";
 import { paymentLabel } from "@/lib/payment";
-import { SUPPORT_WHATSAPP_DISPLAY } from "@/lib/contact";
 import { sendEmail } from "./resend";
 import { sendWhatsApp } from "./whatsapp";
 
@@ -13,10 +14,32 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
 }
 
-const BRAND = "Barbearia Oliveira 01";
+type Brand = { name: string; phone: string | null };
 
-/** Bloco "Descritivo" do plano para as mensagens de WhatsApp (formato do cliente).
- *  1ª parte do scope vira "- ...", as demais viram "* ..."; mensalidade/saldo/renovação à parte. */
+/**
+ * Marca da barbearia que DISPARA a mensagem (nome + telefone próprios) — via service-role.
+ * Garante que cada barbearia comunica com a PRÓPRIA identidade (nunca a de outra).
+ */
+const brandFor = cache(async (tenantId: string | null | undefined): Promise<Brand> => {
+  if (!tenantId) return { name: "Barbearia", phone: null };
+  try {
+    const admin = createSupabaseAdminClient();
+    const [{ data: t }, { data: s }] = await Promise.all([
+      admin.from("tenants").select("name").eq("id", tenantId).maybeSingle(),
+      admin.from("tenant_settings").select("phone").eq("tenant_id", tenantId).maybeSingle(),
+    ]);
+    return { name: (t?.name as string) ?? "Barbearia", phone: (s?.phone as string) ?? null };
+  } catch {
+    return { name: "Barbearia", phone: null };
+  }
+});
+
+/** Linha de contato para rodapés — usa o telefone da própria barbearia (ou some se não houver). */
+function contatoLinha(brand: Brand) {
+  return brand.phone ? ` Fale com a gente no WhatsApp ${brand.phone}.` : "";
+}
+
+/** Bloco "Descritivo" do plano para as mensagens de WhatsApp (formato do cliente). */
 function planDescritivo(
   combo: { name: string; cuts: number; scope: string | null; price_brl: number },
   saldo: number,
@@ -36,21 +59,22 @@ function planDescritivo(
   );
 }
 
-function emailShell(title: string, bodyHtml: string) {
+function emailShell(title: string, bodyHtml: string, brand: Brand) {
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;background:#f4f1ec;padding:24px 0;">
     <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e6e0d6;">
       <tr><td style="background:#171412;padding:20px 28px;">
-        <span style="color:#c8a24b;font-size:20px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">${BRAND}</span>
+        <span style="color:#c8a24b;font-size:20px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;">${brand.name}</span>
       </td></tr>
       <tr><td style="padding:28px;">
         <h1 style="margin:0 0 12px;color:#171412;font-size:20px;">${title}</h1>
         ${bodyHtml}
       </td></tr>
-      <tr><td style="padding:18px 28px;border-top:1px solid #eee7db;color:#8a8578;font-size:12px;line-height:1.7;">
-        💈 Seg–Sáb 9h–20h · 2 primeiros domingos do mês 8h–12h<br/>
-        📲 WhatsApp ${SUPPORT_WHATSAPP_DISPLAY}
-      </td></tr>
+      ${
+        brand.phone
+          ? `<tr><td style="padding:18px 28px;border-top:1px solid #eee7db;color:#8a8578;font-size:12px;line-height:1.7;">📲 WhatsApp ${brand.phone}</td></tr>`
+          : ""
+      }
     </table>
   </div>`;
 }
@@ -67,6 +91,7 @@ export async function notifyServiceStarted(appointmentId: string) {
   const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(appt.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
   const servico =
     one(appt.services as { name: string }[] | { name: string })?.name ??
@@ -76,7 +101,7 @@ export async function notifyServiceStarted(appointmentId: string) {
   const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `Olá${nome ? `, ${nome}` : ""}! *Seu atendimento foi iniciado.* 💈\n\n` +
     `📋 Serviço: *${servico}*\n` +
     `📅 ${quando}${barber ? ` · com ${barber}` : ""}\n\n` +
@@ -106,6 +131,7 @@ export async function notifyServiceAdded(
   const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(appt.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
   const barber = one(appt.barbers as { name: string }[] | { name: string })?.name;
   const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
@@ -113,7 +139,7 @@ export async function notifyServiceAdded(
   const valor = item.priceBRL > 0 ? ` — *${formatBRL(item.priceBRL * item.qty)}* (no local)` : "";
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*${titulo}*\n\n` +
     `${nome ? `${nome}, ` : ""}adicionamos ao seu atendimento:\n` +
     `➕ *${item.qty > 1 ? `${item.qty}x ` : ""}${item.name}*${valor}\n\n` +
@@ -141,6 +167,7 @@ export async function notifyServiceFinished(appointmentId: string) {
   const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(appt.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
   const items =
     (appt.appointment_items as
@@ -152,7 +179,7 @@ export async function notifyServiceFinished(appointmentId: string) {
   const total = items.reduce((s, i) => (i.covered_by_plan ? s : s + Number(i.price_brl) * i.qty), 0);
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `${nome ? `${nome}, ` : ""}*muito obrigado pela preferência!* 🙏\n\n` +
     (originais.length ? `📋 Serviços:\n${fmtList(originais)}\n` : "") +
     (adicionais.length ? `\n➕ Adicionais:\n${fmtList(adicionais)}\n` : "") +
@@ -178,10 +205,11 @@ export async function notifyPlanRequested(clientId: string, comboPlanId: string)
   ]);
   const phone = client?.phone ?? null;
   if (!phone || !combo) return;
+  const brand = await brandFor(client?.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*SOLICITAÇÃO DE ASSINATURA*\n\n` +
     `${nome ? `${nome}, ` : ""}recebemos o seu pedido de contratação do *${combo.name}*.\n` +
     `Em breve você receberá a notificação com a confirmação. 💈\n\n` +
@@ -216,10 +244,11 @@ export async function notifyPlanSubscribed(clientId: string, comboPlanId: string
   ]);
   const phone = client?.phone ?? null;
   if (!phone || !combo) return;
+  const brand = await brandFor(client?.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*CONFIRMAÇÃO DE ASSINATURA*\n\n` +
     `${nome ? `${nome}, ` : ""}sua assinatura está *ativa!* 🎉\n\n` +
     planDescritivo(
@@ -249,6 +278,7 @@ export async function notifyPlanRejected(clientId: string, comboPlanId: string |
   ]);
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(client?.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
   const plano = one(combo as { name: string }[] | { name: string } | null)?.name ?? "plano";
 
@@ -260,10 +290,10 @@ export async function notifyPlanRejected(clientId: string, comboPlanId: string |
         : `seu pedido de *assinatura* do *${plano}* não foi aprovado no momento.`;
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*SOLICITAÇÃO NÃO APROVADA*\n\n` +
     `${nome ? `${nome}, ` : ""}${corpo}\n\n` +
-    `Ficou com dúvida? Fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY} que a gente te ajuda. 💈`;
+    `Ficou com dúvida?${contatoLinha(brand)} 💈`;
   const w = await sendWhatsApp(phone, msg, client?.tenant_id ?? null);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
@@ -284,6 +314,7 @@ export async function notifyPlanCancelled(clientId: string) {
     .maybeSingle();
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(client?.tenant_id);
   const { data: sub } = await supabase
     .from("client_subscriptions")
     .select("combo_plans(name)")
@@ -295,11 +326,10 @@ export async function notifyPlanCancelled(clientId: string) {
   const nome = (client?.name ?? "").split(" ")[0];
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*ASSINATURA CANCELADA*\n\n` +
     `${nome ? `${nome}, ` : ""}sua assinatura do *${plano}* foi cancelada.\n\n` +
-    `Sentiremos sua falta! Quando quiser voltar, é só assinar de novo pelo app. ` +
-    `Qualquer dúvida, fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY}. 💈`;
+    `Sentiremos sua falta! Quando quiser voltar, é só assinar de novo pelo app.${contatoLinha(brand)} 💈`;
   const w = await sendWhatsApp(phone, msg, client?.tenant_id ?? null);
   await supabase.from("notification_log").insert({
     tenant_id: client?.tenant_id ?? null,
@@ -322,6 +352,7 @@ export async function notifyAppointmentCancelled(appointmentId: string) {
   const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(appt.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
   const servico =
     one(appt.services as { name: string }[] | { name: string })?.name ??
@@ -331,7 +362,7 @@ export async function notifyAppointmentCancelled(appointmentId: string) {
   const quando = format(new Date(appt.start_at as string), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR });
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*AGENDAMENTO CANCELADO*\n\n` +
     `${nome ? `${nome}, ` : ""}seu agendamento foi cancelado.\n\n` +
     `📋 Serviço: *${servico}*\n` +
@@ -359,14 +390,15 @@ export async function notifyReservationCancelled(reservationId: string) {
   const client = one(res.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(res.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
   const produto = one(res.products as { name: string }[] | { name: string })?.name ?? "produto";
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*RESERVA CANCELADA*\n\n` +
     `${nome ? `${nome}, ` : ""}sua reserva de *${res.qty}x ${produto}* foi cancelada.\n\n` +
-    `Qualquer dúvida, fale com a gente no WhatsApp ${SUPPORT_WHATSAPP_DISPLAY}. 💈`;
+    `Qualquer dúvida é só chamar.${contatoLinha(brand)} 💈`;
   const w = await sendWhatsApp(phone, msg, res.tenant_id);
   await supabase.from("notification_log").insert({
     tenant_id: res.tenant_id,
@@ -388,6 +420,7 @@ export async function notifyInvite(input: {
 }) {
   const supabase = await createSupabaseServerClient();
   const nome = (input.name ?? "").split(" ")[0];
+  const brand: Brand = { name: input.tenantName, phone: (await brandFor(input.tenantId)).phone };
 
   if (input.phone) {
     const msg =
@@ -417,9 +450,10 @@ export async function notifyInvite(input: {
        <p style="margin:18px 0;">
          <a href="${input.link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Criar meu acesso</a>
        </p>
-       <p style="color:#8a8578;font-size:13px;line-height:1.6;">O link vale por 48 horas. Se o botão não abrir: ${input.link}</p>`
+       <p style="color:#8a8578;font-size:13px;line-height:1.6;">O link vale por 48 horas. Se o botão não abrir: ${input.link}</p>`,
+      brand
     );
-    const r = await sendEmail({ to: input.email, subject: `Seu acesso na ${input.tenantName}`, html });
+    const r = await sendEmail({ to: input.email, subject: `Seu acesso na ${input.tenantName}`, html, fromName: input.tenantName });
     await supabase.from("notification_log").insert({
       tenant_id: input.tenantId ?? null,
       channel: "email",
@@ -438,6 +472,7 @@ export async function notifyWelcome(
   opts?: { phone?: string | null; link?: string | null; tenantId?: string | null }
 ) {
   const nome = (name ?? "").split(" ")[0];
+  const brand: Brand = { name: tenantName, phone: (await brandFor(opts?.tenantId)).phone };
 
   if (email) {
     const html = emailShell(
@@ -449,9 +484,10 @@ export async function notifyWelcome(
          Agende seu próximo corte, acompanhe seus pedidos e aproveite os planos. O pagamento é feito no
          local após o atendimento.
        </p>
-       ${opts?.link ? `<p style="margin:16px 0;"><a href="${opts.link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Abrir o app</a></p>` : ""}`
+       ${opts?.link ? `<p style="margin:16px 0;"><a href="${opts.link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Abrir o app</a></p>` : ""}`,
+      brand
     );
-    await sendEmail({ to: email, subject: `Bem-vindo à ${tenantName}`, html });
+    await sendEmail({ to: email, subject: `Bem-vindo à ${tenantName}`, html, fromName: tenantName });
   }
 
   if (opts?.phone) {
@@ -477,6 +513,7 @@ export async function notifyAppointmentRequested(appointmentId: string) {
   const client = one(appt.clients as { name: string; phone: string | null }[] | { name: string; phone: string | null });
   const phone = client?.phone ?? null;
   if (!phone) return;
+  const brand = await brandFor(appt.tenant_id);
   const nome = (client?.name ?? "").split(" ")[0];
   const servico =
     one(appt.services as { name: string }[] | { name: string })?.name ??
@@ -491,7 +528,7 @@ export async function notifyAppointmentRequested(appointmentId: string) {
   const pagamento = appt.payment_method ? paymentLabel(appt.payment_method as string) : null;
 
   const msg =
-    `✂️ *${BRAND}*\n` +
+    `✂️ *${brand.name}*\n` +
     `*SOLICITAÇÃO DE AGENDAMENTO*\n\n` +
     `${nome ? `${nome}, ` : ""}recebemos o seu pedido de agendamento! 📋\n` +
     `Ele está *aguardando a confirmação* da barbearia — em breve avisamos por aqui.\n\n` +
@@ -519,6 +556,7 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt) return;
+  const brand = await brandFor(appt.tenant_id);
 
   const items = (appt.appointment_items as { price_brl: number; qty: number; covered_by_plan: boolean }[] | null) ?? [];
   const total = items.reduce((s, i) => (i.covered_by_plan ? s : s + Number(i.price_brl) * i.qty), 0);
@@ -555,9 +593,10 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
        <p style="color:#8a8578;font-size:13px;line-height:1.6;">
          O pagamento é feito no local após o atendimento. Precisa remarcar? Cancele pelo app com ao menos
          10 minutos de antecedência ou avise no WhatsApp.
-       </p>`
+       </p>`,
+      brand
     );
-    const r = await sendEmail({ to: email, subject: `Agendamento confirmado — ${BRAND}`, html });
+    const r = await sendEmail({ to: email, subject: `Agendamento confirmado — ${brand.name}`, html, fromName: brand.name });
     await supabase.from("notification_log").insert({
       tenant_id: appt.tenant_id,
       channel: "email",
@@ -567,10 +606,10 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
     });
   }
 
-  // WhatsApp automático (Z-API)
+  // WhatsApp automático
   if (phone) {
     const waMsg =
-      `✂️ *${BRAND}*\n` +
+      `✂️ *${brand.name}*\n` +
       `Olá${nome ? `, ${nome}` : ""}! *Seu agendamento foi confirmado.*\n\n` +
       `📋 Serviço: *${servico}*\n` +
       (child ? `👦 Criança: *${child}*\n` : "") +

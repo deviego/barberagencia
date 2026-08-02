@@ -130,6 +130,29 @@ export async function createInvite(values: { name?: string; phone?: string; emai
   });
   if (error) return { ok: false as const, error: error.message };
 
+  // Cria o cliente já na lista, marcado como "Convidado" (user_id null, status INVITED),
+  // se ainda não houver um com o mesmo e-mail/telefone. Ao se registrar, o trigger
+  // handle_new_user reconcilia esta mesma linha (vira ACTIVE) — sem duplicar.
+  const name = values.name?.trim() || null;
+  const email = values.email?.trim() || null;
+  const phone = values.phone?.trim() || null;
+  if (name || email || phone) {
+    let dup = supabase.from("clients").select("id").eq("tenant_id", user.tenantId);
+    if (email) dup = dup.eq("email", email);
+    else if (phone) dup = dup.eq("phone", phone);
+    else dup = dup.eq("name", name);
+    const { data: existing } = await dup.limit(1).maybeSingle();
+    if (!existing) {
+      await supabase.from("clients").insert({
+        tenant_id: user.tenantId,
+        name: name ?? email ?? phone,
+        email,
+        phone,
+        status: "INVITED",
+      });
+    }
+  }
+
   // Dispara o convite (WhatsApp/e-mail) com o link do portal.
   try {
     const hdrs = await headers();
@@ -148,6 +171,7 @@ export async function createInvite(values: { name?: string; phone?: string; emai
   } catch {
     /* notificação não deve quebrar o fluxo (admin ainda tem o link/Copiar) */
   }
+  revalidatePath("/admin/clientes");
   return { ok: true as const, token };
 }
 

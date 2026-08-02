@@ -4,12 +4,10 @@ import { useState } from "react";
 import { Check, Copy, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MESSAGE_TEMPLATES, fillTemplate } from "@/features/messages/templates";
-import { SUPPORT_WHATSAPP } from "@/lib/contact";
 
-const WHATSAPP_NUMBER = SUPPORT_WHATSAPP;
-
-export function MessageTemplatesList() {
+export function MessageTemplatesList({ tenantName, tenantPhone }: { tenantName: string; tenantPhone?: string | null }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const waNumber = (tenantPhone ?? "").replace(/\D/g, "");
 
   async function copy(id: string, text: string) {
     try {
@@ -24,7 +22,7 @@ export function MessageTemplatesList() {
   return (
     <div className="flex flex-col gap-4">
       {MESSAGE_TEMPLATES.map((t) => {
-        const filled = fillTemplate(t.body, {});
+        const filled = fillTemplate(t.body, { barbearia: tenantName });
         return (
           <div key={t.id} className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5">
             <div className="flex items-center justify-between gap-3">
@@ -44,7 +42,7 @@ export function MessageTemplatesList() {
                 </button>
                 {t.channel === "whatsapp" && (
                   <a
-                    href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(filled)}`}
+                    href={`https://wa.me/${waNumber}?text=${encodeURIComponent(filled)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-caption font-semibold text-white"

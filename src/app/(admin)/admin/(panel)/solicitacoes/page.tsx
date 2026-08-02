@@ -5,6 +5,7 @@ import { RequestCard, type RequestRow } from "@/features/admin/components/reques
 import { PlanRequestCard, type PlanRequestRow } from "@/features/admin/components/plan-request-card";
 import { ReservationCard, type ReservationRow } from "@/features/admin/components/reservation-card";
 import { listRequests, getRecentCancellations, getPlanRequests, getProductReservations } from "@/features/admin/data";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -12,11 +13,12 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 export default async function SolicitacoesPage() {
-  const [requests, planRequests, reservations, cancellations] = await Promise.all([
+  const [requests, planRequests, reservations, cancellations, tenant] = await Promise.all([
     listRequests() as unknown as Promise<RequestRow[]>,
     getPlanRequests() as unknown as Promise<PlanRequestRow[]>,
     getProductReservations() as unknown as Promise<ReservationRow[]>,
     getRecentCancellations(),
+    getCurrentTenant(),
   ]);
   const cancels = cancellations as {
     id: string;
@@ -43,7 +45,7 @@ export default async function SolicitacoesPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {requests.map((r) => (
-            <RequestCard key={r.id} req={r} />
+            <RequestCard key={r.id} req={r} tenantName={tenant.name} />
           ))}
         </div>
       )}

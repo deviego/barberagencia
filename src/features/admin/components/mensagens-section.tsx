@@ -2,11 +2,12 @@ import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MessageTemplatesList } from "@/features/admin/components/message-templates-list";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { getUnitSettings } from "@/features/admin/data";
 import { hasEntitlement } from "@/lib/entitlements";
 
 /** Seção de Mensagens (modelos de WhatsApp) — usada dentro da aba Marketing Place. */
 export async function MensagensSection() {
-  const tenant = await getCurrentTenant();
+  const [tenant, unit] = await Promise.all([getCurrentTenant(), getUnitSettings()]);
   if (!hasEntitlement(tenant.saasPlan, "whatsapp.manual")) {
     return (
       <div className="mx-auto mt-10 flex max-w-md flex-col items-center gap-3 rounded-lg border border-border bg-surface p-8 text-center">
@@ -25,7 +26,7 @@ export async function MensagensSection() {
       <p className="text-body text-text-2">
         Modelos prontos para WhatsApp. Copie ou abra direto no WhatsApp com o texto preenchido.
       </p>
-      <MessageTemplatesList />
+      <MessageTemplatesList tenantName={tenant.name} tenantPhone={unit?.phone ?? null} />
     </div>
   );
 }

@@ -14,7 +14,7 @@ import { formatBRL, cn } from "@/lib/utils";
 import { maskBRL, brlInputFromNumber, maskPhoneBR } from "@/lib/masks";
 import { saveRow, deleteRow } from "@/features/admin/crud-actions";
 
-type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "childrenBadge" | "childService";
+type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "clientStatusBadge" | "childrenBadge" | "childService";
 export interface CrudColumn {
   key: string;
   label: string;
@@ -45,6 +45,14 @@ function renderCell(col: CrudColumn, row: Row) {
       );
     case "activeBadge":
       return v ? <Badge variant="success">Ativo</Badge> : <Badge>Inativo</Badge>;
+    case "clientStatusBadge":
+      return row.status === "INVITED" ? (
+        <Badge variant="warning">Convidado</Badge>
+      ) : row.active ? (
+        <Badge variant="success">Ativo</Badge>
+      ) : (
+        <Badge>Inativo</Badge>
+      );
     case "childrenBadge":
       return Number(v ?? 0) > 0 ? <Badge variant="accent">👶 {Number(v)}</Badge> : <span className="text-text-muted">—</span>;
     case "childService":

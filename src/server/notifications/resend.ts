@@ -4,6 +4,8 @@ interface SendEmailInput {
   to: string;
   subject: string;
   html: string;
+  /** Nome de exibição do remetente (ex.: o nome da barbearia). O endereço segue o do Resend. */
+  fromName?: string;
 }
 
 /**
@@ -14,10 +16,14 @@ export async function sendEmail({
   to,
   subject,
   html,
+  fromName,
 }: SendEmailInput): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;
   // Sem remetente configurado, usa o sandbox do Resend (entrega só para o dono da conta).
-  const from = process.env.NOTIFICATIONS_FROM || "Barbearia <onboarding@resend.dev>";
+  const base = process.env.NOTIFICATIONS_FROM || "Barbearia <onboarding@resend.dev>";
+  // Cada barbearia aparece com o PRÓPRIO nome no remetente (o endereço permanece o do Resend).
+  const address = base.match(/<([^>]+)>/)?.[1] ?? base;
+  const from = fromName ? `${fromName} <${address}>` : base;
   if (!key) return { ok: false, skipped: true };
   try {
     const res = await fetch("https://api.resend.com/emails", {

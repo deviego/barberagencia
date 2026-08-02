@@ -1,6 +1,6 @@
 /**
- * Modelos de mensagem (WhatsApp / in-app) — fiéis aos documentos da Barbearia
- * Oliveira 01. Placeholders: {nome}, {link}. Use fillTemplate() para preencher.
+ * Modelos de mensagem (WhatsApp / in-app). Placeholders: {barbearia}, {nome}, {link}.
+ * Use fillTemplate() para preencher com o nome da barbearia atual (multi-tenant).
  */
 
 export const APP_LINK = "https://barberagencia.vercel.app/client";
@@ -17,7 +17,7 @@ export const MESSAGE_TEMPLATES: MessageTemplate[] = [
     id: "welcome",
     title: "Boas-vindas",
     channel: "whatsapp",
-    body: `👋 Olá! Bem-vindo à Barbearia Oliveira 01! ✂️🔥
+    body: `👋 Olá! Bem-vindo à {barbearia}! ✂️🔥
 Que bom ter você em contato conosco.
 
 Se quer garantir o seu horário agora de forma rápida, é só clicar no nosso link de agendamento online:
@@ -36,7 +36,7 @@ Se preferir agendar por aqui ou tiver dúvida, mande seu nome e o serviço desej
     title: "Contatos ausentes (retorno)",
     channel: "whatsapp",
     body: `👋 Fala, {nome}! Beleza?
-Vimos aqui no sistema que já faz um tempo desde o seu último corte na Barbearia Oliveira 01. O visual já deve estar pedindo aquele trato, hein? ✂️💥
+Vimos aqui no sistema que já faz um tempo desde o seu último corte na {barbearia}. O visual já deve estar pedindo aquele trato, hein? ✂️💥
 
 Já estamos com a cadeira pronta esperando por você esta semana. Que tal garantir seu horário agora para não ficar sem vaga?
 📲 {link}
@@ -47,7 +47,7 @@ Se preferir agendar por aqui ou for pagar em dinheiro e precisar de troco, é s�
     id: "post-signup",
     title: "Agendamento após a inscrição (in-app)",
     channel: "in-app",
-    body: `👋 Bem-vindo à Barbearia Oliveira 01! Que bom ter você por aqui. Escolha o barbeiro de preferência, o serviço e o melhor horário para o seu atendimento.
+    body: `👋 Bem-vindo à {barbearia}! Que bom ter você por aqui. Escolha o barbeiro de preferência, o serviço e o melhor horário para o seu atendimento.
 
 ⚠️ Pagamento: realizado diretamente no local após o atendimento. Aceitamos dinheiro, PIX e cartões. Vai pagar em dinheiro? Se precisar de troco, avise o seu barbeiro ao chegar. Aproveite a experiência! ✂️💈`,
   },
@@ -55,7 +55,7 @@ Se preferir agendar por aqui ou for pagar em dinheiro e precisar de troco, é s�
     id: "confirmed",
     title: "Agendamento confirmado",
     channel: "whatsapp",
-    body: `💈 Agendamento confirmado — Barbearia Oliveira 01
+    body: `💈 Agendamento confirmado — {barbearia}
 Olá, {nome}! Seu horário está garantido!
 
 Regras de cancelamento:
@@ -70,7 +70,7 @@ Se precisar falar com a gente, é só responder esta mensagem. Nos vemos em brev
     id: "absence",
     title: "Ausência (fora do expediente)",
     channel: "whatsapp",
-    body: `🌙 Olá! Obrigado por entrar em contato com a Barbearia Oliveira 01! 💈
+    body: `🌙 Olá! Obrigado por entrar em contato com a {barbearia}! 💈
 No momento estamos com as tesouras guardadas e a barbearia fechada. Nosso atendimento retorna no próximo dia útil!
 
 Nosso agendamento online funciona 24h — garanta sua vaga agora:
@@ -84,8 +84,9 @@ Deixe seu nome e o que precisa que, assim que abrirmos, nossa equipe responde po
   },
 ];
 
-export function fillTemplate(body: string, vars: { nome?: string; link?: string }): string {
+export function fillTemplate(body: string, vars: { nome?: string; link?: string; barbearia?: string }): string {
   return body
+    .replaceAll("{barbearia}", vars.barbearia ?? "nossa barbearia")
     .replaceAll("{nome}", vars.nome ?? "")
     .replaceAll("{link}", vars.link ?? APP_LINK);
 }
