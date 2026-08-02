@@ -20,6 +20,8 @@ const OLD_REDIRECTS: Record<string, string> = {
   "/otp": "/client/otp",
   "/recuperar-senha": "/client/recuperar-senha",
   "/redefinir-senha": "/client/redefinir-senha",
+  "/cliente/login": "/client/login",
+  "/cliente": "/client/login",
 };
 
 function areaHome(key: AreaKey) {
@@ -40,8 +42,8 @@ function isAuthPage(path: string) {
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // Raiz e rotas antigas → área do cliente.
-  if (path === "/") return NextResponse.redirect(new URL("/client", request.url));
+  // Raiz = landing page pública (marketing). Não exige sessão.
+  if (path === "/") return NextResponse.next();
   if (OLD_REDIRECTS[path])
     return NextResponse.redirect(new URL(OLD_REDIRECTS[path] + request.nextUrl.search, request.url));
 
