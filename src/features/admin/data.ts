@@ -103,7 +103,7 @@ export async function getCombos() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("combo_plans")
-    .select("id, name, cuts, price_brl")
+    .select("id, name, cuts, price_brl, booking_mode")
     .eq("active", true)
     .order("name");
   return data ?? [];
@@ -167,7 +167,7 @@ export async function getComboPlans() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("combo_plans")
-    .select("id, name, cuts, scope, price_brl, active")
+    .select("id, name, cuts, scope, price_brl, booking_mode, forfeit_on_noshow, active")
     .order("name");
   return data ?? [];
 }
@@ -245,7 +245,7 @@ export async function getPlanRequests() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("plan_requests")
-    .select("id, type, created_at, clients(name), combo_plans(name)")
+    .select("id, type, created_at, combo_plan_id, client_id, clients(name), combo_plans(name, booking_mode)")
     .eq("status", "PENDING")
     .order("created_at", { ascending: true });
   return data ?? [];
@@ -299,7 +299,7 @@ export async function getClientDetail(id: string) {
     supabase.from("clients").select("id, name, email, phone, active, avatar_url").eq("id", id).maybeSingle(),
     supabase
       .from("client_subscriptions")
-      .select("saldo_cortes, status, combo_plans(name, cuts, price_brl)")
+      .select("saldo_cortes, status, fixed_weekday, fixed_start_min, combo_plans(name, cuts, price_brl, booking_mode)")
       .eq("client_id", id)
       .eq("status", "ACTIVE")
       .limit(1)

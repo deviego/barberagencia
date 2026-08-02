@@ -23,14 +23,33 @@ export default async function AgendarPage({
   ]);
 
   const sub = home?.sub as
-    | { combo_plan_id: string; saldo_cortes: number; combo_plans: unknown }
+    | {
+        combo_plan_id: string;
+        saldo_cortes: number;
+        fixed_weekday: number | null;
+        fixed_start_min: number | null;
+        fixed_barber_id: string | null;
+        combo_plans: unknown;
+      }
     | null
     | undefined;
-  const combo = one(sub?.combo_plans as { name: string }[] | { name: string });
+  const combo = one(sub?.combo_plans as { name: string; booking_mode?: string }[] | { name: string; booking_mode?: string });
+  const bookingMode = combo?.booking_mode ?? "FLEXIBLE";
+  const fixedBarberName =
+    sub?.fixed_barber_id ? catalog.barbers.find((b) => b.id === sub.fixed_barber_id)?.name ?? null : null;
 
   const plan =
     sub && combo
-      ? { comboPlanId: sub.combo_plan_id, name: combo.name, saldo: sub.saldo_cortes }
+      ? {
+          comboPlanId: sub.combo_plan_id,
+          name: combo.name,
+          saldo: sub.saldo_cortes,
+          bookingMode,
+          fixed:
+            bookingMode === "FIXED"
+              ? { weekday: sub.fixed_weekday, startMin: sub.fixed_start_min, barberName: fixedBarberName }
+              : null,
+        }
       : null;
 
   return (

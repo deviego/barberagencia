@@ -23,9 +23,14 @@ export async function getClientHome() {
   const client = await getMyClient();
   if (!client) return null;
 
+  // Plano fixo: garante a janela rolante de reservas semanais (top-up preguiçoso).
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: client.id });
+
   const { data: sub } = await supabase
     .from("client_subscriptions")
-    .select("combo_plan_id, saldo_cortes, billing_day, status, combo_plans(name, cuts, scope, price_brl)")
+    .select(
+      "combo_plan_id, saldo_cortes, billing_day, status, fixed_weekday, fixed_start_min, fixed_barber_id, fixed_service_id, combo_plans(name, cuts, scope, price_brl, booking_mode)"
+    )
     .eq("client_id", client.id)
     .eq("status", "ACTIVE")
     .limit(1)
@@ -88,9 +93,13 @@ export async function getMyPlan() {
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();
   if (!client) return null;
+  // Plano fixo: garante a janela rolante de reservas semanais (top-up preguiçoso).
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: client.id });
   const { data: sub } = await supabase
     .from("client_subscriptions")
-    .select("saldo_cortes, billing_day, status, combo_plans(name, cuts, scope, price_brl)")
+    .select(
+      "saldo_cortes, billing_day, status, fixed_weekday, fixed_start_min, fixed_barber_id, fixed_service_id, combo_plans(name, cuts, scope, price_brl, booking_mode)"
+    )
     .eq("client_id", client.id)
     .eq("status", "ACTIVE")
     .limit(1)
@@ -102,6 +111,16 @@ export async function getMyPlan() {
     .eq("consumed_from_plan", true)
     .order("start_at", { ascending: false })
     .limit(10);
+  // Próximas reservas do plano (futuras, não canceladas) — para o modo fixo.
+  const { data: upcoming } = await supabase
+    .from("appointments")
+    .select("id, start_at, status, services(name), barbers(name)")
+    .eq("client_id", client.id)
+    .eq("consumed_from_plan", true)
+    .gte("start_at", new Date().toISOString())
+    .neq("status", "CANCELLED")
+    .order("start_at", { ascending: true })
+    .limit(12);
   const { data: request } = await supabase
     .from("plan_requests")
     .select("id, type, created_at, combo_plans(name)")
@@ -110,7 +129,7 @@ export async function getMyPlan() {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return { sub, usage: usage ?? [], request };
+  return { sub, usage: usage ?? [], upcoming: upcoming ?? [], request };
 }
 
 /** Um agendamento do cliente, para a tela de reagendamento. */

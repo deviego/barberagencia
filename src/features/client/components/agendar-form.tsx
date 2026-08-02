@@ -16,7 +16,18 @@ const SLOT_MIN = 45;
 interface Barber { id: string; name: string }
 interface Service { id: string; name: string; price_brl: number; duration_min?: number; is_child_service?: boolean }
 interface Product { id: string; name: string; price_brl: number }
-interface PlanInfo { comboPlanId: string; name: string; saldo: number }
+interface PlanInfo {
+  comboPlanId: string;
+  name: string;
+  saldo: number;
+  bookingMode?: string;
+  fixed?: { weekday: number | null; startMin: number | null; barberName: string | null } | null;
+}
+const WEEKDAYS_PT = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+function minToHHMM(m: number | null | undefined) {
+  if (m == null) return "";
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
 interface WorkingHour { barber_id: string; weekday: number; start_min: number; end_min: number }
 
 export function AgendarForm({
@@ -37,8 +48,11 @@ export function AgendarForm({
   children?: Child[];
 }) {
   const router = useRouter();
-  const hasPlan = !!plan && plan.saldo > 0;
-  const planNoBalance = !!plan && plan.saldo <= 0;
+  // Plano FIXO: o corte do plano é reservado automaticamente no horário fixo — não é
+  // marcável aqui. O cliente só marca serviços avulsos.
+  const isFixedPlan = plan?.bookingMode === "FIXED";
+  const hasPlan = !!plan && plan.saldo > 0 && !isFixedPlan;
+  const planNoBalance = !!plan && plan.saldo <= 0 && !isFixedPlan;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [barberId, setBarberId] = useState<string | null>(barbers[0]?.id ?? null);
@@ -186,6 +200,19 @@ export function AgendarForm({
     <div className="flex flex-col gap-6">
       <h1 className="text-h3 font-bold text-text">Montar pedido</h1>
 
+      {isFixedPlan && plan?.fixed && (
+        <div className="rounded-lg border border-accent bg-accent-wash px-4 py-3 text-caption text-accent">
+          Seu corte do plano é toda <strong>{WEEKDAYS_PT[plan.fixed.weekday ?? 0]}</strong> às{" "}
+          <strong>{minToHHMM(plan.fixed.startMin)}</strong>
+          {plan.fixed.barberName ? (
+            <>
+              {" "}
+              com <strong>{plan.fixed.barberName}</strong>
+            </>
+          ) : null}
+          {" "}— já reservado. Veja em <strong>Meus agendamentos</strong>. Aqui você marca apenas serviços avulsos.
+        </div>
+      )}
       {planNoBalance && (
         <div className="rounded-lg border border-warning bg-warning-bg px-4 py-3 text-caption text-warning-strong">
           Você usou todos os cortes do plano este mês. Os itens abaixo serão avulsos (pagos no local).

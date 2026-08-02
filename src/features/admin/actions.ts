@@ -210,7 +210,7 @@ export async function saveBranding(values: { accent?: string; instagram?: string
   return { ok: true as const };
 }
 
-/** Atribui/renova um combo a um cliente (admin). */
+/** Atribui/renova um combo a um cliente (admin). Planos Livres. */
 export async function assignComboToClient(clientId: string, comboPlanId: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("assign_combo", {
@@ -219,6 +219,44 @@ export async function assignComboToClient(clientId: string, comboPlanId: string)
   });
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin/clientes");
+  return { ok: true as const };
+}
+
+/** Ativa uma assinatura de HORÁRIO FIXO — o admin define dia/hora/barbeiro/serviço e o
+ *  sistema reserva/agenda os cortes semanais. */
+export async function activateFixedPlan(
+  clientId: string,
+  comboPlanId: string,
+  slot: { weekday: number; startMin: number; barberId: string; serviceId: string }
+) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("activate_fixed_plan", {
+    p_client_id: clientId,
+    p_combo_id: comboPlanId,
+    p_weekday: slot.weekday,
+    p_start_min: slot.startMin,
+    p_barber_id: slot.barberId,
+    p_service_id: slot.serviceId,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  try {
+    await notifyPlanSubscribed(clientId, comboPlanId);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Reposição manual de um corte do plano fixo (o admin decide em caso de falta). */
+export async function addFixedMakeup(clientId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("add_fixed_makeup", { p_client_id: clientId });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin/agenda");
   return { ok: true as const };
 }
 
@@ -255,12 +293,15 @@ export async function cancelClientSubscription(clientId: string) {
     .eq("client_id", clientId)
     .eq("status", "ACTIVE");
   if (error) return { ok: false as const, error: error.message };
+  // Cancela as reservas futuras do plano (relevante para planos fixos).
+  await supabase.rpc("cancel_future_plan_appointments", { p_client_id: clientId });
   try {
     await notifyPlanCancelled(clientId);
   } catch {
     /* notificação não deve quebrar o fluxo */
   }
   revalidatePath("/admin/clientes");
+  revalidatePath("/admin/agenda");
   revalidatePath("/admin");
   return { ok: true as const };
 }
@@ -450,6 +491,44 @@ export async function approvePlanRequest(id: string) {
     .update({ status: "APPROVED", resolved_at: new Date().toISOString() })
     .eq("id", id);
   revalidatePath("/admin/solicitacoes");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** Aprova um pedido de assinatura de plano FIXO, definindo o slot (dia/hora/barbeiro/serviço). */
+export async function approveFixedPlanRequest(
+  id: string,
+  slot: { weekday: number; startMin: number; barberId: string; serviceId: string }
+) {
+  const supabase = await createSupabaseServerClient();
+  const { data: req } = await supabase
+    .from("plan_requests")
+    .select("client_id, combo_plan_id, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!req || req.status !== "PENDING" || !req.combo_plan_id)
+    return { ok: false as const, error: "Pedido inválido" };
+
+  const { error } = await supabase.rpc("activate_fixed_plan", {
+    p_client_id: req.client_id,
+    p_combo_id: req.combo_plan_id,
+    p_weekday: slot.weekday,
+    p_start_min: slot.startMin,
+    p_barber_id: slot.barberId,
+    p_service_id: slot.serviceId,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  try {
+    await notifyPlanSubscribed(req.client_id, req.combo_plan_id);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
+  await supabase
+    .from("plan_requests")
+    .update({ status: "APPROVED", resolved_at: new Date().toISOString() })
+    .eq("id", id);
+  revalidatePath("/admin/solicitacoes");
+  revalidatePath("/admin/agenda");
   revalidatePath("/admin");
   return { ok: true as const };
 }

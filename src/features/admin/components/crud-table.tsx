@@ -14,7 +14,7 @@ import { formatBRL, cn } from "@/lib/utils";
 import { maskBRL, brlInputFromNumber, maskPhoneBR } from "@/lib/masks";
 import { saveRow, deleteRow } from "@/features/admin/crud-actions";
 
-type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "clientStatusBadge" | "childrenBadge" | "childService";
+type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "clientStatusBadge" | "childrenBadge" | "childService" | "planMode";
 export interface CrudColumn {
   key: string;
   label: string;
@@ -23,9 +23,10 @@ export interface CrudColumn {
 export interface CrudField {
   name: string;
   label: string;
-  /** "currency" aplica máscara de R$; os demais seguem o input HTML nativo. */
+  /** "currency" aplica máscara de R$; "select" usa options; os demais seguem o input HTML nativo. */
   type?: string;
   placeholder?: string;
+  options?: { value: string; label: string }[];
 }
 type StatusFilter = "all" | "active" | "inactive";
 type Row = Record<string, unknown> & { id: string };
@@ -57,6 +58,8 @@ function renderCell(col: CrudColumn, row: Row) {
       return Number(v ?? 0) > 0 ? <Badge variant="accent">👶 {Number(v)}</Badge> : <span className="text-text-muted">—</span>;
     case "childService":
       return v ? <Badge variant="accent">Infantil</Badge> : <span className="text-text-muted">—</span>;
+    case "planMode":
+      return v === "FIXED" ? <Badge variant="warning">Fixo</Badge> : <Badge variant="neutral">Livre</Badge>;
     default:
       return <span>{v == null || v === "" ? "—" : String(v)}</span>;
   }
@@ -319,6 +322,24 @@ export function CrudTable({
                     defaultChecked={form[f.name] === "true"}
                     onChange={(v) => setForm((s) => ({ ...s, [f.name]: v ? "true" : "false" }))}
                   />
+                </div>
+              );
+            }
+            if (f.type === "select") {
+              return (
+                <div key={f.name} className="flex flex-col gap-1.5">
+                  <Label>{f.label}</Label>
+                  <select
+                    value={form[f.name] ?? f.options?.[0]?.value ?? ""}
+                    onChange={(e) => setForm((s) => ({ ...s, [f.name]: e.target.value }))}
+                    className="h-10 rounded-md border border-border bg-inset px-3 text-body text-text focus-visible:border-focus focus-visible:outline-none"
+                  >
+                    {(f.options ?? []).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               );
             }

@@ -6,22 +6,56 @@ import { Check, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/drawer";
-import { assignComboToClient } from "@/features/admin/actions";
+import { activateFixedPlan, assignComboToClient } from "@/features/admin/actions";
+import { FixedSlotFields, timeToMin, type FixedSlot } from "@/features/admin/components/fixed-slot-fields";
 
-interface Opt { id: string; name: string }
+interface Opt {
+  id: string;
+  name: string;
+}
+interface ComboOpt extends Opt {
+  booking_mode?: string;
+}
 
-export function AssignCombo({ clients, combos }: { clients: Opt[]; combos: Opt[] }) {
+export function AssignCombo({
+  clients,
+  combos,
+  barbers,
+  services,
+}: {
+  clients: Opt[];
+  combos: ComboOpt[];
+  barbers: Opt[];
+  services: Opt[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState("");
   const [comboId, setComboId] = useState("");
+  const [slot, setSlot] = useState<FixedSlot>({ weekday: 1, time: "09:00", barberId: "", serviceId: "" });
   const [pending, startTransition] = useTransition();
   const [ok, setOk] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const combo = combos.find((c) => c.id === comboId);
+  const isFixed = combo?.booking_mode === "FIXED";
 
   function submit() {
+    setError(null);
     if (!clientId || !comboId) return;
+    if (isFixed && (!slot.barberId || !slot.serviceId || !slot.time)) {
+      setError("Defina dia, horário, barbeiro e serviço.");
+      return;
+    }
     startTransition(async () => {
-      const res = await assignComboToClient(clientId, comboId);
+      const res = isFixed
+        ? await activateFixedPlan(clientId, comboId, {
+            weekday: slot.weekday,
+            startMin: timeToMin(slot.time),
+            barberId: slot.barberId,
+            serviceId: slot.serviceId,
+          })
+        : await assignComboToClient(clientId, comboId);
       if (res.ok) {
         setOk(true);
         router.refresh();
@@ -29,7 +63,7 @@ export function AssignCombo({ clients, combos }: { clients: Opt[]; combos: Opt[]
           setOk(false);
           setOpen(false);
         }, 1200);
-      }
+      } else setError(res.error);
     });
   }
 
@@ -51,6 +85,8 @@ export function AssignCombo({ clients, combos }: { clients: Opt[]; combos: Opt[]
               <>
                 <Check size={16} /> Atribuído
               </>
+            ) : isFixed ? (
+              "Ativar plano fixo"
             ) : (
               "Atribuir combo"
             )}
@@ -76,13 +112,19 @@ export function AssignCombo({ clients, combos }: { clients: Opt[]; combos: Opt[]
               {combos.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                  {c.booking_mode === "FIXED" ? " · fixo" : ""}
                 </option>
               ))}
             </select>
           </div>
-          <p className="text-caption text-text-muted">
-            O saldo de cortes é definido pelo combo. Pagamento no local.
-          </p>
+
+          {isFixed ? (
+            <FixedSlotFields barbers={barbers} services={services} value={slot} onChange={setSlot} />
+          ) : (
+            <p className="text-caption text-text-muted">O saldo de cortes é definido pelo combo. Pagamento no local.</p>
+          )}
+
+          {error && <p className="text-caption text-danger">{error}</p>}
         </div>
       </Drawer>
     </>

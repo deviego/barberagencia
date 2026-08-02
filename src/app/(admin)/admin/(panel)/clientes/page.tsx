@@ -1,7 +1,7 @@
 import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-table";
 import { AssignCombo } from "@/features/admin/components/assign-combo";
 import { InviteButton } from "@/features/admin/components/invite-button";
-import { getClients, getCombos } from "@/features/admin/data";
+import { getBarbers, getClients, getCombos, getServices } from "@/features/admin/data";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 
 const columns: CrudColumn[] = [
@@ -13,14 +13,27 @@ const columns: CrudColumn[] = [
 ];
 
 export default async function ClientesPage() {
-  const [rows, combos, tenant] = await Promise.all([getClients(), getCombos(), getCurrentTenant()]);
+  const [rows, combos, tenant, barbers, services] = await Promise.all([
+    getClients(),
+    getCombos(),
+    getCurrentTenant(),
+    getBarbers(),
+    getServices(),
+  ]);
   // Convidados (ainda não registrados) não podem receber plano.
   const registered = (rows as { id: string; name: string; status?: string }[]).filter((r) => r.status !== "INVITED");
+  const activeBarbers = (barbers as { id: string; name: string; active?: boolean }[]).filter((b) => b.active !== false);
+  const activeServices = (services as { id: string; name: string; active?: boolean }[]).filter((s) => s.active !== false);
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap justify-end gap-3">
         <InviteButton tenantName={tenant.name} />
-        <AssignCombo clients={registered as { id: string; name: string }[]} combos={combos as { id: string; name: string }[]} />
+        <AssignCombo
+          clients={registered as { id: string; name: string }[]}
+          combos={combos as { id: string; name: string; booking_mode?: string }[]}
+          barbers={activeBarbers as { id: string; name: string }[]}
+          services={activeServices as { id: string; name: string }[]}
+        />
       </div>
       <CrudTable
         table="clients"

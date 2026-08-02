@@ -11,6 +11,7 @@ const serviceColumns: CrudColumn[] = [
 
 const planColumns: CrudColumn[] = [
   { key: "name", label: "Plano" },
+  { key: "booking_mode", label: "Modo", format: "planMode" },
   { key: "cuts", label: "Cortes/mês" },
   { key: "scope", label: "Escopo" },
   { key: "price_brl", label: "Preço", format: "price" },
@@ -40,7 +41,8 @@ export default async function ServicosAdminPage() {
 
       <div className="border-t border-border-subtle pt-2">
         <p className="mb-2 text-caption text-text-muted">
-          Planos mensais (combos) que o cliente assina e o admin pode atribuir.
+          Planos mensais (combos) que o cliente assina e o admin pode atribuir. No modo <strong>Fixo</strong>, o cliente
+          tem dia/horário/barbeiro fixos toda semana (você define ao ativar) e o sistema já reserva os cortes.
         </p>
         <CrudTable
           table="combo_plans"
@@ -54,6 +56,16 @@ export default async function ServicosAdminPage() {
             { name: "cuts", label: "Cortes por mês", type: "number" },
             { name: "scope", label: "Escopo", placeholder: "Ex.: cabelo+barba+sobrancelha" },
             { name: "price_brl", label: "Preço (R$/mês)", type: "currency" },
+            {
+              name: "booking_mode",
+              label: "Modo de agendamento",
+              type: "select",
+              options: [
+                { value: "FLEXIBLE", label: "Livre — cliente marca em qualquer horário" },
+                { value: "FIXED", label: "Fixo — dia/horário/barbeiro fixos toda semana" },
+              ],
+            },
+            { name: "forfeit_on_noshow", label: "Fixo: perde o corte em caso de falta", type: "switch" },
           ]}
         />
       </div>

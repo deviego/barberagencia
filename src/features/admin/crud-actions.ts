@@ -26,8 +26,9 @@ const SCHEMAS: Record<string, CrudSchema> = {
     path: "/admin/produtos",
   },
   combo_plans: {
-    fields: ["name", "cuts", "scope", "price_brl", "active"],
+    fields: ["name", "cuts", "scope", "price_brl", "booking_mode", "forfeit_on_noshow", "active"],
     numeric: ["cuts", "price_brl"],
+    boolean: ["forfeit_on_noshow"],
     path: "/admin/servicos",
   },
   barbers: { fields: ["name", "active"], numeric: [], path: "/admin/barbeiros" },

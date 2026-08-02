@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { RequestCard, type RequestRow } from "@/features/admin/components/request-card";
 import { PlanRequestCard, type PlanRequestRow } from "@/features/admin/components/plan-request-card";
 import { ReservationCard, type ReservationRow } from "@/features/admin/components/reservation-card";
-import { listRequests, getRecentCancellations, getPlanRequests, getProductReservations } from "@/features/admin/data";
+import { listRequests, getRecentCancellations, getPlanRequests, getProductReservations, getBarbers, getServices } from "@/features/admin/data";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -13,13 +13,17 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 export default async function SolicitacoesPage() {
-  const [requests, planRequests, reservations, cancellations, tenant] = await Promise.all([
+  const [requests, planRequests, reservations, cancellations, tenant, barbers, services] = await Promise.all([
     listRequests() as unknown as Promise<RequestRow[]>,
     getPlanRequests() as unknown as Promise<PlanRequestRow[]>,
     getProductReservations() as unknown as Promise<ReservationRow[]>,
     getRecentCancellations(),
     getCurrentTenant(),
+    getBarbers(),
+    getServices(),
   ]);
+  const activeBarbers = (barbers as { id: string; name: string; active?: boolean }[]).filter((b) => b.active !== false);
+  const activeServices = (services as { id: string; name: string; active?: boolean }[]).filter((s) => s.active !== false);
   const cancels = cancellations as {
     id: string;
     start_at: string;
@@ -61,7 +65,7 @@ export default async function SolicitacoesPage() {
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             {planRequests.map((r) => (
-              <PlanRequestCard key={r.id} req={r} />
+              <PlanRequestCard key={r.id} req={r} barbers={activeBarbers} services={activeServices} />
             ))}
           </div>
         </div>

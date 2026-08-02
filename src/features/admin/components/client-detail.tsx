@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AvatarUpload } from "@/components/avatar-upload";
-import { adminAddChild, cancelClientSubscription, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
+import { addFixedMakeup, adminAddChild, cancelClientSubscription, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
 import { formatBRL, getInitials } from "@/lib/utils";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -90,6 +90,15 @@ export function ClientDetail({ clientId }: { clientId: string }) {
     });
   }
 
+  function doMakeup() {
+    setErr(null);
+    startTransition(async () => {
+      const res = await addFixedMakeup(clientId);
+      if (res.ok) reload();
+      else setErr(res.error);
+    });
+  }
+
   if (!data) {
     return (
       <div className="flex items-center justify-center py-10 text-text-muted">
@@ -101,7 +110,16 @@ export function ClientDetail({ clientId }: { clientId: string }) {
   const client = data.client;
   if (!client) return <p className="text-text-muted">Cliente não encontrado.</p>;
 
-  const combo = one(data.sub?.combo_plans as { name: string; cuts: number; price_brl: number }[] | { name: string; cuts: number; price_brl: number });
+  const combo = one(
+    data.sub?.combo_plans as
+      | { name: string; cuts: number; price_brl: number; booking_mode?: string }[]
+      | { name: string; cuts: number; price_brl: number; booking_mode?: string }
+  );
+  const subFixed = data.sub as { fixed_weekday?: number | null; fixed_start_min?: number | null } | null;
+  const isFixed = combo?.booking_mode === "FIXED";
+  const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const hhmm = (m: number | null | undefined) =>
+    m == null ? "" : `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
   return (
     <div className="flex flex-col gap-5">
@@ -139,13 +157,30 @@ export function ClientDetail({ clientId }: { clientId: string }) {
           <>
             <div className="mt-1 flex items-center justify-between">
               <div>
-                <div className="text-body font-semibold text-text">{combo.name}</div>
-                <div className="text-caption text-text-muted">{formatBRL(combo.price_brl)}/mês</div>
+                <div className="flex items-center gap-2 text-body font-semibold text-text">
+                  {combo.name}
+                  {isFixed && <Badge variant="warning">Fixo</Badge>}
+                </div>
+                <div className="text-caption text-text-muted">
+                  {formatBRL(combo.price_brl)}/mês
+                  {isFixed && subFixed?.fixed_weekday != null
+                    ? ` · ${WD[subFixed.fixed_weekday]} ${hhmm(subFixed.fixed_start_min)}`
+                    : ""}
+                </div>
               </div>
               <Badge variant="accent">
-                {data.sub?.saldo_cortes ?? 0}/{combo.cuts} cortes
+                {isFixed ? `${data.sub?.saldo_cortes ?? 0} reservados` : `${data.sub?.saldo_cortes ?? 0}/${combo.cuts} cortes`}
               </Badge>
             </div>
+            {isFixed && (
+              <button
+                onClick={doMakeup}
+                disabled={pending}
+                className="mt-3 mr-4 text-caption font-medium text-accent hover:underline disabled:opacity-50"
+              >
+                + Repor um corte (em caso de falta)
+              </button>
+            )}
             {confirming ? (
               <div className="mt-3 rounded-md border border-danger bg-danger-bg px-3 py-2.5">
                 <p className="text-caption text-danger-strong">
