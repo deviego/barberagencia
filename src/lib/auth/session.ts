@@ -1,7 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Role } from "@/lib/rbac";
+import { getActingTenantId } from "@/lib/auth/acting";
+import { ROLES, type Role } from "@/lib/rbac";
 
 export interface SessionUser {
   id: string;
@@ -35,11 +36,21 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     return best;
   }, null);
 
+  const role = (top?.role as Role | undefined) ?? null;
+  let tenantId = (top?.tenant_id as string | undefined) ?? null;
+
+  // Super-admin "atuar como": um MASTER pode operar o admin de qualquer barbearia.
+  // O tenant efetivo passa a ser o escolhido (coerente com o override do RLS).
+  if (role === ROLES.MASTER) {
+    const acting = await getActingTenantId();
+    if (acting) tenantId = acting;
+  }
+
   return {
     id: user.id,
     email: user.email ?? null,
-    role: (top?.role as Role | undefined) ?? null,
-    tenantId: (top?.tenant_id as string | undefined) ?? null,
+    role,
+    tenantId,
     name: (profile?.full_name as string | undefined) ?? null,
     avatarUrl: (profile?.avatar_url as string | undefined) ?? null,
   };

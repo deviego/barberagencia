@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BookOpen, Building2, ChevronDown, Menu, Search } from "lucide-react";
+import { Bell, BookOpen, Menu, Search, Shield } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
+import { BarbershopSwitcher } from "@/components/nav/barbershop-switcher";
 import { ViewAsClientButton } from "@/components/nav/view-as-client-button";
 import { MobileNav } from "@/components/nav/mobile-nav";
 import { TrialBanner } from "@/components/nav/trial-banner";
@@ -50,6 +51,9 @@ export function AdminShell({
   avatarUrl,
   pendingCount = 0,
   trialEndsAt,
+  isMaster = false,
+  tenants,
+  acting = false,
   children,
 }: {
   logoText: string;
@@ -61,6 +65,9 @@ export function AdminShell({
   avatarUrl?: string | null;
   pendingCount?: number;
   trialEndsAt?: string | null;
+  isMaster?: boolean;
+  tenants?: { id: string; name: string }[];
+  acting?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -71,7 +78,6 @@ export function AdminShell({
   const prevCount = useRef(pendingCount);
 
   const items = ADMIN_NAV.filter((i) => !i.feature || hasEntitlement(plan, i.feature));
-  const shortName = name.replace(/^Barbearia\s+/i, "");
   const initials = getInitials(userName, userEmail);
   const mobileItems = items.map((i) => ({
     href: i.href,
@@ -119,6 +125,15 @@ export function AdminShell({
         title={name}
         footer={
           <>
+            {isMaster && (
+              <Link
+                href="/master"
+                onClick={() => setMobileNav(false)}
+                className="flex w-full items-center gap-3 rounded-md border border-border px-3 py-2.5 text-body font-semibold text-text-2 transition-colors hover:border-accent hover:text-accent"
+              >
+                <Shield size={18} /> Painel Master
+              </Link>
+            )}
             <a
               href="/documentacao"
               target="_blank"
@@ -163,11 +178,9 @@ export function AdminShell({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button className="hidden items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-caption text-text transition-colors hover:border-accent sm:flex">
-            <Building2 size={15} className="text-accent" />
-            {shortName}
-            <ChevronDown size={14} className="text-text-muted" />
-          </button>
+          {isMaster && tenants ? (
+            <BarbershopSwitcher tenants={tenants} currentName={name} acting={acting} />
+          ) : null}
           <Link
             href="/admin/solicitacoes"
             aria-label="Solicitações"
@@ -225,6 +238,19 @@ export function AdminShell({
             );
           })}
           <div className="mt-auto flex flex-col gap-1.5">
+            {isMaster && (
+              <Link
+                href="/master"
+                title="Painel Master"
+                className={cn(
+                  "flex items-center gap-3 rounded-md border border-border px-3 py-2.5 text-body font-semibold text-text-2 transition-colors hover:border-accent hover:text-accent",
+                  open ? "justify-start" : "justify-center"
+                )}
+              >
+                <Shield size={18} className="shrink-0" />
+                {open && <span>Painel Master</span>}
+              </Link>
+            )}
             <a
               href="/documentacao"
               target="_blank"

@@ -2,13 +2,40 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
+import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
 
 function tempPassword() {
   return "Bb" + randomUUID().replace(/-/g, "").slice(0, 10) + "#7";
+}
+
+/**
+ * Define (ou limpa) a barbearia que o MASTER está "atuando como" no painel admin.
+ * Só MASTER. O banco só honra o override para MASTER (ver schema-actas.sql).
+ */
+export async function setActingTenant(tenantId: string | null) {
+  const user = await getSessionUser();
+  if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
+
+  const jar = await cookies();
+  if (!tenantId) {
+    jar.delete(ACT_COOKIE);
+    revalidatePath("/admin", "layout");
+    return { ok: true as const };
+  }
+
+  if (!isUuid(tenantId)) return { ok: false as const, error: "Barbearia inválida." };
+
+  const admin = createSupabaseAdminClient();
+  const { data: exists } = await admin.from("tenants").select("id").eq("id", tenantId).maybeSingle();
+  if (!exists) return { ok: false as const, error: "Barbearia não encontrada." };
+
+  jar.set(ACT_COOKIE, tenantId, { path: "/", httpOnly: true, sameSite: "lax", secure: true, maxAge: 60 * 60 * 24 * 30 });
+  revalidatePath("/admin", "layout");
+  return { ok: true as const };
 }
 
 /** Cria uma barbearia (tenant + branding + usuário admin). Somente MASTER. */
