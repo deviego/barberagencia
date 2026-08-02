@@ -139,3 +139,21 @@ app.post("/sessions/:tenantId/logout", async (req, res) => {
 });
 
 app.listen(PORT, () => log.info(`wa-gateway ouvindo na porta ${PORT}`));
+
+// --- Keep-alive: o próprio serviço bate na sua URL pública a cada 10 min ---
+// O Render hiberna serviços free após 15 min SEM tráfego de entrada. Como este processo
+// fica sempre rodando (Baileys), ele mesmo gera tráfego pingando a própria URL pública
+// (RENDER_EXTERNAL_URL é preenchida automaticamente pelo Render). Sem GitHub/serviço externo.
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.SELF_URL;
+if (SELF_URL) {
+  const KEEP_ALIVE_MS = 10 * 60 * 1000; // 10 min (< 15 min do spin down)
+  setInterval(async () => {
+    try {
+      const r = await fetch(`${SELF_URL.replace(/\/$/, "")}/health`, { signal: AbortSignal.timeout(30000) });
+      log.debug({ status: r.status }, "keep-alive");
+    } catch (e) {
+      log.warn({ err: e?.message }, "keep-alive falhou");
+    }
+  }, KEEP_ALIVE_MS).unref();
+  log.info({ url: SELF_URL }, "keep-alive ativo (auto-ping a cada 10 min)");
+}
