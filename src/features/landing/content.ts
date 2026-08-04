@@ -1,7 +1,7 @@
-import { waLink } from "@/lib/contact";
+import { BARBERAGENCIA_WHATSAPP, waLink } from "@/lib/contact";
 
-/** WhatsApp comercial que recebe os leads da landing. Defina NEXT_PUBLIC_SALES_WHATSAPP na Vercel. */
-export const SALES_WHATSAPP = process.env.NEXT_PUBLIC_SALES_WHATSAPP || "";
+/** WhatsApp comercial que recebe os leads da landing. NEXT_PUBLIC_SALES_WHATSAPP pode sobrescrever. */
+export const SALES_WHATSAPP = process.env.NEXT_PUBLIC_SALES_WHATSAPP || BARBERAGENCIA_WHATSAPP;
 
 /** Monta um link wa.me para o WhatsApp comercial com uma mensagem pronta. */
 export function salesWaLink(message: string) {

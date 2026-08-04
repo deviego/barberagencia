@@ -398,14 +398,14 @@ export async function sendSupportMessage(input: { category: string; subject: str
     `<b>Assunto:</b> ${assunto || "—"}</p>` +
     `<hr/><p style="font-family:Arial,sans-serif;color:#171412;font-size:15px;line-height:1.6;white-space:pre-wrap;">${message.replace(/</g, "&lt;")}</p>`;
 
-  const r = await sendEmail({ to: "deviego4@gmail.com", subject, html });
+  const r = await sendEmail({ to: "barberagencia@gmail.com", subject, html });
 
   const supabase = await createSupabaseServerClient();
   await supabase.from("notification_log").insert({
     tenant_id: user.tenantId,
     channel: "email",
     template: "support",
-    recipient: "deviego4@gmail.com",
+    recipient: "barberagencia@gmail.com",
     status: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED",
   });
 
