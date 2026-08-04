@@ -1,9 +1,10 @@
 /**
  * Isolamento de sessão por ÁREA do app.
  *
- * Cada área (cliente / admin / master) usa um cookie de sessão com NOME e PATH
- * próprios, para que cliente e equipe possam ficar logados ao mesmo tempo no
- * mesmo navegador, sem uma sessão sobrescrever a outra.
+ * Duas sessões coexistem no mesmo navegador: a do CLIENTE (`sb-cli`, /client) e a
+ * da EQUIPE (`sb-stf`, /). Admin e Master compartilham a MESMA sessão de equipe —
+ * assim uma conta MASTER logada no /admin acessa o /master sem logar de novo
+ * (reaproveita a permissão). Cliente e equipe seguem separados.
  */
 export type AreaKey = "client" | "admin" | "master";
 
@@ -12,10 +13,12 @@ export interface AreaCookie {
   path: string;
 }
 
+const STAFF: AreaCookie = { name: "sb-stf", path: "/" };
+
 export const AREAS: Record<AreaKey, AreaCookie> = {
   client: { name: "sb-cli", path: "/client" },
-  admin: { name: "sb-adm", path: "/admin" },
-  master: { name: "sb-mst", path: "/master" },
+  admin: STAFF,
+  master: STAFF,
 };
 
 /** Header injetado pelo middleware para os Server Components saberem a área. */

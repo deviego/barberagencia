@@ -9,7 +9,9 @@ import { isMaster } from "@/lib/rbac";
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect("/master/login");
-  if (!user.role || !isMaster(user.role)) redirect("/master/login");
+  // Logado como equipe, mas sem papel MASTER → volta para o painel admin (evita loop
+  // com o redirect de página de login já autenticada).
+  if (!user.role || !isMaster(user.role)) redirect("/admin");
   return (
     <div className="flex min-h-screen">
       <MasterSidebar />
