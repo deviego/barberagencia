@@ -39,8 +39,22 @@ function isAuthPage(path: string) {
   return AUTH_PAGES.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
+/** Domínio de produção (.vercel.app) que deve redirecionar para o domínio oficial .com. */
+const VERCEL_HOST = "barberagencia.vercel.app";
+const OFFICIAL_HOST = "barberagencia.com";
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  // Acessou pelo .vercel.app → redireciona (308) para o domínio oficial .com, mantendo o caminho.
+  // (Só o alias de produção; previews barberagencia-*.vercel.app continuam funcionando.)
+  if ((request.headers.get("host") ?? "") === VERCEL_HOST) {
+    const url = request.nextUrl.clone();
+    url.protocol = "https:";
+    url.host = OFFICIAL_HOST;
+    url.port = "";
+    return NextResponse.redirect(url, 308);
+  }
 
   // Raiz = landing page pública (marketing). Não exige sessão.
   if (path === "/") return NextResponse.next();
