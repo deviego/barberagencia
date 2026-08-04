@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { Scissors } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Copyright } from "@/components/brand/copyright";
 
@@ -22,13 +21,10 @@ export function AuthScreen({
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-8 py-3">
         <div className="flex items-center gap-3 text-text">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-text-inverse">
-            <Scissors size={18} />
-          </span>
-          <div>
-            <div className="font-display text-h5 font-extrabold tracking-wide">Barber Agência</div>
-            {subtitle && <div className="text-caption text-text-muted">{subtitle}</div>}
+          <div className="relative h-9 w-32 overflow-hidden rounded">
+            <Image src="/barber-agencia-logo.jpeg" alt="Barber Agência" fill sizes="128px" className="object-cover object-center" priority />
           </div>
+          {subtitle && <span className="text-caption text-text-muted">{subtitle}</span>}
         </div>
         <ThemeToggle />
       </header>
@@ -48,12 +44,7 @@ export function AuthScreen({
               "radial-gradient(ellipse 60% 45% at 50% 0%, var(--bb-accent-wash), transparent)",
           }}
         />
-        <div className="relative flex w-full max-w-[400px] flex-col items-center gap-7">
-          <div className="relative h-28 w-56 overflow-hidden rounded-lg">
-            <Image src="/barber-agencia-logo.jpeg" alt="Barber Agência" fill sizes="224px" className="object-cover object-center" priority />
-          </div>
-          <div className="w-full">{children}</div>
-        </div>
+        <div className="relative w-full max-w-[400px]">{children}</div>
         <Copyright className="absolute inset-x-0 bottom-4" />
       </main>
     </div>
