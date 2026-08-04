@@ -256,61 +256,7 @@ export function NewAppointmentDrawer({
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setClientOpen(false)} />
                   <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
-                    {filteredClients.length === 0 ? (
-                      <div className="flex flex-col gap-2 p-2">
-                        <p className="px-1 text-caption text-text-muted">Nenhum cliente encontrado.</p>
-                        {newClientName && (
-                          <button
-                            type="button"
-                            onClick={createSimple}
-                            disabled={creating}
-                            className="flex items-center gap-2 rounded-md border border-accent bg-accent-wash px-3 py-2 text-left text-body font-semibold text-accent transition-colors hover:brightness-95 disabled:opacity-60"
-                          >
-                            <Plus size={15} /> Criar “{newClientName}” (rápido)
-                          </button>
-                        )}
-                        {!showFull ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setNewName(newClientName);
-                              setShowFull(true);
-                            }}
-                            className="self-start px-1 text-caption font-medium text-text-2 hover:text-accent"
-                          >
-                            + Cadastro completo (nome, telefone, e-mail)
-                          </button>
-                        ) : (
-                          <div className="flex flex-col gap-2 border-t border-border-subtle pt-2">
-                            <input
-                              value={newName}
-                              onChange={(e) => setNewName(e.target.value)}
-                              placeholder="Nome completo"
-                              className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
-                            />
-                            <input
-                              value={newPhone}
-                              onChange={(e) => setNewPhone(maskPhoneBR(e.target.value))}
-                              inputMode="tel"
-                              maxLength={15}
-                              placeholder="Telefone (opcional)"
-                              className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
-                            />
-                            <input
-                              value={newEmail}
-                              onChange={(e) => setNewEmail(e.target.value)}
-                              type="email"
-                              placeholder="E-mail (opcional)"
-                              className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
-                            />
-                            <Button size="sm" loading={creating} onClick={createFull}>
-                              Criar cliente
-                            </Button>
-                          </div>
-                        )}
-                        {createErr && <p className="px-1 text-caption text-danger">{createErr}</p>}
-                      </div>
-                    ) : (
+                    {filteredClients.length > 0 ? (
                       filteredClients.map((c) => (
                         <button
                           key={c.id}
@@ -328,7 +274,62 @@ export function NewAppointmentDrawer({
                           ) : null}
                         </button>
                       ))
+                    ) : (
+                      <p className="px-3 py-2.5 text-caption text-text-muted">Nenhum cliente encontrado.</p>
                     )}
+                    {/* Criar cliente — sempre disponível (por último), permite nome repetido */}
+                    <div className="flex flex-col gap-2 border-t border-border-subtle p-2">
+                      {newClientName && (
+                        <button
+                          type="button"
+                          onClick={createSimple}
+                          disabled={creating}
+                          className="flex items-center gap-2 rounded-md border border-accent bg-accent-wash px-3 py-2 text-left text-body font-semibold text-accent transition-colors hover:brightness-95 disabled:opacity-60"
+                        >
+                          <Plus size={15} /> Criar “{newClientName}” (novo cliente)
+                        </button>
+                      )}
+                      {!showFull ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewName(newClientName);
+                            setShowFull(true);
+                          }}
+                          className="self-start px-1 text-caption font-medium text-text-2 hover:text-accent"
+                        >
+                          + Cadastro completo (nome, telefone, e-mail)
+                        </button>
+                      ) : (
+                        <div className="flex flex-col gap-2 border-t border-border-subtle pt-2">
+                          <input
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            placeholder="Nome completo"
+                            className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+                          />
+                          <input
+                            value={newPhone}
+                            onChange={(e) => setNewPhone(maskPhoneBR(e.target.value))}
+                            inputMode="tel"
+                            maxLength={15}
+                            placeholder="Telefone (opcional)"
+                            className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+                          />
+                          <input
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            type="email"
+                            placeholder="E-mail (opcional)"
+                            className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+                          />
+                          <Button size="sm" loading={creating} onClick={createFull}>
+                            Criar cliente
+                          </Button>
+                        </div>
+                      )}
+                      {createErr && <p className="px-1 text-caption text-danger">{createErr}</p>}
+                    </div>
                   </div>
                 </>
               )}
