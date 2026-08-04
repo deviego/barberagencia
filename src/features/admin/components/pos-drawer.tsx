@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
+import { ClientPicker } from "@/features/admin/components/client-picker";
 import { formatBRL, cn } from "@/lib/utils";
 import { createSale, type SaleItemInput } from "@/features/admin/actions";
 
@@ -110,18 +111,12 @@ export function PosButton({
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-1.5">
               <span className="text-caption font-semibold text-text-2">Cliente</span>
-              <select
+              <ClientPicker
+                clients={clients}
                 value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className="h-10 rounded-md border border-border bg-inset px-3 text-body text-text focus-visible:border-focus focus-visible:outline-none"
-              >
-                <option value="">Venda de balcão</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(id) => setClientId(id)}
+                noneLabel="Venda de balcão"
+              />
             </div>
 
             <Section label="Serviços">
