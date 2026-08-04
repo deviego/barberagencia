@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Scissors } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Copyright } from "@/components/brand/copyright";
@@ -36,7 +37,12 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
               "radial-gradient(ellipse 60% 45% at 50% 0%, var(--bb-accent-wash), transparent)",
           }}
         />
-        <div className="relative w-full max-w-[440px]">{children}</div>
+        <div className="relative flex w-full max-w-[440px] flex-col items-center gap-7">
+          <div className="relative h-28 w-56 overflow-hidden rounded-lg">
+            <Image src="/barber-agencia-logo.jpeg" alt="Barber Agência" fill sizes="224px" className="object-cover object-center" priority />
+          </div>
+          <div className="w-full">{children}</div>
+        </div>
         <Copyright className="absolute inset-x-0 bottom-4" />
       </main>
     </div>
