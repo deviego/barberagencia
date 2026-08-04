@@ -67,7 +67,7 @@ export async function saveRow(table: string, id: string | null, values: Record<s
   return { ok: true as const };
 }
 
-/** Soft delete (inativar) — preserva histórico. */
+/** Soft delete (desativar) — preserva histórico. */
 export async function deleteRow(table: string, id: string) {
   const schema = SCHEMAS[table];
   if (!schema) return { ok: false as const, error: "Tabela inválida" };

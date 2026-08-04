@@ -384,9 +384,9 @@ export function CrudTable({
       <ConfirmModal
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        title="Inativar registro?"
-        message="Prefira inativar para preservar o histórico e os relatórios."
-        confirmLabel="Inativar"
+        title="Desativar registro?"
+        message="Prefira desativar para preservar o histórico e os relatórios."
+        confirmLabel="Desativar"
         danger
         onConfirm={confirmDelete}
       />
