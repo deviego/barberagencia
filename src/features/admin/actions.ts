@@ -463,6 +463,29 @@ export async function createAppointmentAdmin(input: {
     .single();
   if (error) return { ok: false as const, error: error.message };
 
+  // Lança o serviço agendado como item base da comanda (senão o Pedido fica zerado).
+  // No corte do plano (usePlan) não há serviço avulso → a comanda segue coberta/R$ 0.
+  if (!input.usePlan && input.serviceId) {
+    const { data: svc } = await supabase
+      .from("services")
+      .select("name, price_brl, duration_min")
+      .eq("id", input.serviceId)
+      .maybeSingle();
+    if (svc) {
+      await supabase.from("appointment_items").insert({
+        appointment_id: data.id,
+        tenant_id: user.tenantId,
+        kind: "service",
+        ref_id: input.serviceId,
+        name: svc.name,
+        price_brl: svc.price_brl,
+        qty: 1,
+        duration_min: svc.duration_min ?? 0,
+        covered_by_plan: false,
+      });
+    }
+  }
+
   if (input.usePlan) {
     const { error: rpcErr } = await supabase.rpc("consume_cut", { p_client_id: input.clientId });
     if (rpcErr) {
