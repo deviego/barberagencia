@@ -249,7 +249,7 @@ export function NewAppointmentDrawer({
                   setClientOpen(true);
                 }}
                 onFocus={() => setClientOpen(true)}
-                placeholder="Buscar cliente pelo nome…"
+                placeholder="Insira o nome do cliente"
                 className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
               />
               {clientOpen && clientQuery.trim() && !clientId && (
