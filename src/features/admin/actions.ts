@@ -260,6 +260,36 @@ export async function addFixedMakeup(clientId: string) {
   return { ok: true as const };
 }
 
+/** Cria um cliente rápido (admin) para agendar na hora. Retorna id + nome.
+ *  Simples = só nome; completo = nome + telefone + e-mail. Sem convite. */
+export async function createClientAdmin(input: { name: string; phone?: string; email?: string }) {
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const name = input.name.trim();
+  if (!name) return { ok: false as const, error: "Informe o nome do cliente." };
+  const email = input.email?.trim() || null;
+  const phone = input.phone?.trim() || null;
+
+  // Dedupe leve: se já existe cliente com o mesmo e-mail/telefone, reaproveita.
+  if (email || phone) {
+    let q = supabase.from("clients").select("id, name").eq("tenant_id", user.tenantId);
+    q = email ? q.eq("email", email) : q.eq("phone", phone as string);
+    const { data: existing } = await q.limit(1).maybeSingle();
+    if (existing) return { ok: true as const, client: { id: existing.id as string, name: existing.name as string } };
+  }
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({ tenant_id: user.tenantId, name, email, phone })
+    .select("id, name")
+    .single();
+  if (error || !data) return { ok: false as const, error: error?.message ?? "Falha ao criar cliente." };
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/clientes");
+  return { ok: true as const, client: { id: data.id as string, name: data.name as string } };
+}
+
 /** Admin cadastra uma criança para um cliente. */
 export async function adminAddChild(
   clientId: string,

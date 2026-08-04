@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/drawer";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatBRL, cn } from "@/lib/utils";
-import { createAppointmentAdmin } from "@/features/admin/actions";
+import { maskPhoneBR } from "@/lib/masks";
+import { createAppointmentAdmin, createClientAdmin } from "@/features/admin/actions";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const SLOT_MIN = 45;
@@ -42,6 +43,14 @@ export function NewAppointmentDrawer({
   const [clientId, setClientId] = useState<string>("");
   const [clientQuery, setClientQuery] = useState("");
   const [clientOpen, setClientOpen] = useState(false);
+  // Clientes criados na hora (ainda não vêm na prop `clients` até o refresh).
+  const [extraClients, setExtraClients] = useState<ClientWithPlan[]>([]);
+  const [showFull, setShowFull] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [creating, startCreate] = useTransition();
   const [barberId, setBarberId] = useState<string | null>(barbers[0]?.id ?? null);
   const [mode, setMode] = useState<"plan" | "service">("service");
   const [serviceId, setServiceId] = useState<string | null>(services[0]?.id ?? null);
@@ -51,11 +60,48 @@ export function NewAppointmentDrawer({
   const [time, setTime] = useState<string | null>(null);
   const [booked, setBooked] = useState<number[]>([]);
 
-  const client = clients.find((c) => c.id === clientId) ?? null;
+  const allClients = useMemo(() => {
+    const byId = new Map<string, ClientWithPlan>();
+    for (const c of [...clients, ...extraClients]) byId.set(c.id, byId.get(c.id) ?? c);
+    return [...byId.values()];
+  }, [clients, extraClients]);
+  const client = allClients.find((c) => c.id === clientId) ?? null;
   const canUsePlan = !!client?.plan && client.plan.saldo > 0;
-  const filteredClients = clients
+  const filteredClients = allClients
     .filter((c) => c.name.toLowerCase().includes(clientQuery.trim().toLowerCase()))
     .slice(0, 8);
+
+  const newClientName = clientQuery.trim();
+  function selectNewClient(c: { id: string; name: string }) {
+    setExtraClients((prev) => (prev.some((x) => x.id === c.id) ? prev : [...prev, { id: c.id, name: c.name, plan: null }]));
+    setClientId(c.id);
+    setClientQuery(c.name);
+    setClientOpen(false);
+    setShowFull(false);
+    setNewName("");
+    setNewPhone("");
+    setNewEmail("");
+    setCreateErr(null);
+  }
+  function createSimple() {
+    if (!newClientName) return;
+    setCreateErr(null);
+    startCreate(async () => {
+      const res = await createClientAdmin({ name: newClientName });
+      if (res.ok) selectNewClient(res.client);
+      else setCreateErr(res.error);
+    });
+  }
+  function createFull() {
+    const nm = (newName || newClientName).trim();
+    if (!nm) return setCreateErr("Informe o nome do cliente.");
+    setCreateErr(null);
+    startCreate(async () => {
+      const res = await createClientAdmin({ name: nm, phone: newPhone || undefined, email: newEmail || undefined });
+      if (res.ok) selectNewClient(res.client);
+      else setCreateErr(res.error);
+    });
+  }
   // Corte infantil (serviço avulso marcado) → precisa escolher a criança.
   const needsChild = mode === "service" && !!services.find((s) => s.id === serviceId)?.is_child_service;
 
@@ -162,6 +208,7 @@ export function NewAppointmentDrawer({
         setClientQuery("");
         setChildId(null);
         setTime(null);
+        setExtraClients([]); // o refresh traz o cliente novo pela prop
         router.refresh();
       } else setError(res.error);
     });
@@ -208,9 +255,61 @@ export function NewAppointmentDrawer({
               {clientOpen && clientQuery.trim() && !clientId && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setClientOpen(false)} />
-                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
+                  <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-lg">
                     {filteredClients.length === 0 ? (
-                      <p className="px-3 py-2.5 text-caption text-text-muted">Nenhum cliente encontrado.</p>
+                      <div className="flex flex-col gap-2 p-2">
+                        <p className="px-1 text-caption text-text-muted">Nenhum cliente encontrado.</p>
+                        {newClientName && (
+                          <button
+                            type="button"
+                            onClick={createSimple}
+                            disabled={creating}
+                            className="flex items-center gap-2 rounded-md border border-accent bg-accent-wash px-3 py-2 text-left text-body font-semibold text-accent transition-colors hover:brightness-95 disabled:opacity-60"
+                          >
+                            <Plus size={15} /> Criar “{newClientName}” (rápido)
+                          </button>
+                        )}
+                        {!showFull ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewName(newClientName);
+                              setShowFull(true);
+                            }}
+                            className="self-start px-1 text-caption font-medium text-text-2 hover:text-accent"
+                          >
+                            + Cadastro completo (nome, telefone, e-mail)
+                          </button>
+                        ) : (
+                          <div className="flex flex-col gap-2 border-t border-border-subtle pt-2">
+                            <input
+                              value={newName}
+                              onChange={(e) => setNewName(e.target.value)}
+                              placeholder="Nome completo"
+                              className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+                            />
+                            <input
+                              value={newPhone}
+                              onChange={(e) => setNewPhone(maskPhoneBR(e.target.value))}
+                              inputMode="tel"
+                              maxLength={15}
+                              placeholder="Telefone (opcional)"
+                              className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+                            />
+                            <input
+                              value={newEmail}
+                              onChange={(e) => setNewEmail(e.target.value)}
+                              type="email"
+                              placeholder="E-mail (opcional)"
+                              className="w-full rounded-md border border-border bg-inset px-3 py-2 text-body text-text placeholder:text-text-muted focus:border-accent focus:outline-none"
+                            />
+                            <Button size="sm" loading={creating} onClick={createFull}>
+                              Criar cliente
+                            </Button>
+                          </div>
+                        )}
+                        {createErr && <p className="px-1 text-caption text-danger">{createErr}</p>}
+                      </div>
                     ) : (
                       filteredClients.map((c) => (
                         <button
