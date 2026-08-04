@@ -5,6 +5,7 @@ import { ArrowLeft, ExternalLink, MapPin, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/kpi-card";
 import { BarChart } from "@/features/platform/components/bar-chart";
+import { EnterAdminButton } from "@/features/platform/components/enter-admin-button";
 import { getTenantDetail } from "@/features/platform/data";
 import { formatBRL } from "@/lib/utils";
 
@@ -47,13 +48,16 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             </div>
           </div>
         </div>
-        <Link
-          href={`/b/${t.subdomain}`}
-          target="_blank"
-          className="flex items-center gap-1.5 text-caption font-semibold text-accent hover:underline"
-        >
-          /b/{t.subdomain} <ExternalLink size={14} />
-        </Link>
+        <div className="flex flex-col items-end gap-2">
+          <EnterAdminButton tenantId={t.id} label="Acessar painel admin" />
+          <Link
+            href={`/b/${t.subdomain}`}
+            target="_blank"
+            className="flex items-center gap-1.5 text-caption font-semibold text-accent hover:underline"
+          >
+            /b/{t.subdomain} <ExternalLink size={14} />
+          </Link>
+        </div>
       </div>
 
       {(t.phone || t.address) && (

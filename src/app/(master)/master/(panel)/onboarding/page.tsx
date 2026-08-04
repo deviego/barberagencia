@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, MessageCircle, Plus } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Check, Copy, MessageCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { createTenant } from "@/features/platform/actions";
@@ -131,10 +132,15 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button variant="secondary" onClick={reset}>
             <Plus size={15} /> Criar outra
           </Button>
+          <Link href="/master/barbearias">
+            <Button variant="outline">
+              <ArrowLeft size={15} /> Voltar ao painel
+            </Button>
+          </Link>
         </div>
       </div>
     );

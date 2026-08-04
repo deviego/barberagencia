@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EnterAdminButton } from "@/features/platform/components/enter-admin-button";
 import { getTenants } from "@/features/platform/data";
 import { formatBRL } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ export default async function BarbeariasPage() {
               <th className="px-4 py-3 font-semibold">Assinantes</th>
               <th className="px-4 py-3 font-semibold">Faturamento (mês)</th>
               <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold text-right">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -62,11 +64,14 @@ export default async function BarbeariasPage() {
                     {t.status === "ACTIVE" ? "Ativa" : t.status}
                   </Badge>
                 </td>
+                <td className="px-4 py-3 text-right">
+                  <EnterAdminButton tenantId={t.id} label="Acessar" variant="outline" size="sm" />
+                </td>
               </tr>
             ))}
             {tenants.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-text-muted">
+                <td colSpan={8} className="px-4 py-10 text-center text-text-muted">
                   Nenhuma barbearia ainda.
                 </td>
               </tr>
