@@ -16,7 +16,7 @@ export function MasterSidebar() {
         </div>
         <div>
           <div className="font-display text-h6 font-extrabold uppercase tracking-wide text-text">
-            barberagencia
+            Barber Agência
           </div>
           <div className="text-caption text-text-muted">Admin Master · SaaS</div>
         </div>

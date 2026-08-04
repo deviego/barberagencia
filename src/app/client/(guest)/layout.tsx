@@ -13,7 +13,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             <Scissors size={18} />
           </span>
           <div>
-            <div className="font-display text-h5 font-extrabold lowercase tracking-wide">barberagencia</div>
+            <div className="font-display text-h5 font-extrabold tracking-wide">Barber Agência</div>
             <div className="text-caption text-text-muted">Acesso à sua conta</div>
           </div>
         </Link>

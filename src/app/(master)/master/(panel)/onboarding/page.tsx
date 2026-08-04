@@ -86,7 +86,7 @@ export default function OnboardingPage() {
 
   if (result) {
     const message =
-      `Olá! A sua barbearia "${result.name}" já está no ar na barberagencia 🎉\n\n` +
+      `Olá! A sua barbearia "${result.name}" já está no ar na Barber Agência 🎉\n\n` +
       `🔐 Painel de administração: ${result.adminLoginUrl}\n` +
       `E-mail: ${result.adminEmail}\n` +
       `Senha temporária: ${result.password}\n` +

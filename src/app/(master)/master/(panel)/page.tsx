@@ -14,7 +14,7 @@ export default async function MasterDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-h3 font-bold text-text">Painel da plataforma</h1>
-          <p className="text-caption text-text-muted">Visão geral da barberagencia — o avanço de todas as barbearias</p>
+          <p className="text-caption text-text-muted">Visão geral da Barber Agência — o avanço de todas as barbearias</p>
         </div>
         <div className="flex gap-3">
           <Link href="/master/barbearias">

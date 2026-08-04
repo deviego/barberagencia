@@ -11,7 +11,7 @@ export const TENANT_COOKIE = "bb_tenant";
 /** Tenant neutro para visitantes anônimos SEM contexto de barbearia (nunca expõe outra barbearia). */
 const NEUTRAL_TENANT: ResolvedTenant = {
   id: "",
-  name: "barberagencia",
+  name: "Barber Agência",
   subdomain: "",
   customDomain: null,
   networkId: null,

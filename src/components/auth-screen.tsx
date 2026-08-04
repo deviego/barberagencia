@@ -25,7 +25,7 @@ export function AuthScreen({
             <Scissors size={18} />
           </span>
           <div>
-            <div className="font-display text-h5 font-extrabold lowercase tracking-wide">barberagencia</div>
+            <div className="font-display text-h5 font-extrabold tracking-wide">Barber Agência</div>
             {subtitle && <div className="text-caption text-text-muted">{subtitle}</div>}
           </div>
         </div>

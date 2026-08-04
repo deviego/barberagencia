@@ -5,7 +5,7 @@ export function Copyright({ className }: { className?: string }) {
   const year = new Date().getFullYear();
   return (
     <p className={cn("text-center text-caption text-text-muted", className)}>
-      © {year} <span className="font-semibold">barberagencia</span>
+      © {year} <span className="font-semibold">Barber Agência</span>
     </p>
   );
 }

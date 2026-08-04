@@ -22,7 +22,7 @@ import {
 } from "@/features/landing/content";
 
 export const metadata: Metadata = {
-  title: "barberagencia — a barbearia inteira em uma plataforma",
+  title: "Barber Agência — a barbearia inteira em uma plataforma",
   description:
     "Plataforma white-label de agendamento, assinaturas, financeiro e atendimento para barbearias. Com a sua marca, no seu domínio. 15 dias grátis, sem cartão.",
 };
@@ -165,7 +165,7 @@ export default function LandingPage() {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-success-bg">
                   <Icon name="check" size={17} className="text-[color:var(--bb-success)]" />
                 </span>
-                <span className="text-[17px] font-semibold">Com a barberagencia</span>
+                <span className="text-[17px] font-semibold">Com a Barber Agência</span>
               </div>
               {AFTER.map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] leading-[1.5] text-text">
@@ -395,7 +395,7 @@ export default function LandingPage() {
               <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent font-display text-[16px] font-black text-text-inverse">
                 B✦
               </span>
-              <span className="font-display text-[18px] font-extrabold uppercase tracking-[0.04em]">barberagencia</span>
+              <span className="font-display text-[18px] font-extrabold uppercase tracking-[0.04em]">Barber Agência</span>
             </div>
             <p className="m-0 max-w-[280px] text-[13px] leading-[1.55] text-text-muted">
               Plataforma white-label de agendamento, assinaturas e gestão para barbearias.
@@ -419,7 +419,7 @@ export default function LandingPage() {
           ))}
         </div>
         <div className="flex justify-center border-t border-border-subtle px-6 py-5 text-center text-[12px] text-text-muted sm:px-10">
-          © 2026 barberagencia · Todos os direitos reservados
+          © 2026 Barber Agência · Todos os direitos reservados
         </div>
       </footer>
     </div>

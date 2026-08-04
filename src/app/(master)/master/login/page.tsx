@@ -5,7 +5,7 @@ export const metadata = { title: "Admin Master" };
 
 export default function MasterLoginPage() {
   return (
-    <AuthScreen logoText="B✦" name="barberagencia" subtitle="Admin Master">
+    <AuthScreen logoText="B✦" name="Barber Agência" subtitle="Admin Master">
       <div className="mx-auto flex w-[400px] max-w-full flex-col gap-6">
         <div className="text-center">
           <h1 className="font-display text-h2 uppercase leading-none text-text">Admin Master</h1>
