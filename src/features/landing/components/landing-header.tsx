@@ -21,7 +21,7 @@ export function LandingHeader() {
             B✦
           </span>
           <span className="whitespace-nowrap font-display text-[19px] font-extrabold uppercase tracking-[0.04em] text-text">
-            Barber Platform
+            barberagencia
           </span>
         </a>
 

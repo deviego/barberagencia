@@ -9,10 +9,10 @@ export function salesWaLink(message: string) {
 }
 
 export const WA_MESSAGES = {
-  trial: "Olá! Quero testar a Barber Platform (15 dias grátis). Pode me ajudar?",
-  specialist: "Olá! Gostaria de falar com um especialista sobre a Barber Platform.",
+  trial: "Olá! Quero testar a barberagencia (15 dias grátis). Pode me ajudar?",
+  specialist: "Olá! Gostaria de falar com um especialista sobre a barberagencia.",
   demo: (v: { name: string; phone: string; email: string }) =>
-    `Olá! Quero uma demonstração da Barber Platform.\n\n` +
+    `Olá! Quero uma demonstração da barberagencia.\n\n` +
     `Barbearia: ${v.name || "-"}\nWhatsApp: ${v.phone || "-"}\nE-mail: ${v.email || "-"}`,
 };
 

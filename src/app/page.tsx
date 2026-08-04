@@ -165,7 +165,7 @@ export default function LandingPage() {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-success-bg">
                   <Icon name="check" size={17} className="text-[color:var(--bb-success)]" />
                 </span>
-                <span className="text-[17px] font-semibold">Com a Barber Platform</span>
+                <span className="text-[17px] font-semibold">Com a barberagencia</span>
               </div>
               {AFTER.map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] leading-[1.5] text-text">
@@ -395,7 +395,7 @@ export default function LandingPage() {
               <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent font-display text-[16px] font-black text-text-inverse">
                 B✦
               </span>
-              <span className="font-display text-[18px] font-extrabold uppercase tracking-[0.04em]">Barber Platform</span>
+              <span className="font-display text-[18px] font-extrabold uppercase tracking-[0.04em]">barberagencia</span>
             </div>
             <p className="m-0 max-w-[280px] text-[13px] leading-[1.55] text-text-muted">
               Plataforma white-label de agendamento, assinaturas e gestão para barbearias.

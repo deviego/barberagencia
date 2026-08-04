@@ -26,7 +26,7 @@ export function MasterMobileMenu() {
         items={MASTER_NAV.map((i) => ({ href: i.href, label: i.label, icon: i.icon }))}
         pathname={pathname}
         rootHref="/master"
-        title="Barber Platform"
+        title="barberagencia"
         footer={<LogoutButton variant="sidebar" />}
       />
     </>
