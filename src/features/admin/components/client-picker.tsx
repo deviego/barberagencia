@@ -136,16 +136,16 @@ export function ClientPicker({
                 <Plus size={15} /> Criar “{q}” (novo cliente)
               </button>
               {!showFull ? (
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setNName(q);
                     setShowFull(true);
                   }}
-                  className="self-start px-1 text-caption font-medium text-text-2 hover:text-accent"
                 >
-                  + Cadastro completo (nome, telefone, e-mail)
-                </button>
+                  Cadastro completo (nome, telefone, e-mail)
+                </Button>
               ) : (
                 <div className="flex flex-col gap-2 border-t border-border-subtle pt-2">
                   <input value={nName} onChange={(e) => setNName(e.target.value)} placeholder="Nome completo" className={inputCls} />

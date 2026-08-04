@@ -290,16 +290,16 @@ export function NewAppointmentDrawer({
                         </button>
                       )}
                       {!showFull ? (
-                        <button
-                          type="button"
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => {
                             setNewName(newClientName);
                             setShowFull(true);
                           }}
-                          className="self-start px-1 text-caption font-medium text-text-2 hover:text-accent"
                         >
-                          + Cadastro completo (nome, telefone, e-mail)
-                        </button>
+                          Cadastro completo (nome, telefone, e-mail)
+                        </Button>
                       ) : (
                         <div className="flex flex-col gap-2 border-t border-border-subtle pt-2">
                           <input
