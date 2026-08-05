@@ -6,7 +6,7 @@ export const metadata = { title: "Acesso da barbearia" };
 
 export default function AdminLoginPage() {
   return (
-    <AuthScreen subtitle="Área da barbearia">
+    <AuthScreen>
       <div className="mx-auto flex w-[400px] max-w-full flex-col gap-6">
         <div className="text-center">
           <h1 className="font-display text-h2 uppercase leading-none text-text">Área da barbearia</h1>

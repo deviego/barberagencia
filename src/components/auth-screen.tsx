@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Copyright } from "@/components/brand/copyright";
 
@@ -21,10 +20,13 @@ export function AuthScreen({
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-8 py-3">
         <div className="flex items-center gap-3 text-text">
-          <div className="relative h-9 w-32 overflow-hidden rounded">
-            <Image src="/barber-agencia-logo.jpeg" alt="Barber Agência" fill sizes="128px" className="object-cover object-center" priority />
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent font-display text-[17px] font-black text-text-inverse">
+            B✦
+          </span>
+          <div>
+            <div className="font-display text-h5 font-extrabold tracking-wide">Barber Agência</div>
+            {subtitle && <div className="text-caption text-text-muted">{subtitle}</div>}
           </div>
-          {subtitle && <span className="text-caption text-text-muted">{subtitle}</span>}
         </div>
         <ThemeToggle />
       </header>
