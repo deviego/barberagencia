@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Scissors } from "lucide-react";
+import Image from "next/image";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Copyright } from "@/components/brand/copyright";
 
@@ -8,14 +8,11 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
     <div className="flex min-h-screen flex-col">
       {/* Topbar — marca fixa "barberagencia" (a barbearia aparece só após logar) */}
       <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-8 py-3">
-        <Link href="/client/login" className="flex items-center gap-3 text-text">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-text-inverse">
-            <Scissors size={18} />
-          </span>
-          <div>
-            <div className="font-display text-h5 font-extrabold tracking-wide">Barber Agência</div>
-            <div className="text-caption text-text-muted">Acesso à sua conta</div>
+        <Link href="/client/login" className="flex items-center gap-3 text-text" aria-label="Barber Agência">
+          <div className="relative h-9 w-32 overflow-hidden rounded">
+            <Image src="/barber-agencia-logo.jpeg" alt="Barber Agência" fill sizes="128px" className="object-cover object-center" priority />
           </div>
+          <span className="text-caption text-text-muted">Acesso à sua conta</span>
         </Link>
         <ThemeToggle />
       </header>
