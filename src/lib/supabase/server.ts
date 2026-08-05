@@ -1,13 +1,19 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
-import { AREA_HEADER, areaFromKey } from "./area";
+import { AREA_HEADER, STAFF, areaFromKey } from "./area";
 import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
+import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 
 /** Supabase client no servidor (RLS sob o JWT do usuário via cookies da ÁREA). */
 export async function createSupabaseServerClient() {
   const [cookieStore, hdrs] = await Promise.all([cookies(), headers()]);
-  const area = areaFromKey(hdrs.get(AREA_HEADER));
+  // "Ver como cliente": na área do cliente, um admin/equipe usa a sessão de equipe (sb-stf).
+  const previewAsClient =
+    hdrs.get(AREA_HEADER) === "client" &&
+    cookieStore.get(VIEW_AS_CLIENT_COOKIE)?.value === "1" &&
+    cookieStore.getAll().some((c) => c.name.startsWith("sb-stf"));
+  const area = previewAsClient ? STAFF : areaFromKey(hdrs.get(AREA_HEADER));
 
   // Modo "atuar como" (MASTER): repassa o tenant escolhido ao PostgREST. O banco só
   // honra este header para usuários MASTER (ver auth_tenant_id em schema-actas.sql).

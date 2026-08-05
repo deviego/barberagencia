@@ -13,7 +13,7 @@ export interface AreaCookie {
   path: string;
 }
 
-const STAFF: AreaCookie = { name: "sb-stf", path: "/" };
+export const STAFF: AreaCookie = { name: "sb-stf", path: "/" };
 
 export const AREAS: Record<AreaKey, AreaCookie> = {
   client: { name: "sb-cli", path: "/client" },

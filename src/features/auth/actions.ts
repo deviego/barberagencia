@@ -40,10 +40,10 @@ export async function sendWelcomeEmail() {
   return { ok: true as const };
 }
 
-/** Admin entra no modo "ver como cliente" (visualiza o app do cliente). */
+/** Admin entra no modo "ver como cliente" (pré-visualiza o app da própria barbearia). */
 export async function enterClientPreview() {
   (await cookies()).set(VIEW_AS_CLIENT_COOKIE, "1", { path: "/", sameSite: "lax" });
-  redirect("/client/login");
+  redirect("/client");
 }
 
 /** Sai do modo "ver como cliente" e volta ao painel do papel. */

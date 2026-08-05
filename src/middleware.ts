@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { AREA_HEADER, areaFromKey, areaKeyFor, type AreaKey } from "@/lib/supabase/area";
+import { AREA_HEADER, STAFF, areaFromKey, areaKeyFor, type AreaKey } from "@/lib/supabase/area";
+import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 
 /** Rotas públicas (sem sessão). Todo o resto exige login. */
 const PUBLIC_PREFIXES = [
@@ -62,7 +63,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(OLD_REDIRECTS[path] + request.nextUrl.search, request.url));
 
   const areaKey = areaKeyFor(path);
-  const area = areaFromKey(areaKey);
+  // "Ver como cliente": no /client, um admin/equipe é autorizado pela sessão de equipe (sb-stf).
+  const previewAsClient =
+    areaKey === "client" &&
+    request.cookies.get(VIEW_AS_CLIENT_COOKIE)?.value === "1" &&
+    request.cookies.getAll().some((c) => c.name.startsWith("sb-stf"));
+  const area = previewAsClient ? STAFF : areaFromKey(areaKey);
 
   // Header para os Server Components saberem a área (qual cookie de sessão usar).
   const requestHeaders = new Headers(request.headers);
