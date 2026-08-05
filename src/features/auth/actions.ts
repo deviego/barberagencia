@@ -46,10 +46,12 @@ export async function enterClientPreview() {
   redirect("/client");
 }
 
-/** Sai do modo "ver como cliente" e volta ao painel do papel. */
+/** Sai do modo "ver como cliente" e volta ao painel ADMIN da barbearia (de onde o
+ *  preview é sempre iniciado). MASTER volta ao /admin atuando na mesma barbearia
+ *  (o "Painel Master" continua acessível pelo sidebar). */
 export async function exitClientPreview() {
   (await cookies()).delete(VIEW_AS_CLIENT_COOKIE);
   const user = await getSessionUser();
-  const dest = user?.role === "MASTER" ? "/master" : user?.role === "NETWORK_ADMIN" ? "/rede" : "/admin";
+  const dest = user?.role === "NETWORK_ADMIN" ? "/rede" : "/admin";
   redirect(dest);
 }
