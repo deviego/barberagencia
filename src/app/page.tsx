@@ -350,7 +350,7 @@ export default function LandingPage() {
                 background: "repeating-linear-gradient(-45deg, var(--bb-pole-red) 0 10px, var(--bb-pole-white) 10px 20px, var(--bb-pole-blue) 20px 30px)",
               }}
             />
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col items-center gap-4 text-center">
               <h2 className="m-0 font-display text-[38px] font-black uppercase leading-[0.98] sm:text-[52px]">
                 Pronto para
                 <br />
@@ -359,7 +359,7 @@ export default function LandingPage() {
               <p className="m-0 max-w-[460px] text-[16px] leading-[1.55] text-text-2">
                 Comece o teste de 15 dias agora — a gente configura a sua barbearia junto com você.
               </p>
-              <div className="mt-1.5 flex flex-wrap gap-3">
+              <div className="mt-1.5 flex flex-wrap justify-center gap-3">
                 <a
                   href={salesWaLink(WA_MESSAGES.trial)}
                   target="_blank"
