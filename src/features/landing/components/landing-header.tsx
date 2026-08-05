@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { NAV_LINKS, salesWaLink, WA_MESSAGES } from "@/features/landing/content";
@@ -41,12 +40,6 @@ export function LandingHeader() {
         {/* Ações (nunca cortadas) */}
         <div className="flex shrink-0 items-center gap-2.5">
           <ThemeToggle />
-          <Link
-            href="/admin/login"
-            className="hidden whitespace-nowrap rounded-md border border-border px-4 py-2 text-[14px] font-medium text-text transition-colors hover:border-accent hover:text-accent sm:inline-flex"
-          >
-            Entrar
-          </Link>
           <a
             href={salesWaLink(WA_MESSAGES.trial)}
             target="_blank"
@@ -82,13 +75,6 @@ export function LandingHeader() {
               </a>
             ))}
             <div className="mt-2 flex flex-col gap-2">
-              <Link
-                href="/admin/login"
-                onClick={() => setOpen(false)}
-                className="rounded-md border border-border px-3 py-2.5 text-center text-[15px] font-medium text-text"
-              >
-                Entrar
-              </Link>
               <a
                 href={salesWaLink(WA_MESSAGES.trial)}
                 target="_blank"

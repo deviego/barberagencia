@@ -4,7 +4,6 @@ import Image from "next/image";
 import { LandingHeader } from "@/features/landing/components/landing-header";
 import { DeviceShowcase } from "@/features/landing/components/device-showcase";
 import { Faq } from "@/features/landing/components/faq";
-import { ContactForm } from "@/features/landing/components/contact-form";
 import { Icon } from "@/features/landing/components/icon";
 import {
   AFTER,
@@ -344,7 +343,7 @@ export default function LandingPage() {
 
         {/* CONTATO / CTA */}
         <section id="contato" className="mx-auto mt-28 max-w-[1180px] px-6 sm:px-10">
-          <div className="relative grid items-center gap-12 overflow-hidden rounded-lg border border-accent bg-surface p-8 sm:p-14 lg:grid-cols-[1.2fr_1fr]">
+          <div className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-accent bg-surface p-8 sm:p-14">
             <div
               className="absolute inset-x-0 top-0 h-[5px]"
               style={{
@@ -358,8 +357,7 @@ export default function LandingPage() {
                 encher a agenda?
               </h2>
               <p className="m-0 max-w-[460px] text-[16px] leading-[1.55] text-text-2">
-                Comece o teste de 15 dias agora ou fale com um especialista — a gente configura a sua barbearia junto com
-                você.
+                Comece o teste de 15 dias agora — a gente configura a sua barbearia junto com você.
               </p>
               <div className="mt-1.5 flex flex-wrap gap-3">
                 <a
@@ -370,19 +368,8 @@ export default function LandingPage() {
                 >
                   Começar teste grátis
                 </a>
-                <a
-                  href={salesWaLink(WA_MESSAGES.specialist)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-md px-[26px] py-[15px] text-[15px] font-semibold"
-                  style={{ border: "1px solid #25D366", color: "#25D366" }}
-                >
-                  <Icon name="message-circle" size={17} />
-                  WhatsApp
-                </a>
               </div>
             </div>
-            <ContactForm />
           </div>
         </section>
       </main>
