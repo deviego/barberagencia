@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { NAV_LINKS, salesWaLink, WA_MESSAGES } from "@/features/landing/content";
@@ -17,10 +16,13 @@ export function LandingHeader() {
     >
       <div className="mx-auto flex max-w-[1240px] flex-nowrap items-center justify-between gap-5 px-5 py-3.5 sm:px-8">
         {/* Marca */}
-        <a href="#produto" className="flex shrink-0 items-center" aria-label="Barber Agência">
-          <div className="relative h-10 w-36 overflow-hidden rounded">
-            <Image src="/barber-agencia-logo.jpeg" alt="Barber Agência" fill sizes="144px" className="object-cover object-center" priority />
-          </div>
+        <a href="#produto" className="flex shrink-0 items-center gap-3">
+          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md bg-accent font-display text-[17px] font-black text-text-inverse">
+            B✦
+          </span>
+          <span className="whitespace-nowrap font-display text-[19px] font-extrabold uppercase tracking-[0.04em] text-text">
+            Barber Agência
+          </span>
         </a>
 
         {/* Nav central (some abaixo de 1080px) */}
