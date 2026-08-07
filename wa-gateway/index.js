@@ -209,7 +209,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "single-socket-v2";
+const BUILD = "logout-timeout-v3";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -299,12 +299,17 @@ app.get("/sessions/:tenantId/check", async (req, res) => {
 });
 
 app.post("/sessions/:tenantId/logout", async (req, res) => {
-  const s = sessions.get(req.params.tenantId);
-  try {
-    if (s?.sock) await s.sock.logout().catch(() => {});
-  } catch {}
-  sessions.set(req.params.tenantId, { sock: null, status: "disconnected", qr: null, number: null, attempts: 0 });
-  await supabase.from("wa_sessions").delete().eq("tenant_id", req.params.tenantId).catch(() => {});
+  const tenantId = req.params.tenantId;
+  const s = sessions.get(tenantId);
+  // O essencial é limpar creds+keys (para re-parear limpo). O unlink no WhatsApp
+  // é best-effort: sock.logout() pode TRAVAR num socket em estado ruim (gera 502),
+  // então corre contra um timeout curto e, de qualquer forma, encerra o socket.
+  if (s?.sock) {
+    try { await Promise.race([Promise.resolve(s.sock.logout()).catch(() => {}), sleep(4000)]); } catch {}
+    try { s.sock.end?.(undefined); } catch {}
+  }
+  sessions.set(tenantId, { sock: null, status: "disconnected", qr: null, number: null, attempts: 0, starting: false });
+  await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId).catch(() => {});
   res.json({ ok: true });
 });
 
