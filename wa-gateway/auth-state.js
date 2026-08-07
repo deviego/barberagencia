@@ -17,12 +17,19 @@ export async function makeSupabaseAuthState(supabase, tenantId) {
   const keys = revive(data?.keys) || {};
 
   async function persist() {
-    await supabase.from("wa_sessions").upsert({
-      tenant_id: tenantId,
-      creds: JSON.parse(JSON.stringify(creds, BufferJSON.replacer)),
-      keys: JSON.parse(JSON.stringify(keys, BufferJSON.replacer)),
-      updated_at: new Date().toISOString(),
-    });
+    // NUNCA deixa rejeitar: é usado como handler de evento (creds.update) e em keys.set.
+    // No Node 22 uma promise rejeitada não tratada DERRUBA o processo — um hiccup de rede
+    // com o Supabase durante o churn de sessão viraria queda do gateway inteiro.
+    try {
+      await supabase.from("wa_sessions").upsert({
+        tenant_id: tenantId,
+        creds: JSON.parse(JSON.stringify(creds, BufferJSON.replacer)),
+        keys: JSON.parse(JSON.stringify(keys, BufferJSON.replacer)),
+        updated_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error("[wa] persist falhou", tenantId, e?.message);
+    }
   }
 
   const state = {

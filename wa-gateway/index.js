@@ -16,6 +16,12 @@ if (!TOKEN || !SUPABASE_URL || !SERVICE_KEY) {
 }
 
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
+
+// Rede/Baileys geram rejeições/erros esporádicos. No Node 22 isso encerra o processo
+// (crash-loop no Render). Mantemos o gateway VIVO e logamos — o estado vive no Supabase,
+// então watchdogs/re-hidratação recuperam a sessão sem derrubar o serviço.
+process.on("unhandledRejection", (e) => log.error({ err: e?.message ?? String(e) }, "unhandledRejection"));
+process.on("uncaughtException", (e) => log.error({ err: e?.message ?? String(e) }, "uncaughtException"));
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 const app = express();
 app.use(express.json());
@@ -209,7 +215,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "logout-timeout-v3";
+const BUILD = "resilient-v4";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
