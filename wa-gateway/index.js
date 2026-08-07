@@ -215,7 +215,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "resilient-v4";
+const BUILD = "resilient-v5";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
