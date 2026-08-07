@@ -2,7 +2,7 @@ import express from "express";
 import QRCode from "qrcode";
 import pino from "pino";
 import { createClient } from "@supabase/supabase-js";
-import makeWASocket, { DisconnectReason } from "@whiskeysockets/baileys";
+import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 import { makeSupabaseAuthState } from "./auth-state.js";
 
 const PORT = process.env.PORT || 8080;
@@ -20,8 +20,13 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSessio
 const app = express();
 app.use(express.json());
 
-/** sessions: tenantId -> { sock, status, qr, number } */
+/** sessions: tenantId -> { sock, status, qr, number, attempts, connectingSince, starting } */
 const sessions = new Map();
+
+const MAX_ATTEMPTS = 8; // reconexões seguidas antes de desistir (até novo /connect ou watchdog)
+const CONNECTING_TIMEOUT_MS = 60_000; // preso em "connecting" além disso → reinicia
+const WATCHDOG_MS = 3 * 60_000; // varredura periódica de auto-cura
+let waVersion; // versão web do WhatsApp (fetchLatestBaileysVersion)
 
 function toWhatsPhone(phone) {
   let n = String(phone).replace(/\D/g, "");
@@ -29,17 +34,35 @@ function toWhatsPhone(phone) {
   return n;
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const backoffMs = (attempts) => Math.min(30_000, 2000 * 2 ** Math.max(0, attempts - 1));
 
-async function startSession(tenantId) {
+async function startSession(tenantId, prev) {
+  // Evita iniciar duas vezes em paralelo o mesmo tenant.
+  const existing = sessions.get(tenantId);
+  if (existing?.starting) return existing;
+
   const { state, saveCreds } = await makeSupabaseAuthState(supabase, tenantId);
   const sock = makeWASocket({
+    version: waVersion,
     auth: state,
     printQRInTerminal: false,
-    browser: ["Barbearia", "Chrome", "1.0"],
+    browser: ["Barber Agencia", "Chrome", "1.0"],
     logger: log.child({ tenant: tenantId }),
     syncFullHistory: false,
+    markOnlineOnConnect: false,
+    connectTimeoutMs: 60_000,
+    keepAliveIntervalMs: 15_000,
+    retryRequestDelayMs: 2000,
   });
-  const s = { sock, status: "connecting", qr: null, number: null };
+  const s = {
+    sock,
+    status: "connecting",
+    qr: null,
+    number: prev?.number ?? null,
+    attempts: (prev?.attempts ?? 0) + 1,
+    connectingSince: Date.now(),
+    starting: false,
+  };
   sessions.set(tenantId, s);
 
   sock.ev.on("creds.update", saveCreds);
@@ -48,11 +71,13 @@ async function startSession(tenantId) {
     if (qr) {
       s.status = "qr";
       s.qr = await QRCode.toDataURL(qr);
+      s.connectingSince = Date.now(); // aguardando o scan
     }
     if (connection === "open") {
       s.status = "connected";
       s.qr = null;
-      s.number = sock.user?.id ? sock.user.id.split(":")[0].split("@")[0] : null;
+      s.attempts = 0;
+      s.number = sock.user?.id ? sock.user.id.split(":")[0].split("@")[0] : s.number;
       try {
         await supabase
           .from("wa_sessions")
@@ -63,15 +88,31 @@ async function startSession(tenantId) {
     }
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
-      sessions.delete(tenantId);
+      const cur = sessions.get(tenantId);
+      // Só age se ainda for esta sessão (evita corrida com um restart mais novo).
+      if (cur && cur.sock !== sock) return;
+
       if (code === DisconnectReason.loggedOut) {
-        s.status = "disconnected";
-        await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId);
-        log.warn({ tenant: tenantId }, "logout — sessão removida");
-      } else {
-        log.warn({ tenant: tenantId, code }, "conexão caiu — reconectando");
-        startSession(tenantId).catch((e) => log.error(e, "falha ao reconectar"));
+        sessions.set(tenantId, { ...s, sock: null, status: "disconnected", qr: null });
+        await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId).catch(() => {});
+        log.warn({ tenant: tenantId }, "logout — sessão removida (precisa novo QR)");
+        return;
       }
+      if (code === DisconnectReason.connectionReplaced) {
+        // Outra conexão assumiu (ex.: mesmo número em 2 lugares). Não brigar.
+        sessions.set(tenantId, { ...s, sock: null, status: "disconnected", qr: null });
+        log.warn({ tenant: tenantId }, "conexão substituída — parando (número em uso em outro lugar?)");
+        return;
+      }
+      if (s.attempts >= MAX_ATTEMPTS) {
+        sessions.set(tenantId, { ...s, sock: null, status: "disconnected", qr: null });
+        log.error({ tenant: tenantId, code }, "máx. tentativas — desistindo até novo connect/watchdog");
+        return;
+      }
+      const wait = code === DisconnectReason.restartRequired ? 0 : backoffMs(s.attempts);
+      log.warn({ tenant: tenantId, code, wait }, "conexão caiu — reconectando");
+      await sleep(wait);
+      startSession(tenantId, s).catch((e) => log.error(e, "falha ao reconectar"));
     }
   });
 
@@ -80,8 +121,61 @@ async function startSession(tenantId) {
 
 async function ensureSession(tenantId) {
   const s = sessions.get(tenantId);
-  if (s) return s;
-  return startSession(tenantId);
+  if (s && (s.status === "connected" || s.status === "connecting" || s.status === "qr") && s.sock) return s;
+  return startSession(tenantId, s);
+}
+
+// Aguarda a sessão conectar (usado no /send).
+async function waitConnected(tenantId, timeoutMs = 15_000) {
+  const step = 400;
+  for (let waited = 0; waited < timeoutMs; waited += step) {
+    const s = sessions.get(tenantId);
+    if (s?.status === "connected") return s;
+    if (s?.status === "disconnected") return s; // não adianta esperar (logout/replaced)
+    await sleep(step);
+  }
+  return sessions.get(tenantId);
+}
+
+// --- Re-hidratação no boot: religa todas as sessões salvas ---
+async function rehydrate() {
+  try {
+    waVersion = (await fetchLatestBaileysVersion()).version;
+    log.info({ waVersion }, "versão WhatsApp");
+  } catch (e) {
+    log.warn({ err: e?.message }, "não obteve a versão do WhatsApp (usa a padrão do Baileys)");
+  }
+  const { data } = await supabase.from("wa_sessions").select("tenant_id");
+  const ids = (data ?? []).map((r) => r.tenant_id);
+  log.info({ n: ids.length }, "re-hidratando sessões salvas");
+  for (const id of ids) startSession(id).catch((e) => log.error(e, "falha ao re-hidratar"));
+}
+
+// --- Watchdogs: connecting preso + auto-cura periódica ---
+function tickWatchdog() {
+  const now = Date.now();
+  for (const [tenantId, s] of sessions) {
+    const stuck =
+      (s.status === "connecting" || s.status === "qr") &&
+      s.connectingSince &&
+      now - s.connectingSince > CONNECTING_TIMEOUT_MS &&
+      s.attempts < MAX_ATTEMPTS;
+    if (stuck) {
+      log.warn({ tenant: tenantId, status: s.status }, "preso conectando — reiniciando");
+      try { s.sock?.end?.(new Error("stuck")); } catch {}
+      startSession(tenantId, s).catch((e) => log.error(e, "watchdog restart"));
+    }
+  }
+}
+async function tickReconnectDown() {
+  // Religa tenants que têm creds salvas mas estão sem sessão viva.
+  const { data } = await supabase.from("wa_sessions").select("tenant_id").catch(() => ({ data: [] }));
+  for (const r of data ?? []) {
+    const s = sessions.get(r.tenant_id);
+    if (!s || (!s.sock && s.status === "disconnected" && (s.attempts ?? 0) < MAX_ATTEMPTS)) {
+      startSession(r.tenant_id, s).catch(() => {});
+    }
+  }
 }
 
 // --- auth middleware ---
@@ -91,10 +185,12 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
   try {
+    const cur = sessions.get(req.params.tenantId);
+    if (cur) cur.attempts = 0; // reset ao pedir conexão manual
     const s = await ensureSession(req.params.tenantId);
     res.json({ status: s.status, qr: s.qr, number: s.number });
   } catch (e) {
@@ -103,8 +199,16 @@ app.post("/sessions/:tenantId/connect", async (req, res) => {
   }
 });
 
-app.get("/sessions/:tenantId/status", (req, res) => {
-  const s = sessions.get(req.params.tenantId);
+app.get("/sessions/:tenantId/status", async (req, res) => {
+  let s = sessions.get(req.params.tenantId);
+  // Lazy-restore: sem sessão viva mas com creds salvas → tenta religar.
+  if (!s || (!s.sock && s.status !== "connected")) {
+    const { data } = await supabase.from("wa_sessions").select("tenant_id").eq("tenant_id", req.params.tenantId).maybeSingle();
+    if (data) {
+      if (s) s.attempts = 0;
+      s = await ensureSession(req.params.tenantId).catch(() => s);
+    }
+  }
   if (!s) return res.json({ status: "disconnected" });
   res.json({ status: s.status, qr: s.qr, number: s.number });
 });
@@ -113,12 +217,13 @@ app.post("/sessions/:tenantId/send", async (req, res) => {
   const { phone, message } = req.body || {};
   if (!phone || !message) return res.status(400).json({ error: "phone/message obrigatórios" });
   try {
-    let s = await ensureSession(req.params.tenantId);
-    for (let i = 0; i < 20 && s.status !== "connected"; i++) {
-      await sleep(500);
-      s = sessions.get(req.params.tenantId) || s;
+    const cur = sessions.get(req.params.tenantId);
+    if (cur && cur.status === "disconnected") cur.attempts = 0; // dá nova chance
+    await ensureSession(req.params.tenantId);
+    const s = await waitConnected(req.params.tenantId, 15_000);
+    if (s?.status !== "connected" || !s.sock) {
+      return res.status(409).json({ error: s?.status === "disconnected" ? "needs_reconnect" : "not_connected", status: s?.status ?? "disconnected" });
     }
-    if (s.status !== "connected") return res.status(409).json({ error: "not_connected", status: s.status });
     const jid = `${toWhatsPhone(phone)}@s.whatsapp.net`;
     await s.sock.sendMessage(jid, { text: message });
     res.json({ ok: true });
@@ -133,12 +238,17 @@ app.post("/sessions/:tenantId/logout", async (req, res) => {
   try {
     if (s?.sock) await s.sock.logout().catch(() => {});
   } catch {}
-  sessions.delete(req.params.tenantId);
+  sessions.set(req.params.tenantId, { sock: null, status: "disconnected", qr: null, number: null, attempts: 0 });
   await supabase.from("wa_sessions").delete().eq("tenant_id", req.params.tenantId).catch(() => {});
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => log.info(`wa-gateway ouvindo na porta ${PORT}`));
+app.listen(PORT, () => {
+  log.info(`wa-gateway ouvindo na porta ${PORT}`);
+  rehydrate().catch((e) => log.error(e, "rehydrate"));
+  setInterval(tickWatchdog, 20_000).unref();
+  setInterval(() => tickReconnectDown().catch(() => {}), WATCHDOG_MS).unref();
+});
 
 // --- Keep-alive: o próprio serviço bate na sua URL pública a cada 10 min ---
 // O Render hiberna serviços free após 15 min SEM tráfego de entrada. Como este processo
