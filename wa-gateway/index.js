@@ -36,10 +36,35 @@ function toWhatsPhone(phone) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const backoffMs = (attempts) => Math.min(30_000, 2000 * 2 ** Math.max(0, attempts - 1));
 
-async function startSession(tenantId, prev) {
-  // Evita iniciar duas vezes em paralelo o mesmo tenant.
+async function startSession(tenantId, prev, force = false) {
   const existing = sessions.get(tenantId);
+  // Single-flight: uma sessão já iniciando impede abrir outra em paralelo.
+  // Dois sockets no mesmo tenant disputam as MESMAS chaves Signal no banco e as
+  // corrompem → o WhatsApp do destinatário não decifra ("Aguardando a mensagem").
   if (existing?.starting) return existing;
+  // Sem force: se já há socket vivo, reutiliza (não reinicia à toa). Os caminhos que
+  // QUEREM reiniciar (close/watchdog) passam force=true e caem fora deste atalho.
+  if (!force && existing?.sock && (existing.status === "connecting" || existing.status === "qr" || existing.status === "connected")) {
+    return existing;
+  }
+
+  // Trava SÍNCRONA antes de qualquer await (fecha a janela de corrida entre os
+  // vários caminhos que chamam startSession: reconexão, watchdogs, /status, /send).
+  const lock = {
+    sock: null,
+    status: existing?.status === "connected" ? "connecting" : (existing?.status ?? "connecting"),
+    qr: null,
+    number: prev?.number ?? existing?.number ?? null,
+    attempts: (prev?.attempts ?? existing?.attempts ?? 0) + 1,
+    connectingSince: Date.now(),
+    starting: true,
+  };
+  sessions.set(tenantId, lock);
+
+  // Encerra qualquer socket anterior para nunca deixar dois vivos ao mesmo tempo.
+  try { prev?.sock?.end?.(undefined); } catch {}
+  try { if (existing?.sock && existing.sock !== prev?.sock) existing.sock.end?.(undefined); } catch {}
+  await sleep(300); // deixa a persistência pendente do socket antigo assentar antes de recarregar as chaves
 
   const { state, saveCreds } = await makeSupabaseAuthState(supabase, tenantId);
   const sock = makeWASocket({
@@ -58,8 +83,8 @@ async function startSession(tenantId, prev) {
     sock,
     status: "connecting",
     qr: null,
-    number: prev?.number ?? null,
-    attempts: (prev?.attempts ?? 0) + 1,
+    number: lock.number,
+    attempts: lock.attempts,
     connectingSince: Date.now(),
     starting: false,
   };
@@ -112,7 +137,7 @@ async function startSession(tenantId, prev) {
       const wait = code === DisconnectReason.restartRequired ? 0 : backoffMs(s.attempts);
       log.warn({ tenant: tenantId, code, wait }, "conexão caiu — reconectando");
       await sleep(wait);
-      startSession(tenantId, s).catch((e) => log.error(e, "falha ao reconectar"));
+      startSession(tenantId, s, true).catch((e) => log.error(e, "falha ao reconectar"));
     }
   });
 
@@ -162,8 +187,7 @@ function tickWatchdog() {
       s.attempts < MAX_ATTEMPTS;
     if (stuck) {
       log.warn({ tenant: tenantId, status: s.status }, "preso conectando — reiniciando");
-      try { s.sock?.end?.(new Error("stuck")); } catch {}
-      startSession(tenantId, s).catch((e) => log.error(e, "watchdog restart"));
+      startSession(tenantId, s, true).catch((e) => log.error(e, "watchdog restart"));
     }
   }
 }
