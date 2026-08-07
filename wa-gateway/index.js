@@ -213,6 +213,26 @@ app.get("/sessions/:tenantId/status", async (req, res) => {
   res.json({ status: s.status, qr: s.qr, number: s.number });
 });
 
+/**
+ * Resolve o JID REAL de um número no WhatsApp. Números do Brasil têm a ambiguidade
+ * do "9º dígito": o JID interno pode ou não conter o 9 após o DDD. Enviar para o JID
+ * montado "na mão" faz o sendMessage resolver localmente (ok) mas nunca entregar.
+ * onWhatsApp() devolve o jid correto (e diz se o número existe no WhatsApp).
+ */
+async function resolveJid(sock, phone) {
+  const num = toWhatsPhone(phone); // ex.: 5547996595755
+  try {
+    const results = await sock.onWhatsApp(`${num}@s.whatsapp.net`);
+    const hit = Array.isArray(results) ? results.find((r) => r?.exists && r?.jid) : null;
+    if (hit) return { jid: hit.jid, exists: true };
+  } catch (e) {
+    log.warn({ err: e?.message, num }, "onWhatsApp falhou — usando jid montado");
+    // Se a checagem falhar (rede/rate), cai no jid montado como último recurso.
+    return { jid: `${num}@s.whatsapp.net`, exists: null };
+  }
+  return { jid: `${num}@s.whatsapp.net`, exists: false };
+}
+
 app.post("/sessions/:tenantId/send", async (req, res) => {
   const { phone, message } = req.body || {};
   if (!phone || !message) return res.status(400).json({ error: "phone/message obrigatórios" });
@@ -224,12 +244,32 @@ app.post("/sessions/:tenantId/send", async (req, res) => {
     if (s?.status !== "connected" || !s.sock) {
       return res.status(409).json({ error: s?.status === "disconnected" ? "needs_reconnect" : "not_connected", status: s?.status ?? "disconnected" });
     }
-    const jid = `${toWhatsPhone(phone)}@s.whatsapp.net`;
-    await s.sock.sendMessage(jid, { text: message });
-    res.json({ ok: true });
+    const { jid, exists } = await resolveJid(s.sock, phone);
+    if (exists === false) {
+      log.warn({ tenant: req.params.tenantId, phone }, "número não está no WhatsApp");
+      return res.status(422).json({ error: "not_on_whatsapp" });
+    }
+    const result = await s.sock.sendMessage(jid, { text: message });
+    res.json({ ok: true, jid, id: result?.key?.id ?? null });
   } catch (e) {
     log.error(e, "send");
     res.status(500).json({ error: "send_failed" });
+  }
+});
+
+/** Diagnóstico: confere se um número existe no WhatsApp e qual o JID real. */
+app.get("/sessions/:tenantId/check", async (req, res) => {
+  const phone = req.query.phone;
+  if (!phone) return res.status(400).json({ error: "phone obrigatório" });
+  try {
+    await ensureSession(req.params.tenantId);
+    const s = await waitConnected(req.params.tenantId, 15_000);
+    if (s?.status !== "connected" || !s.sock) return res.status(409).json({ error: "not_connected", status: s?.status });
+    const { jid, exists } = await resolveJid(s.sock, String(phone));
+    res.json({ input: String(phone), normalized: toWhatsPhone(String(phone)), jid, exists });
+  } catch (e) {
+    log.error(e, "check");
+    res.status(500).json({ error: "check_failed" });
   }
 });
 
