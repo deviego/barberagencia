@@ -5,8 +5,11 @@ import { Headphones, Plus, Scissors } from "lucide-react";
 import { CutMeter } from "@/components/cut-meter";
 import { StatusBadge, type AppointmentStatus } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Ticket } from "lucide-react";
 import { AppointmentActions } from "@/features/client/components/appointment-actions";
 import { getClientHome } from "@/features/client/data";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { getMyTicket, getQueueBoard, getQueueConfig } from "@/features/queue/data";
 
 // Relações "to-one" do supabase podem vir como objeto ou array de 1 — normaliza.
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -17,6 +20,14 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 export default async function ClientHome() {
   const home = await getClientHome();
   const firstName = home?.client?.name?.split(" ")[0] ?? "";
+
+  // Fila (só se a barbearia ativou e o cliente tem senha hoje).
+  const tenant = await getCurrentTenant();
+  const queueCfg = tenant.id ? await getQueueConfig(tenant.id) : { enabled: false, pickBarber: false };
+  const [filaTicket, filaBoard] = queueCfg.enabled
+    ? await Promise.all([getMyTicket(), getQueueBoard(tenant.id)])
+    : [null, { serving: [], waiting: [] }];
+  const servingLabel = filaBoard.serving.length ? filaBoard.serving.map((s) => `#${s.ticket}`).join(", ") : "—";
   const sub = home?.sub as
     | { saldo_cortes: number; billing_day: number; combo_plans: { name: string; cuts: number } | { name: string; cuts: number }[] }
     | null
@@ -38,6 +49,26 @@ export default async function ClientHome() {
           {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
         </p>
       </div>
+
+      {/* Fila — senha do cliente + em atendimento */}
+      {queueCfg.enabled && filaTicket && (
+        <Link
+          href="/client/fila"
+          className="flex items-center justify-between rounded-lg border-2 border-accent bg-surface p-5 shadow-sm transition-shadow hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <Ticket size={22} className="text-accent" />
+            <div>
+              <div className="text-caption uppercase text-text-muted">Sua senha na fila</div>
+              <div className="font-display text-h3 font-black leading-none text-accent">#{filaTicket.ticket}</div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-caption text-text-muted">Em atendimento</div>
+            <div className="font-display text-h4 font-bold text-text tabular">{servingLabel}</div>
+          </div>
+        </Link>
+      )}
 
       {/* Próximo agendamento */}
       {next ? (

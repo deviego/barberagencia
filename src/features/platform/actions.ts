@@ -47,6 +47,7 @@ export async function createTenant(input: {
   adminName?: string;
   phone?: string;
   trialEnabled?: boolean;
+  queueEnabled?: boolean;
   contract?: {
     legalName?: string;
     tradeName?: string;
@@ -79,7 +80,7 @@ export async function createTenant(input: {
   // 1) tenant + branding
   const { data: tenant, error: tErr } = await admin
     .from("tenants")
-    .insert({ name, subdomain, saas_plan: input.plan, status: "ACTIVE" })
+    .insert({ name, subdomain, saas_plan: input.plan, status: "ACTIVE", queue_enabled: input.queueEnabled ?? false })
     .select("id")
     .single();
   if (tErr || !tenant) return { ok: false as const, error: tErr?.message ?? "Falha ao criar a barbearia." };

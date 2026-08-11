@@ -44,6 +44,7 @@ export default function OnboardingPage() {
   const [adminName, setAdminName] = useState("");
   const [phone, setPhone] = useState("");
   const [trialEnabled, setTrialEnabled] = useState(true);
+  const [queueEnabled, setQueueEnabled] = useState(false);
   // Dados do contrato (ASSINANTE)
   const [docType, setDocType] = useState<"CNPJ" | "CPF">("CNPJ");
   const [docNumber, setDocNumber] = useState("");
@@ -75,6 +76,7 @@ export default function OnboardingPage() {
         adminName,
         phone,
         trialEnabled,
+        queueEnabled,
         contract: {
           legalName,
           tradeName: name,
@@ -116,6 +118,7 @@ export default function OnboardingPage() {
     setAdminName("");
     setPhone("");
     setTrialEnabled(true);
+    setQueueEnabled(false);
     setDocType("CNPJ");
     setDocNumber("");
     setLegalName("");
@@ -252,6 +255,15 @@ export default function OnboardingPage() {
           </div>
         </div>
         <Switch defaultChecked={trialEnabled} onChange={setTrialEnabled} />
+      </div>
+
+      {/* Fila (Essencial/Advance) */}
+      <div className="flex items-center justify-between rounded-md border border-border bg-inset px-4 py-3">
+        <div>
+          <div className="text-body font-semibold text-text">Habilitar Fila (QR/totem)</div>
+          <div className="text-caption text-text-muted">Recurso dos planos Essencial e Advance.</div>
+        </div>
+        <Switch defaultChecked={queueEnabled} onChange={setQueueEnabled} />
       </div>
 
       {/* Dados do contrato (ASSINANTE) */}

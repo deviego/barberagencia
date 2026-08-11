@@ -10,6 +10,8 @@ import { buildContractView } from "@/features/contract/view";
 import { ContractSection } from "@/features/contract/components/contract-section";
 import { getPlanUsage } from "@/lib/plan/effective";
 import { PlanUsage } from "@/features/plan/components/plan-usage";
+import { getQueueConfig } from "@/features/queue/data";
+import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
 
 export default async function ConfigPage() {
   const [tenant, branding, unit, contract, planUsage] = await Promise.all([
@@ -20,6 +22,7 @@ export default async function ConfigPage() {
     getPlanUsage(),
   ]);
   const contractView = buildContractView(contract);
+  const queueCfg = await getQueueConfig(tenant.id);
 
   return (
     <div className="flex flex-col gap-6" id="unidade">
@@ -50,6 +53,8 @@ export default async function ConfigPage() {
       </section>
 
       <WhatsAppConnect />
+
+      {queueCfg.enabled && <PickBarberToggle enabled={queueCfg.pickBarber} />}
 
       <PlanUsage view={planUsage} />
 

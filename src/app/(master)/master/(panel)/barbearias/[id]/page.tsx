@@ -12,6 +12,8 @@ import { buildContractView, PLAN_LABEL as CONTRACT_PLAN_LABEL } from "@/features
 import { MasterContractPanel } from "@/features/contract/components/master-contract-panel";
 import { getUpgradeRequestsForTenant } from "@/features/plan/data";
 import { MasterPlanPanel } from "@/features/plan/components/master-plan-panel";
+import { getQueueConfig } from "@/features/queue/data";
+import { QueueEnableToggle } from "@/features/queue/components/queue-enable-toggle";
 import { formatBRL } from "@/lib/utils";
 
 const PLAN_LABEL: Record<string, string> = {
@@ -22,10 +24,11 @@ const PLAN_LABEL: Record<string, string> = {
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [t, contract, upgradeReqs] = await Promise.all([
+  const [t, contract, upgradeReqs, queueConfig] = await Promise.all([
     getTenantDetail(id),
     getTenantContractById(id),
     getUpgradeRequestsForTenant(id),
+    getQueueConfig(id),
   ]);
   if (!t) notFound();
   const contractView = buildContractView(contract);
@@ -155,6 +158,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       </Section>
 
       <MasterPlanPanel tenantId={t.id} plan={t.saasPlan} requests={upgradeReqs} />
+
+      <QueueEnableToggle tenantId={t.id} enabled={queueConfig.enabled} />
 
       {contractView && (
         <MasterContractPanel
