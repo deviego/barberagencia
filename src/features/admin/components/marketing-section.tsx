@@ -3,8 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MarketingForm } from "@/features/admin/components/marketing-form";
 import { getCampaigns } from "@/features/admin/data";
-import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { hasEntitlement } from "@/lib/entitlements";
+import { getEffectivePlan } from "@/lib/plan/effective";
 
 const STATUS: Record<string, { label: string; variant: React.ComponentProps<typeof Badge>["variant"] }> = {
   DRAFT: { label: "Rascunho", variant: "neutral" },
@@ -15,8 +15,8 @@ const STATUS: Record<string, { label: string; variant: React.ComponentProps<type
 
 /** Seção de Marketing (campanhas) — usada dentro da aba Marketing Place. */
 export async function MarketingSection() {
-  const tenant = await getCurrentTenant();
-  if (!hasEntitlement(tenant.saasPlan, "marketing.basic")) {
+  const eff = await getEffectivePlan();
+  if (eff.gated && !hasEntitlement(eff.plan, "marketing.basic")) {
     return (
       <div className="mx-auto mt-10 flex max-w-md flex-col items-center gap-3 rounded-lg border border-border bg-surface p-8 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-wash">
@@ -33,7 +33,7 @@ export async function MarketingSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <MarketingForm canSegmented={hasEntitlement(tenant.saasPlan, "marketing.segmented")} />
+      <MarketingForm canSegmented={!eff.gated || hasEntitlement(eff.plan, "marketing.segmented")} />
 
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-body">

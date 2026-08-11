@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notifyPlanRequested, notifyAppointmentRequested, notifyAppointmentCancelled, notifyServiceAdded } from "@/server/notifications/notify";
+import { checkLimit } from "@/lib/plan/effective";
 import { getMyClient } from "./data";
 
 const itemSchema = z.object({
@@ -37,6 +38,10 @@ export async function requestAppointment(input: RequestAppointmentInput) {
   const supabase = await createSupabaseServerClient();
   const client = await getMyClient();
   if (!client) return { ok: false as const, error: "Cliente não encontrado" };
+
+  const quota = await checkLimit("appointments.monthly");
+  if (!quota.allowed)
+    return { ok: false as const, error: "A agenda da barbearia atingiu o limite do mês. Tente novamente mais tarde." };
 
   const firstServiceIdx = items.findIndex((i) => i.kind === "service");
   const primaryServiceRef = firstServiceIdx >= 0 ? items[firstServiceIdx].refId ?? null : null;

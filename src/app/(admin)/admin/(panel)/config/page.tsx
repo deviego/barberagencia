@@ -8,13 +8,16 @@ import { getBranding, getUnitSettings } from "@/features/admin/data";
 import { getTenantContract } from "@/features/contract/data";
 import { buildContractView } from "@/features/contract/view";
 import { ContractSection } from "@/features/contract/components/contract-section";
+import { getPlanUsage } from "@/lib/plan/effective";
+import { PlanUsage } from "@/features/plan/components/plan-usage";
 
 export default async function ConfigPage() {
-  const [tenant, branding, unit, contract] = await Promise.all([
+  const [tenant, branding, unit, contract, planUsage] = await Promise.all([
     getCurrentTenant(),
     getBranding(),
     getUnitSettings(),
     getTenantContract(),
+    getPlanUsage(),
   ]);
   const contractView = buildContractView(contract);
 
@@ -47,6 +50,8 @@ export default async function ConfigPage() {
       </section>
 
       <WhatsAppConnect />
+
+      <PlanUsage view={planUsage} />
 
       {contractView && <ContractSection view={contractView} />}
     </div>

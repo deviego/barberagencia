@@ -19,6 +19,7 @@ import {
   notifyServiceAdded,
   notifyInvite,
 } from "@/server/notifications/notify";
+import { checkFeature, checkLimit, guardNewSubscriber } from "@/lib/plan/effective";
 
 async function setStatus(
   id: string,
@@ -177,6 +178,8 @@ export async function createInvite(values: { name?: string; phone?: string; emai
 
 /** Cria uma campanha de marketing. */
 export async function createCampaign(values: { name: string; segment: string; message: string }) {
+  const gate = await checkFeature("marketing.basic");
+  if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
   const supabase = await createSupabaseServerClient();
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
@@ -212,6 +215,8 @@ export async function saveBranding(values: { accent?: string; instagram?: string
 
 /** Atribui/renova um combo a um cliente (admin). Planos Livres. */
 export async function assignComboToClient(clientId: string, comboPlanId: string) {
+  const gate = await guardNewSubscriber(clientId);
+  if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("assign_combo", {
     p_client_id: clientId,
@@ -229,6 +234,8 @@ export async function activateFixedPlan(
   comboPlanId: string,
   slot: { weekday: number; startMin: number; barberId: string; serviceId: string }
 ) {
+  const gate = await guardNewSubscriber(clientId);
+  if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("activate_fixed_plan", {
     p_client_id: clientId,
@@ -442,6 +449,8 @@ export async function createAppointmentAdmin(input: {
   childId?: string | null;
 }) {
   if (!input.clientId || !input.startAt) return { ok: false as const, error: "Dados incompletos" };
+  const gate = await checkLimit("appointments.monthly");
+  if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
   const supabase = await createSupabaseServerClient();
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
@@ -515,6 +524,8 @@ export async function approvePlanRequest(id: string) {
   if (!req || req.status !== "PENDING") return { ok: false as const, error: "Pedido inválido" };
 
   if ((req.type === "CHANGE" || req.type === "SUBSCRIBE") && req.combo_plan_id) {
+    const gate = await guardNewSubscriber(req.client_id);
+    if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
     const { error } = await supabase.rpc("assign_combo", {
       p_client_id: req.client_id,
       p_combo_plan_id: req.combo_plan_id,
@@ -561,6 +572,9 @@ export async function approveFixedPlanRequest(
     .maybeSingle();
   if (!req || req.status !== "PENDING" || !req.combo_plan_id)
     return { ok: false as const, error: "Pedido inválido" };
+
+  const gate = await guardNewSubscriber(req.client_id);
+  if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
 
   const { error } = await supabase.rpc("activate_fixed_plan", {
     p_client_id: req.client_id,

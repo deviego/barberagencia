@@ -10,6 +10,8 @@ import { getTenantDetail } from "@/features/platform/data";
 import { getTenantContractById } from "@/features/contract/data";
 import { buildContractView, PLAN_LABEL as CONTRACT_PLAN_LABEL } from "@/features/contract/view";
 import { MasterContractPanel } from "@/features/contract/components/master-contract-panel";
+import { getUpgradeRequestsForTenant } from "@/features/plan/data";
+import { MasterPlanPanel } from "@/features/plan/components/master-plan-panel";
 import { formatBRL } from "@/lib/utils";
 
 const PLAN_LABEL: Record<string, string> = {
@@ -20,7 +22,11 @@ const PLAN_LABEL: Record<string, string> = {
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [t, contract] = await Promise.all([getTenantDetail(id), getTenantContractById(id)]);
+  const [t, contract, upgradeReqs] = await Promise.all([
+    getTenantDetail(id),
+    getTenantContractById(id),
+    getUpgradeRequestsForTenant(id),
+  ]);
   if (!t) notFound();
   const contractView = buildContractView(contract);
 
@@ -147,6 +153,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           </Table>
         )}
       </Section>
+
+      <MasterPlanPanel tenantId={t.id} plan={t.saasPlan} requests={upgradeReqs} />
 
       {contractView && (
         <MasterContractPanel
