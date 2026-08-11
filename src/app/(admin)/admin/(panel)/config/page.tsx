@@ -5,9 +5,18 @@ import { UnitSettingsForm } from "@/features/admin/components/unit-settings-form
 import { WhatsAppConnect } from "@/features/admin/components/whatsapp-connect";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getBranding, getUnitSettings } from "@/features/admin/data";
+import { getTenantContract } from "@/features/contract/data";
+import { buildContractView } from "@/features/contract/view";
+import { ContractSection } from "@/features/contract/components/contract-section";
 
 export default async function ConfigPage() {
-  const [tenant, branding, unit] = await Promise.all([getCurrentTenant(), getBranding(), getUnitSettings()]);
+  const [tenant, branding, unit, contract] = await Promise.all([
+    getCurrentTenant(),
+    getBranding(),
+    getUnitSettings(),
+    getTenantContract(),
+  ]);
+  const contractView = buildContractView(contract);
 
   return (
     <div className="flex flex-col gap-6" id="unidade">
@@ -38,6 +47,8 @@ export default async function ConfigPage() {
       </section>
 
       <WhatsAppConnect />
+
+      {contractView && <ContractSection view={contractView} />}
     </div>
   );
 }

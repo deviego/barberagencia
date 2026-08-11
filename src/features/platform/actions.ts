@@ -46,6 +46,19 @@ export async function createTenant(input: {
   adminEmail: string;
   adminName?: string;
   phone?: string;
+  trialEnabled?: boolean;
+  contract?: {
+    legalName?: string;
+    tradeName?: string;
+    docType?: string;
+    docNumber?: string;
+    responsibleName?: string;
+    responsibleCpf?: string;
+    addressStreet?: string;
+    addressCity?: string;
+    addressState?: string;
+    addressZip?: string;
+  };
 }) {
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
@@ -81,6 +94,36 @@ export async function createTenant(input: {
   if (phone) {
     await admin.from("tenant_settings").upsert({ tenant_id: tenant.id, phone }, { onConflict: "tenant_id" });
   }
+
+  // contrato de assinatura (com dados legais + flag de teste)
+  const trialEnabled = input.trialEnabled !== false; // default: com teste
+  const now = new Date();
+  const trialEnds = new Date(now.getTime() + (trialEnabled ? 15 * 24 * 60 * 60 * 1000 : 0));
+  const c = input.contract ?? {};
+  const clean = (s?: string) => (s && s.trim() ? s.trim() : null);
+  await admin.from("tenant_contracts").upsert(
+    {
+      tenant_id: tenant.id,
+      plan: input.plan,
+      trial_enabled: trialEnabled,
+      trial_started_at: now.toISOString(),
+      trial_ends_at: trialEnds.toISOString(),
+      status: "PENDING",
+      legal_name: clean(c.legalName),
+      trade_name: clean(c.tradeName) ?? name,
+      doc_type: clean(c.docType),
+      doc_number: clean(c.docNumber),
+      responsible_name: clean(c.responsibleName) ?? clean(input.adminName),
+      responsible_cpf: clean(c.responsibleCpf),
+      address_street: clean(c.addressStreet),
+      address_city: clean(c.addressCity),
+      address_state: clean(c.addressState),
+      address_zip: clean(c.addressZip),
+      contact_email: adminEmail,
+      contact_phone: phone ?? null,
+    },
+    { onConflict: "tenant_id" }
+  );
 
   // 2) usuário admin (o trigger cria client+membership no tenant novo via tenant_subdomain)
   const password = tempPassword();

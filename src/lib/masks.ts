@@ -31,6 +31,38 @@ export function brlInputFromNumber(n: number | string | null | undefined): strin
   return maskBRL(String(Math.round(num * 100)));
 }
 
+/** CPF: 000.000.000-00 */
+export function maskCPF(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  let out = d.slice(0, 3);
+  if (d.length > 3) out += "." + d.slice(3, 6);
+  if (d.length > 6) out += "." + d.slice(6, 9);
+  if (d.length > 9) out += "-" + d.slice(9, 11);
+  return out;
+}
+
+/** CNPJ: 00.000.000/0000-00 */
+export function maskCNPJ(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 14);
+  let out = d.slice(0, 2);
+  if (d.length > 2) out += "." + d.slice(2, 5);
+  if (d.length > 5) out += "." + d.slice(5, 8);
+  if (d.length > 8) out += "/" + d.slice(8, 12);
+  if (d.length > 12) out += "-" + d.slice(12, 14);
+  return out;
+}
+
+/** CEP: 00000-000 */
+export function maskCEP(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 8);
+  return d.length > 5 ? d.slice(0, 5) + "-" + d.slice(5, 8) : d;
+}
+
+/** UF: 2 letras maiúsculas. */
+export function maskUF(value: string): string {
+  return value.replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase();
+}
+
 /** Telefone brasileiro: (XX) XXXXX-XXXX (aceita fixo de 10 dígitos também). */
 export function maskPhoneBR(value: string): string {
   let d = value.replace(/\D/g, "");

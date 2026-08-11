@@ -5,8 +5,9 @@ import Link from "next/link";
 import { ArrowLeft, Check, Copy, MessageCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { createTenant } from "@/features/platform/actions";
-import { maskPhoneBR } from "@/lib/masks";
+import { maskPhoneBR, maskCPF, maskCNPJ, maskCEP, maskUF } from "@/lib/masks";
 
 const PLANS: { key: string; label: string }[] = [
   { key: "personal", label: "Personal" },
@@ -42,6 +43,17 @@ export default function OnboardingPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminName, setAdminName] = useState("");
   const [phone, setPhone] = useState("");
+  const [trialEnabled, setTrialEnabled] = useState(true);
+  // Dados do contrato (ASSINANTE)
+  const [docType, setDocType] = useState<"CNPJ" | "CPF">("CNPJ");
+  const [docNumber, setDocNumber] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [respName, setRespName] = useState("");
+  const [respCpf, setRespCpf] = useState("");
+  const [addrStreet, setAddrStreet] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrState, setAddrState] = useState("");
+  const [addrZip, setAddrZip] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -55,7 +67,27 @@ export default function OnboardingPage() {
   function submit() {
     setError(null);
     startTransition(async () => {
-      const res = await createTenant({ name, subdomain, plan, adminEmail, adminName, phone });
+      const res = await createTenant({
+        name,
+        subdomain,
+        plan,
+        adminEmail,
+        adminName,
+        phone,
+        trialEnabled,
+        contract: {
+          legalName,
+          tradeName: name,
+          docType,
+          docNumber,
+          responsibleName: respName || adminName,
+          responsibleCpf: respCpf,
+          addressStreet: addrStreet,
+          addressCity: addrCity,
+          addressState: addrState,
+          addressZip: addrZip,
+        },
+      });
       if (res.ok) {
         setResult({
           adminLoginUrl: res.adminLoginUrl,
@@ -83,6 +115,16 @@ export default function OnboardingPage() {
     setAdminEmail("");
     setAdminName("");
     setPhone("");
+    setTrialEnabled(true);
+    setDocType("CNPJ");
+    setDocNumber("");
+    setLegalName("");
+    setRespName("");
+    setRespCpf("");
+    setAddrStreet("");
+    setAddrCity("");
+    setAddrState("");
+    setAddrZip("");
   }
 
   if (result) {
@@ -199,6 +241,84 @@ export default function OnboardingPage() {
       <div className="flex flex-col gap-1.5">
         <Label>Telefone / WhatsApp da barbearia (opcional)</Label>
         <Input value={phone} onChange={(e) => setPhone(maskPhoneBR(e.target.value))} inputMode="tel" maxLength={15} placeholder="(11) 99999-9999" />
+      </div>
+
+      {/* Período de teste */}
+      <div className="flex items-center justify-between rounded-md border border-border bg-inset px-4 py-3">
+        <div>
+          <div className="text-body font-semibold text-text">Adicionar 15 dias de teste</div>
+          <div className="text-caption text-text-muted">
+            {trialEnabled ? "A barbearia começa no período gratuito." : "Sem teste — contrato pendente já no 1º acesso."}
+          </div>
+        </div>
+        <Switch defaultChecked={trialEnabled} onChange={setTrialEnabled} />
+      </div>
+
+      {/* Dados do contrato (ASSINANTE) */}
+      <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
+        <div className="text-overline uppercase text-text-muted">Dados do contrato</div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Documento</Label>
+          <div className="flex gap-2">
+            {(["CNPJ", "CPF"] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => {
+                  setDocType(d);
+                  setDocNumber("");
+                }}
+                className={`rounded-pill border px-4 py-1.5 text-caption transition-colors ${
+                  docType === d ? "border-2 border-accent bg-accent-wash text-accent" : "border-border text-text-2 hover:border-accent"
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          <Input
+            value={docNumber}
+            onChange={(e) => setDocNumber(docType === "CNPJ" ? maskCNPJ(e.target.value) : maskCPF(e.target.value))}
+            inputMode="numeric"
+            placeholder={docType === "CNPJ" ? "00.000.000/0000-00" : "000.000.000-00"}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Razão social (opcional)</Label>
+          <Input value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="Nome empresarial" />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label>Responsável legal</Label>
+            <Input value={respName} onChange={(e) => setRespName(e.target.value)} placeholder="Nome do responsável" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>CPF do responsável</Label>
+            <Input value={respCpf} onChange={(e) => setRespCpf(maskCPF(e.target.value))} inputMode="numeric" placeholder="000.000.000-00" />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Endereço</Label>
+          <Input value={addrStreet} onChange={(e) => setAddrStreet(e.target.value)} placeholder="Rua, número, bairro" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_80px_120px]">
+          <div className="flex flex-col gap-1.5">
+            <Label>Cidade</Label>
+            <Input value={addrCity} onChange={(e) => setAddrCity(e.target.value)} placeholder="Cidade" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>UF</Label>
+            <Input value={addrState} onChange={(e) => setAddrState(maskUF(e.target.value))} placeholder="RJ" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>CEP</Label>
+            <Input value={addrZip} onChange={(e) => setAddrZip(maskCEP(e.target.value))} inputMode="numeric" placeholder="00000-000" />
+          </div>
+        </div>
       </div>
 
       {error && <p className="text-caption text-danger">{error}</p>}

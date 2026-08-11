@@ -7,6 +7,9 @@ import { KpiCard } from "@/components/kpi-card";
 import { BarChart } from "@/features/platform/components/bar-chart";
 import { EnterAdminButton } from "@/features/platform/components/enter-admin-button";
 import { getTenantDetail } from "@/features/platform/data";
+import { getTenantContractById } from "@/features/contract/data";
+import { buildContractView, PLAN_LABEL as CONTRACT_PLAN_LABEL } from "@/features/contract/view";
+import { MasterContractPanel } from "@/features/contract/components/master-contract-panel";
 import { formatBRL } from "@/lib/utils";
 
 const PLAN_LABEL: Record<string, string> = {
@@ -17,8 +20,9 @@ const PLAN_LABEL: Record<string, string> = {
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const t = await getTenantDetail(id);
+  const [t, contract] = await Promise.all([getTenantDetail(id), getTenantContractById(id)]);
   if (!t) notFound();
+  const contractView = buildContractView(contract);
 
   return (
     <div className="flex flex-col gap-6">
@@ -143,6 +147,26 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           </Table>
         )}
       </Section>
+
+      {contractView && (
+        <MasterContractPanel
+          tenantId={t.id}
+          view={contractView}
+          planLabel={contract?.plan ? CONTRACT_PLAN_LABEL[contract.plan] ?? contract.plan : null}
+          initial={{
+            legalName: contract?.legal_name ?? "",
+            tradeName: contract?.trade_name ?? t.name,
+            docType: (contract?.doc_type as "CNPJ" | "CPF") ?? "CNPJ",
+            docNumber: contract?.doc_number ?? "",
+            responsibleName: contract?.responsible_name ?? "",
+            responsibleCpf: contract?.responsible_cpf ?? "",
+            addressStreet: contract?.address_street ?? "",
+            addressCity: contract?.address_city ?? "",
+            addressState: contract?.address_state ?? "",
+            addressZip: contract?.address_zip ?? "",
+          }}
+        />
+      )}
     </div>
   );
 }
