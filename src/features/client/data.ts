@@ -169,7 +169,7 @@ export async function getProducts() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("products")
-    .select("id, name, price_brl")
+    .select("id, name, price_brl, image_url, stock")
     .eq("active", true)
     .order("name");
   return data ?? [];

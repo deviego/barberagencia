@@ -2,19 +2,20 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, Image as ImageIcon, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { ConfirmModal } from "@/components/ui/modal";
+import { ImageUpload } from "@/components/image-upload";
 import { ClientDetail } from "@/features/admin/components/client-detail";
 import { formatBRL, cn } from "@/lib/utils";
 import { maskBRL, brlInputFromNumber, maskPhoneBR } from "@/lib/masks";
 import { saveRow, deleteRow } from "@/features/admin/crud-actions";
 
-type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "clientStatusBadge" | "childrenBadge" | "childService" | "planMode";
+type ColFormat = "text" | "price" | "minutes" | "stock" | "activeBadge" | "clientStatusBadge" | "childrenBadge" | "childService" | "planMode" | "image";
 export interface CrudColumn {
   key: string;
   label: string;
@@ -60,6 +61,15 @@ function renderCell(col: CrudColumn, row: Row) {
       return v ? <Badge variant="accent">Infantil</Badge> : <span className="text-text-muted">—</span>;
     case "planMode":
       return v === "FIXED" ? <Badge variant="warning">Fixo</Badge> : <Badge variant="neutral">Livre</Badge>;
+    case "image":
+      return v ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={String(v)} alt="" className="h-10 w-10 rounded-md border border-border object-cover" />
+      ) : (
+        <span className="flex h-10 w-10 items-center justify-center rounded-md border border-border-subtle bg-inset text-text-muted">
+          <ImageIcon size={16} />
+        </span>
+      );
     default:
       return <span>{v == null || v === "" ? "—" : String(v)}</span>;
   }
@@ -313,6 +323,20 @@ export function CrudTable({
           }}
         >
           {fields.map((f) => {
+            if (f.type === "image") {
+              return (
+                <div key={f.name} className="flex flex-col gap-1.5">
+                  <Label>{f.label}</Label>
+                  <ImageUpload
+                    key={`${editing === "new" ? "new" : editing?.id ?? "x"}-${f.name}`}
+                    bucket="products"
+                    folder="produtos"
+                    current={form[f.name] || null}
+                    onChange={(url) => setForm((s) => ({ ...s, [f.name]: url }))}
+                  />
+                </div>
+              );
+            }
             if (f.type === "switch") {
               return (
                 <div key={f.name} className="flex items-center justify-between">

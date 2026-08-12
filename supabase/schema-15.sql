@@ -50,7 +50,7 @@ begin
 
   select count(*) into v_count
     from public.barbers
-   where tenant_id = new.tenant_id and deleted_at is null and active = true;
+   where tenant_id = new.tenant_id and active = true;
 
   if v_count >= v_max then
     raise exception 'Limite de profissionais do plano atingido (%). Faça upgrade para adicionar mais.', v_max

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatBRL, cn } from "@/lib/utils";
 import { reserveProduct } from "@/features/client/actions";
 
-interface Product { id: string; name: string; price_brl: number }
+interface Product { id: string; name: string; price_brl: number; image_url?: string | null }
 
 export function ProdutosView({ products }: { products: Product[] }) {
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -68,8 +68,13 @@ export function ProdutosView({ products }: { products: Product[] }) {
                 qty > 0 ? "border-2 border-accent" : "border-border"
               )}
             >
-              <div className="flex h-16 items-center justify-center rounded-md bg-inset text-accent">
-                <Package size={28} />
+              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-inset text-accent">
+                {p.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
+                ) : (
+                  <Package size={28} />
+                )}
               </div>
               <div className="text-body font-semibold text-text">{p.name}</div>
               <div className="text-body font-bold text-accent tabular">{formatBRL(p.price_brl)}</div>

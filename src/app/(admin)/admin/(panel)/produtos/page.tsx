@@ -2,6 +2,7 @@ import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-tab
 import { getProducts } from "@/features/admin/data";
 
 const columns: CrudColumn[] = [
+  { key: "image_url", label: "Foto", format: "image" },
   { key: "name", label: "Produto" },
   { key: "sku", label: "SKU" },
   { key: "price_brl", label: "Preço", format: "price" },
@@ -20,6 +21,7 @@ export default async function ProdutosPage() {
       searchKeys={["name", "sku"]}
       columns={columns}
       fields={[
+        { name: "image_url", label: "Foto do produto", type: "image" },
         { name: "name", label: "Nome do produto" },
         { name: "sku", label: "SKU" },
         { name: "price_brl", label: "Preço (R$)", type: "currency" },

@@ -107,7 +107,6 @@ export async function getQueueBarbers(tenantId: string): Promise<{ id: string; n
     .eq("tenant_id", tenantId)
     .eq("active", true)
     .eq("accepts_queue", true)
-    .is("deleted_at", null)
     .order("name");
   return (data as { id: string; name: string }[] | null) ?? [];
 }
@@ -120,7 +119,6 @@ export async function getQueueServices(tenantId: string): Promise<{ id: string; 
     .select("id, name, price_brl")
     .eq("tenant_id", tenantId)
     .eq("active", true)
-    .is("deleted_at", null)
     .order("name");
   return ((data as any[]) ?? []).map((s) => ({ id: s.id, name: s.name, priceBrl: s.price_brl }));
 }

@@ -21,7 +21,7 @@ const SCHEMAS: Record<string, CrudSchema> = {
     path: "/admin/servicos",
   },
   products: {
-    fields: ["name", "sku", "price_brl", "cost_brl", "stock", "active"],
+    fields: ["name", "sku", "price_brl", "cost_brl", "stock", "image_url", "active"],
     numeric: ["price_brl", "cost_brl", "stock"],
     path: "/admin/produtos",
   },

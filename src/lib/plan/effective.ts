@@ -52,7 +52,7 @@ function monthStartISO(): string {
 }
 
 const LIMIT_COUNT: Record<NumericLimitKey, () => Promise<number>> = {
-  "professionals.limit": () => count("barbers", (q) => q.is("deleted_at", null).eq("active", true)),
+  "professionals.limit": () => count("barbers", (q) => q.eq("active", true)),
   "clients.limit": () => count("client_subscriptions", (q) => q.eq("status", "ACTIVE")),
   "admins.limit": () => count("memberships", (q) => q.eq("role", "UNIT_ADMIN")),
   "appointments.monthly": () =>
