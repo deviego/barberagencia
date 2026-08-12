@@ -232,7 +232,7 @@ export async function assignComboToClient(clientId: string, comboPlanId: string)
 export async function activateFixedPlan(
   clientId: string,
   comboPlanId: string,
-  slot: { weekday: number; startMin: number; barberId: string; serviceId: string }
+  slot: { weekday: number; startMin: number; barberId: string }
 ) {
   const gate = await guardNewSubscriber(clientId);
   if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
@@ -243,7 +243,7 @@ export async function activateFixedPlan(
     p_weekday: slot.weekday,
     p_start_min: slot.startMin,
     p_barber_id: slot.barberId,
-    p_service_id: slot.serviceId,
+    p_service_id: null, // serviço vem do plano (combo_plans.service_id)
   });
   if (error) return { ok: false as const, error: error.message };
   try {
@@ -562,7 +562,7 @@ export async function approvePlanRequest(id: string) {
 /** Aprova um pedido de assinatura de plano FIXO, definindo o slot (dia/hora/barbeiro/serviço). */
 export async function approveFixedPlanRequest(
   id: string,
-  slot: { weekday: number; startMin: number; barberId: string; serviceId: string }
+  slot: { weekday: number; startMin: number; barberId: string }
 ) {
   const supabase = await createSupabaseServerClient();
   const { data: req } = await supabase
@@ -582,7 +582,7 @@ export async function approveFixedPlanRequest(
     p_weekday: slot.weekday,
     p_start_min: slot.startMin,
     p_barber_id: slot.barberId,
-    p_service_id: slot.serviceId,
+    p_service_id: null, // serviço vem do plano (combo_plans.service_id)
   });
   if (error) return { ok: false as const, error: error.message };
   try {

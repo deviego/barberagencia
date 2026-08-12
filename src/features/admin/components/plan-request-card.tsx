@@ -35,7 +35,7 @@ export function PlanRequestCard({ req, barbers = [], services = [] }: { req: Pla
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [slotOpen, setSlotOpen] = useState(false);
-  const [slot, setSlot] = useState<FixedSlot>({ weekday: 1, time: "09:00", barberId: "", serviceId: "" });
+  const [slot, setSlot] = useState<FixedSlot>({ weekday: 1, time: "09:00", barberId: "" });
   const [error, setError] = useState<string | null>(null);
 
   const client = one(req.clients as { name: string }[] | { name: string });
@@ -62,8 +62,8 @@ export function PlanRequestCard({ req, barbers = [], services = [] }: { req: Pla
 
   function confirmFixed() {
     setError(null);
-    if (!slot.barberId || !slot.serviceId || !slot.time) {
-      setError("Defina dia, horário, barbeiro e serviço.");
+    if (!slot.barberId || !slot.time) {
+      setError("Defina dia, horário e barbeiro.");
       return;
     }
     startTransition(async () => {
@@ -71,7 +71,6 @@ export function PlanRequestCard({ req, barbers = [], services = [] }: { req: Pla
         weekday: slot.weekday,
         startMin: timeToMin(slot.time),
         barberId: slot.barberId,
-        serviceId: slot.serviceId,
       });
       if (res.ok) {
         setSlotOpen(false);
@@ -135,7 +134,7 @@ export function PlanRequestCard({ req, barbers = [], services = [] }: { req: Pla
         }
       >
         <div className="flex flex-col gap-4">
-          <FixedSlotFields barbers={barbers} services={services} value={slot} onChange={setSlot} />
+          <FixedSlotFields barbers={barbers} value={slot} onChange={setSlot} />
           {error && <p className="text-caption text-danger">{error}</p>}
         </div>
       </Drawer>

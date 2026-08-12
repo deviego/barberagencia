@@ -32,7 +32,7 @@ export function AssignCombo({
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState("");
   const [comboId, setComboId] = useState("");
-  const [slot, setSlot] = useState<FixedSlot>({ weekday: 1, time: "09:00", barberId: "", serviceId: "" });
+  const [slot, setSlot] = useState<FixedSlot>({ weekday: 1, time: "09:00", barberId: "" });
   const [pending, startTransition] = useTransition();
   const [ok, setOk] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +43,8 @@ export function AssignCombo({
   function submit() {
     setError(null);
     if (!clientId || !comboId) return;
-    if (isFixed && (!slot.barberId || !slot.serviceId || !slot.time)) {
-      setError("Defina dia, horário, barbeiro e serviço.");
+    if (isFixed && (!slot.barberId || !slot.time)) {
+      setError("Defina dia, horário e barbeiro.");
       return;
     }
     startTransition(async () => {
@@ -53,7 +53,6 @@ export function AssignCombo({
             weekday: slot.weekday,
             startMin: timeToMin(slot.time),
             barberId: slot.barberId,
-            serviceId: slot.serviceId,
           })
         : await assignComboToClient(clientId, comboId);
       if (res.ok) {
@@ -119,7 +118,7 @@ export function AssignCombo({
           </div>
 
           {isFixed ? (
-            <FixedSlotFields barbers={barbers} services={services} value={slot} onChange={setSlot} />
+            <FixedSlotFields barbers={barbers} value={slot} onChange={setSlot} />
           ) : (
             <p className="text-caption text-text-muted">O saldo de cortes é definido pelo combo. Pagamento no local.</p>
           )}

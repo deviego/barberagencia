@@ -65,6 +65,15 @@ export default async function ServicosAdminPage() {
                 { value: "FIXED", label: "Fixo — dia/horário/barbeiro fixos toda semana" },
               ],
             },
+            {
+              name: "service_id",
+              label: "Serviço do plano (usado no plano fixo)",
+              type: "select",
+              options: [
+                { value: "", label: "— (nenhum)" },
+                ...services.map((s) => ({ value: (s as { id: string }).id, label: (s as { name: string }).name })),
+              ],
+            },
             { name: "forfeit_on_noshow", label: "Fixo: perde o corte em caso de falta", type: "switch" },
           ]}
         />

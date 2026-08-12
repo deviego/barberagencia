@@ -26,7 +26,7 @@ const SCHEMAS: Record<string, CrudSchema> = {
     path: "/admin/produtos",
   },
   combo_plans: {
-    fields: ["name", "cuts", "scope", "price_brl", "booking_mode", "forfeit_on_noshow", "active"],
+    fields: ["name", "cuts", "scope", "price_brl", "booking_mode", "service_id", "forfeit_on_noshow", "active"],
     numeric: ["cuts", "price_brl"],
     boolean: ["forfeit_on_noshow"],
     path: "/admin/servicos",
@@ -50,6 +50,8 @@ export async function saveRow(table: string, id: string | null, values: Record<s
       else v = Number(v);
     } else if (schema.boolean?.includes(f)) {
       v = v === true || v === "true" || v === "on" || v === "1";
+    } else if (f.endsWith("_id") && (v === "" || v == null)) {
+      v = null; // FK opcional: string vazia vira null
     }
     payload[f] = v;
   }

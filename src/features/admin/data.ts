@@ -167,7 +167,7 @@ export async function getComboPlans() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("combo_plans")
-    .select("id, name, cuts, scope, price_brl, booking_mode, forfeit_on_noshow, active")
+    .select("id, name, cuts, scope, price_brl, booking_mode, service_id, forfeit_on_noshow, active")
     .order("name");
   return data ?? [];
 }
