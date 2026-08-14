@@ -123,12 +123,66 @@ export async function getQueueServices(tenantId: string): Promise<{ id: string; 
   return ((data as any[]) ?? []).map((s) => ({ id: s.id, name: s.name, priceBrl: s.price_brl }));
 }
 
-/** Config da fila do tenant (flag de escolher barbeiro). */
-export async function getQueueConfig(tenantId: string): Promise<{ pickBarber: boolean; enabled: boolean }> {
+/** Config da fila do tenant (flag de escolher barbeiro + modo). */
+export async function getQueueConfig(
+  tenantId: string
+): Promise<{ pickBarber: boolean; enabled: boolean; mode: "TOTEM" | "APP" | "BOTH"; planRequiresService: boolean }> {
   const admin = createSupabaseAdminClient();
   const [{ data: t }, { data: s }] = await Promise.all([
     admin.from("tenants").select("queue_enabled").eq("id", tenantId).maybeSingle(),
-    admin.from("tenant_settings").select("queue_pick_barber").eq("tenant_id", tenantId).maybeSingle(),
+    admin.from("tenant_settings").select("queue_pick_barber, queue_mode, queue_plan_requires_service").eq("tenant_id", tenantId).maybeSingle(),
   ]);
-  return { enabled: Boolean(t?.queue_enabled), pickBarber: Boolean(s?.queue_pick_barber) };
+  return {
+    enabled: Boolean(t?.queue_enabled),
+    pickBarber: Boolean(s?.queue_pick_barber),
+    mode: ((s?.queue_mode as string) ?? "TOTEM") as "TOTEM" | "APP" | "BOTH",
+    planRequiresService: Boolean(s?.queue_plan_requires_service),
+  };
+}
+
+/** Token do totem do tenant (para montar o link nas Configurações). */
+export async function getTotemToken(tenantId: string): Promise<string | null> {
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin.from("tenants").select("totem_token").eq("id", tenantId).maybeSingle();
+  return (data?.totem_token as string) ?? null;
+}
+
+export type TotemData = {
+  tenantId: string;
+  name: string;
+  mode: "TOTEM" | "APP" | "BOTH";
+  pickBarber: boolean;
+  planRequiresService: boolean;
+  services: { id: string; name: string; priceBrl: number }[];
+  barbers: { id: string; name: string }[];
+};
+
+/** Dados do totem — valida o token secreto. Retorna null se inválido. */
+export async function getTotemData(slug: string, token: string): Promise<TotemData | null> {
+  if (!slug || !token) return null;
+  const admin = createSupabaseAdminClient();
+  const { data: t } = await admin
+    .from("tenants")
+    .select("id, name, queue_enabled, totem_token")
+    .eq("subdomain", slug)
+    .maybeSingle();
+  if (!t?.totem_token || t.totem_token !== token || !t.queue_enabled) return null;
+
+  const [{ data: s }, services, barbers] = await Promise.all([
+    admin.from("tenant_settings").select("queue_pick_barber, queue_mode, queue_plan_requires_service").eq("tenant_id", t.id).maybeSingle(),
+    getQueueServices(t.id as string),
+    getQueueBarbers(t.id as string),
+  ]);
+  const mode = ((s?.queue_mode as string) ?? "TOTEM") as "TOTEM" | "APP" | "BOTH";
+  if (mode === "APP") return null; // totem desativado neste modo
+  const pickBarber = Boolean(s?.queue_pick_barber);
+  return {
+    tenantId: t.id as string,
+    name: t.name as string,
+    mode,
+    pickBarber,
+    planRequiresService: Boolean(s?.queue_plan_requires_service),
+    services,
+    barbers: pickBarber ? barbers : [],
+  };
 }

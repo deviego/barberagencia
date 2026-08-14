@@ -23,6 +23,17 @@ export default async function ClientFilaPage() {
     );
   }
 
+  if (config.mode === "TOTEM") {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <h1 className="text-h4 font-bold text-text">Fila pelo totem</h1>
+        <p className="mt-2 text-body text-text-2">
+          Nesta barbearia, a senha é retirada no totem do balcão. É só chegar e pegar a sua senha por lá.
+        </p>
+      </div>
+    );
+  }
+
   const [ticket, board, services, barbers] = await Promise.all([
     getMyTicket(),
     getQueueBoard(tenant.id),

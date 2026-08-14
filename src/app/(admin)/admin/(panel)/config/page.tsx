@@ -10,8 +10,11 @@ import { buildContractView } from "@/features/contract/view";
 import { ContractSection } from "@/features/contract/components/contract-section";
 import { getPlanUsage } from "@/lib/plan/effective";
 import { PlanUsage } from "@/features/plan/components/plan-usage";
-import { getQueueConfig } from "@/features/queue/data";
+import QRCode from "qrcode";
+import { headers } from "next/headers";
+import { getQueueConfig, getTotemToken } from "@/features/queue/data";
 import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
+import { TotemConfig } from "@/features/queue/components/totem-config";
 
 export default async function ConfigPage() {
   const [tenant, branding, unit, contract, planUsage] = await Promise.all([
@@ -23,6 +26,19 @@ export default async function ConfigPage() {
   ]);
   const contractView = buildContractView(contract);
   const queueCfg = await getQueueConfig(tenant.id);
+
+  // Link + QR do totem (quando a fila está ativa).
+  let totem: { url: string; qr: string } | null = null;
+  if (queueCfg.enabled) {
+    const token = await getTotemToken(tenant.id);
+    if (token) {
+      const h = await headers();
+      const host = h.get("host") ?? "";
+      const proto = host.includes("localhost") ? "http" : "https";
+      const url = `${proto}://${host}/b/${tenant.subdomain}/totem?k=${token}`;
+      totem = { url, qr: await QRCode.toDataURL(url, { margin: 1, width: 220 }) };
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6" id="unidade">
@@ -53,6 +69,15 @@ export default async function ConfigPage() {
       </section>
 
       <WhatsAppConnect />
+
+      {queueCfg.enabled && totem && (
+        <TotemConfig
+          totemUrl={totem.url}
+          qrDataUrl={totem.qr}
+          mode={queueCfg.mode}
+          planRequiresService={queueCfg.planRequiresService}
+        />
+      )}
 
       {queueCfg.enabled && <PickBarberToggle enabled={queueCfg.pickBarber} />}
 
