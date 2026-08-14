@@ -11,9 +11,9 @@ import { setQueueMode, setQueuePlanRequiresService, regenerateTotemToken } from 
 type Mode = "TOTEM" | "APP" | "BOTH";
 
 const MODES: { key: Mode; label: string; desc: string }[] = [
-  { key: "TOTEM", label: "Totem", desc: "Senha pelo totem (identifica por telefone)" },
-  { key: "APP", label: "App / QR", desc: "Cliente pega a senha pelo próprio celular" },
-  { key: "BOTH", label: "Ambos", desc: "Totem e app disponíveis" },
+  { key: "APP", label: "App / QR", desc: "Padrão — cliente pega a senha pelo próprio celular" },
+  { key: "TOTEM", label: "Totem", desc: "Se você tem um totem no balcão (identifica por telefone)" },
+  { key: "BOTH", label: "Ambos", desc: "App e totem disponíveis" },
 ];
 
 /** Seção "Fila / Totem" nas Configurações do admin. */

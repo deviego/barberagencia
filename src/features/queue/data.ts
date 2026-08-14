@@ -135,7 +135,7 @@ export async function getQueueConfig(
   return {
     enabled: Boolean(t?.queue_enabled),
     pickBarber: Boolean(s?.queue_pick_barber),
-    mode: ((s?.queue_mode as string) ?? "TOTEM") as "TOTEM" | "APP" | "BOTH",
+    mode: ((s?.queue_mode as string) ?? "APP") as "TOTEM" | "APP" | "BOTH",
     planRequiresService: Boolean(s?.queue_plan_requires_service),
   };
 }
@@ -173,7 +173,7 @@ export async function getTotemData(slug: string, token: string): Promise<TotemDa
     getQueueServices(t.id as string),
     getQueueBarbers(t.id as string),
   ]);
-  const mode = ((s?.queue_mode as string) ?? "TOTEM") as "TOTEM" | "APP" | "BOTH";
+  const mode = ((s?.queue_mode as string) ?? "APP") as "TOTEM" | "APP" | "BOTH";
   if (mode === "APP") return null; // totem desativado neste modo
   const pickBarber = Boolean(s?.queue_pick_barber);
   return {
