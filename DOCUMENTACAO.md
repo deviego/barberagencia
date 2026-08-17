@@ -1,6 +1,6 @@
 # 📘 Documentação da Plataforma — Barbearia
 
-Manual funcional completo, separado em **App do Cliente** e **Painel do Admin**. Explica, passo a passo, tudo o que cada perfil consegue fazer.
+Manual funcional completo, separado em **App do Cliente**, **Painel do Admin** e **Recursos avançados** (fila/totem, planos & limites, contrato e painel master). Explica, passo a passo, tudo o que cada perfil consegue fazer.
 
 ---
 
@@ -50,9 +50,15 @@ Este documento é o **manual funcional** da plataforma da barbearia. Ele foi esc
 24. [Configurações](#24-configurações)
 25. [Avisos que o admin dispara](#25-avisos-que-o-admin-dispara)
 
+**PARTE 3 — RECURSOS AVANÇADOS**
+26. [Fila de atendimento (senha por ordem de chegada)](#26-fila-de-atendimento-senha-por-ordem-de-chegada)
+27. [Meu plano e limites](#27-meu-plano-e-limites)
+28. [Contrato de assinatura](#28-contrato-de-assinatura)
+29. [Painel Master (rede/plataforma)](#29-painel-master-redeplataforma)
+
 **ENCERRAMENTO**
-26. [Regras de negócio (resumo)](#26-regras-de-negócio-resumo)
-27. [Glossário](#27-glossário)
+30. [Regras de negócio (resumo)](#30-regras-de-negócio-resumo)
+31. [Glossário](#31-glossário)
 
 ---
 
@@ -69,6 +75,9 @@ Pontos importantes do modelo:
 - **Os avisos ao cliente são automáticos**, principalmente por **WhatsApp** (e e-mail em alguns casos): confirmação, início/fim de atendimento, item adicionado, assinatura, cancelamentos, etc.
 - Várias telas atualizam **em tempo real** (sem precisar recarregar): a fila de solicitações do admin e a tela de acompanhamento do cliente.
 - **Cada barbearia é isolada** (multi-tenant): o cliente entra pela barbearia por um **link próprio** (`/b/nome-da-barbearia`) e fica vinculado a ela; o admin logado só vê os dados da sua barbearia. O app do cliente vive em **`/client`** e o painel em **`/admin`** — dá para ficar logado como cliente numa aba e admin em outra ao mesmo tempo.
+- **Quatro perfis:** **Cliente**, **Admin da unidade** (`/admin`), **Rede/Franquia** (`/rede`) e **Admin Master** (`/master`, quem cria e administra todas as barbearias — ver seção 29).
+- **Plano e teste.** Cada barbearia assina um **plano** (Personal / Essencial / Advance) e começa com **15 dias de teste** (configurável). O plano define **limites e recursos** liberados (ver seção 27) e é formalizado por um **contrato** (ver seção 28).
+- **Rotas novas da fila:** `/b/nome/fila` (cliente pega senha pelo celular), `/b/nome/totem` (totem do balcão) e `/b/nome/painel` (painel de chamada em TV) — ver seção 26.
 
 ---
 
@@ -81,6 +90,9 @@ Antes dos detalhes, alguns conceitos que se repetem no documento:
 - **Pedido / Comanda.** Um agendamento é uma **comanda**: pode ter **vários itens** (serviços e produtos). Um item pode ser **coberto pelo plano** (não é cobrado) ou **avulso** (pago no local).
 - **Avulso × Coberto pelo plano.** O plano cobre **1 corte** por atendimento; serviços/produtos extras são **avulsos** e entram no total a pagar no local.
 - **Tempo real.** A fila de **Solicitações** do admin toca um som e atualiza sozinha quando chega algo novo; a **tela de confirmação** do cliente muda sozinha quando o admin decide.
+- **Teste de 15 dias.** Barbearia nova entra em período de teste; nele **tudo fica liberado**. Ao terminar, valem os **limites/recursos do plano** e é preciso **aceitar o contrato** (seções 27 e 28).
+- **Fila (senha) × Solicitações.** Não confundir: **Solicitações** é a fila de aprovações (agendamentos/planos); **Fila** (seção 26) é a **senha por ordem de chegada** de quem chega na barbearia (walk-in).
+- **Totem.** Dispositivo no balcão que o cliente usa para **pegar a senha** informando o telefone (e se cadastrar na hora), com **impressão** da senha. É opcional (seção 26).
 
 ---
 
@@ -221,7 +233,7 @@ A aba **Pedidos** reúne **todos** os pedidos do cliente (futuros, em atendiment
 Catálogo de produtos da barbearia (cremes, bálsamos, etc.).
 
 ### Como usar
-1. Ver os produtos com preço.
+1. Ver os produtos com **foto** e preço (quando a barbearia cadastra a imagem do produto — seção 19).
 2. Tocar em **Solicitar/Reservar** e escolher a **quantidade** para **retirada no local**.
 3. A reserva fica registrada; o cliente acompanha o status (aguardando retirada / retirado / cancelado).
 
@@ -264,6 +276,7 @@ Os avisos são enviados **automaticamente** (WhatsApp e, em alguns casos, e-mail
 - **Atendimento finalizado** — agradecimento, lista de serviços/adicionais e **total pago**.
 - **Assinatura** — solicitação recebida, **confirmação** (plano ativo) e **recusa** (quando não aprovada).
 - **Cancelamentos** — assinatura, agendamento ou reserva de produto cancelados.
+- **Boas-vindas** — ao ser **cadastrado** pela barbearia (por convite ou pelo **totem** — seção 26), com link para ativar o app.
 
 > 💡 **Observação:** quando o pedido é para uma **criança**, as mensagens de solicitação e confirmação incluem o **nome da criança**.
 
@@ -377,10 +390,15 @@ Onde a barbearia gerencia o **catálogo de serviços** e os **planos (combos)**.
 - O switch **Serviço infantil** é o que faz aquele serviço, ao ser escolhido no app, pedir a **seleção/registro da criança** (seção 5). Na lista, esses serviços aparecem com o selo **"Infantil"**.
 
 ### Planos (combos)
-- **Criar/editar/inativar** planos com: **nome, cortes por mês, escopo/benefícios e preço**.
+- **Criar/editar/inativar** planos com: **nome, cortes por mês, escopo/benefícios, preço**, **modo de agendamento** e **serviço do plano**.
 - O texto de **escopo** é o que vira a lista de **benefícios** exibida ao cliente (adesão, desconto em produtos, etc.).
+- **Modo de agendamento:**
+  - **Livre (flexível)** — o assinante marca em qualquer horário disponível, gastando o saldo de cortes.
+  - **Fixo** — o cliente tem **dia, horário e barbeiro fixos toda semana** e o sistema **já reserva os cortes** automaticamente.
+- **Serviço do plano** — define **qual serviço** o plano reserva/inclui. Com isso, ao **ativar/aprovar um plano fixo** o admin informa só **dia, horário e barbeiro** — o serviço já vem do plano (não é preciso escolher de novo). Planos **flexíveis** não pedem serviço na aprovação.
 
 > 💡 **Observação:** preços usam **máscara de moeda** (R$) e são salvos corretamente.
+> 💡 A **disponibilidade** de cada plano depende do limite de **mensalistas** do seu plano SaaS (seção 27).
 
 ---
 
@@ -390,7 +408,8 @@ Onde a barbearia gerencia o **catálogo de serviços** e os **planos (combos)**.
 Catálogo de produtos para venda/retirada.
 
 ### Como usar
-- **Criar/editar/inativar** produtos com **preço, custo e estoque**.
+- **Criar/editar/inativar** produtos com **foto, preço, custo e estoque**.
+- **Foto do produto** — no cadastro/edição há uma área de **upload de imagem**: envie a foto e ela é salva na hora; aparece como **miniatura** na lista do admin e como **imagem do produto** para o cliente (seção 8).
 - Os produtos aparecem para o cliente reservar (seção 8) e podem ser lançados nas comandas.
 
 ---
@@ -447,11 +466,15 @@ Modelos de mensagens de **WhatsApp** prontos para uso manual.
 ## 24. Configurações
 
 ### O que é
-Dados e identidade visual da barbearia.
+Central de ajustes da barbearia: dados, identidade visual, WhatsApp, plano, contrato e fila.
 
 ### Como usar
-- Ajustar **dados da unidade** e **horários**.
+- **Dados da unidade** — nome, telefone, endereço e **horários**.
 - **Identidade visual (branding)** — logo e cor de destaque da barbearia.
+- **WhatsApp** — **Conectar** o número da barbearia lendo um **QR Code** (aparelho vinculado). Depois de conectado, os avisos automáticos (seção 25) saem por esse número. É possível **desconectar** e reconectar.
+- **Meu plano** — uso × limites do plano, recursos incluídos/bloqueados e botão **Fazer upgrade** (ver seção 27).
+- **Contrato** — ler o contrato de assinatura, ver o status (pendente/assinado) e **assinar** (ver seção 28).
+- **Fila / Totem** (quando a fila está ativa) — escolher o **modo da fila** (App/QR · Totem · Ambos), o toggle **"cliente de plano também escolhe serviço"**, o toggle **"cliente escolhe o barbeiro"** e o **link + QR do totem** (com opção de regenerar). Ver seção 26.
 
 ---
 
@@ -473,9 +496,105 @@ Todos os envios ficam **registrados** internamente (log de notificações), com 
 
 ---
 
+# PARTE 3 — RECURSOS AVANÇADOS
+
+## 26. Fila de atendimento (senha por ordem de chegada)
+
+### O que é
+A **fila de walk-in**: quem chega na barbearia **sem agendamento** pega uma **senha por ordem de chegada**. É diferente da fila de **Solicitações** (seção 14), que é a aprovação de agendamentos/planos. A Fila é um **recurso de plano** (Essencial/Advance) e precisa ser **ativada** para a barbearia (o Master liga — ver seção 29).
+
+### Modo da fila (definido em Configurações)
+- **App / QR** (padrão) — o cliente pega a senha pelo **próprio celular**.
+- **Totem** — o cliente pega a senha no **totem do balcão**.
+- **Ambos** — os dois disponíveis.
+
+### Cliente pelo App/QR
+1. O cliente escaneia o **QR** (ou abre `/b/nome/fila`) e entra na fila.
+2. Vê **a sua senha** e a **senha em atendimento no momento** — inclusive na **Home** do app.
+3. Escolhe o **serviço** e, se a barbearia permitir, o **barbeiro**.
+
+### Cliente pelo Totem
+Tela em **tela cheia** no dispositivo da barbearia (abre por um **link secreto** — seção 24/29):
+1. Toca em **Pegar senha** e digita o **telefone** (teclado na tela).
+2. **Se já é cliente** — o totem identifica se ele tem **plano** (mostra o selo). Com plano e a opção "plano escolhe serviço" **desligada**, vai direto para a senha; senão, escolhe o serviço.
+3. **Se ainda não é cliente daquela barbearia** — abre o **cadastro rápido** (telefone já preenchido → **nome + data de nascimento**), cria o cliente e envia **boas-vindas no WhatsApp** com link do app; depois escolhe o serviço.
+4. A **senha aparece em tela cheia** e é **impressa** automaticamente (impressora do totem). "Nova senha" reinicia para o próximo.
+
+### Admin — aba Fila
+- Lista as senhas **por ordem de chegada** (aguardando / em atendimento), atualizando em tempo real.
+- Ações por senha: **Chamar**, **Iniciar atendimento** (vira uma **comanda/pedido** normal — seção 16), **Concluir** e **Remover** (não veio/desistiu).
+- Traz o **QR do totem** e o link do **painel de chamada**.
+
+### Painel de chamada (TV)
+- `/b/nome/painel` — tela **pública** para um monitor/TV, mostrando as **senhas em atendimento** e as **próximas**, atualizando sozinha.
+
+> 💡 A fila reinicia a numeração **por dia**. A senha do cliente e a "senha atual" também aparecem na Home do app.
+
+---
+
+## 27. Meu plano e limites
+
+### O que é
+Cada barbearia assina um **plano da plataforma** — **Personal**, **Essencial** ou **Advance** — que define **limites numéricos** e **recursos liberados**. Durante o **teste de 15 dias**, **tudo fica liberado**; quando o teste termina, passam a valer os limites/recursos do plano.
+
+### Limites por plano
+| Recurso | Personal | Essencial | Advance |
+|---|---|---|---|
+| Profissionais (barbeiros) | 3 | 5 | 8 |
+| Clientes mensalistas | 20 | 90 | Ilimitado |
+| Agendamentos por mês | 300 | 1.500 | 3.000 |
+| Administradores | 1 | 3 | 4 |
+| Campanhas de marketing | — | ✓ | ✓ |
+| **Fila (QR/totem)** | — | ✓ | ✓ |
+| Bot IA / recuperação / display de produtos | — | ✓ | ✓ |
+| Nota fiscal / venda direta / gateway (API) | — | — | ✓ |
+
+### Seção "Meu plano" (em Configurações)
+- Mostra o **plano atual**, o **uso × limite** de cada recurso (barras) e a **lista de recursos não incluídos**.
+- Botão **Fazer upgrade** → envia uma **solicitação ao Master** (a barbearia não troca sozinha; o Master aprova — seção 29).
+
+### O que acontece ao atingir um limite
+- Ações que passariam do limite (ex.: cadastrar o 4º barbeiro no Personal, ou o agendamento além do teto do mês) são **bloqueadas** com um aviso e o **CTA de upgrade**.
+- Recursos fora do plano aparecem **bloqueados** (cadeado) com a indicação do **plano necessário**.
+
+> 💡 Nada disso vale durante o **teste de 15 dias** — nele a barbearia usa tudo à vontade.
+
+---
+
+## 28. Contrato de assinatura
+
+### O que é
+O **contrato de prestação de serviços e assinatura** entre a barbearia (**ASSINANTE**) e a **Barber Agência**. Ele é preenchido com os dados da barbearia e **aceito digitalmente** dentro da plataforma (**assinatura eletrônica**, nos termos do Art. 10, §2º da MP 2.200-2/2001).
+
+### Como funciona
+- Barbearia nova entra com **15 dias de teste** (o Master pode criar **sem teste**, se quiser).
+- Durante o teste, aparece um **aviso** com a contagem regressiva.
+- **Quando o teste termina**, ao acessar o painel aparece um **modal com o contrato** para o admin **ler e aceitar** ("Li e aceito os Termos de Uso e Contrato de Assinatura"). O modal **pode ser fechado**, mas reaparece nos próximos acessos até ser assinado.
+- Em **Configurações → Contrato**, o admin pode **ler o contrato completo**, ver o **status** (pendente/assinado), **assinar** e **imprimir**.
+- Ao assinar, ficam registrados **data, IP, nome, versão do contrato e uma "impressão digital"** do texto (prova da assinatura).
+
+> 💡 A **cobrança** é feita manualmente (fora do app). O contrato apenas **formaliza** a relação e libera o uso após o teste.
+
+---
+
+## 29. Painel Master (rede/plataforma)
+
+### O que é
+Área de quem administra **todas as barbearias** da plataforma (perfil **Master**, em `/master`). É por aqui que novas barbearias são criadas e acompanhadas.
+
+### O que permite
+- **Criar barbearia** — nome, slug (link `/b/...`), **plano**, e-mail do admin, telefone e os **dados legais do contrato** (razão social, CNPJ/CPF, responsável + CPF, endereço). Toggles na criação: **adicionar 15 dias de teste** e **habilitar a Fila**. Ao criar, o sistema mostra o **link de acesso + credenciais** do admin.
+- **Ver todas as barbearias** com **faturamento** e contadores (clientes, serviços, produtos, assinantes).
+- **Contrato por barbearia** — status, dados legais editáveis e o documento completo (seção 28).
+- **Plano & upgrades** — trocar o **plano** da barbearia e **aprovar/recusar** as solicitações de upgrade (seção 27).
+- **Fila** — **ativar/desativar** a fila da barbearia.
+- **Acessar o painel admin** de qualquer barbearia (atuar como aquela unidade) sem precisar de outra senha.
+
+---
+
 # ENCERRAMENTO
 
-## 26. Regras de negócio (resumo)
+## 30. Regras de negócio (resumo)
 
 - **Solicitação de agendamento expira em 10 minutos** se o admin não responder (o horário é liberado).
 - **Saldo de cortes**: agendar pelo plano **consome 1 corte**; **cancelar devolve** o corte ao saldo. Renova no dia de cobrança.
@@ -487,17 +606,24 @@ Todos os envios ficam **registrados** internamente (log de notificações), com 
 
 ---
 
-## 27. Glossário
+## 31. Glossário
 
 - **Solicitação** — pedido (de agendamento ou de plano) que aguarda aprovação do admin.
+- **Fila / Senha** — ordem de chegada de quem chega na barbearia sem agendamento (walk-in); cada um recebe uma **senha** (seção 26). Não confundir com **Solicitações**.
+- **Totem** — dispositivo no balcão onde o cliente pega a senha informando o telefone (e se cadastra na hora), com impressão da senha.
 - **Comanda / Pedido** — um agendamento com um ou mais itens (serviços e produtos).
 - **Avulso** — item pago no local, fora do plano.
 - **Coberto pelo plano** — item incluído no plano (não cobrado); consome saldo.
 - **Adesão** — valor da 1ª mensalidade do plano.
 - **Saldo (de cortes)** — quantidade de cortes disponíveis no mês para o assinante.
+- **Plano fixo** — plano com dia/horário/barbeiro fixos toda semana; o sistema já reserva os cortes.
 - **No-show** — falta sem aviso prévio.
 - **Assinante** — cliente com plano ativo.
-- **Entitlement** — recurso do painel liberado conforme o plano contratado pela barbearia (ex.: Marketing).
+- **Plano SaaS** — plano da barbearia na plataforma (Personal/Essencial/Advance) que define limites e recursos (seção 27).
+- **Teste (15 dias)** — período inicial da barbearia em que tudo fica liberado; ao fim, valem os limites do plano e é preciso assinar o contrato.
+- **Contrato** — termo de assinatura entre a barbearia e a Barber Agência, aceito digitalmente (seção 28).
+- **Entitlement** — recurso do painel liberado conforme o plano contratado pela barbearia (ex.: Marketing, Fila).
+- **Master** — perfil que administra todas as barbearias da plataforma (seção 29).
 
 ---
 

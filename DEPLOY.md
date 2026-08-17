@@ -21,6 +21,10 @@ Marque para **Production, Preview e Development**.
 | `DIRECT_URL` | connection string do **Session Pooler** (porta 5432) — para migrations |
 | `NEXT_PUBLIC_APP_DOMAIN` | `barber.app` (ou o domínio base dos subdomínios de tenant) |
 | `NEXT_PUBLIC_MASTER_HOST` | `admin.barber.app` (host do painel da plataforma) |
+| `WA_SERVICE_URL` | URL pública do **gateway de WhatsApp** (ex.: `https://wa-gateway-production-3785.up.railway.app`) |
+| `WA_SERVICE_TOKEN` | segredo compartilhado com o gateway (mesmo valor nos dois lados) |
+| `RESEND_API_KEY` | chave do **Resend** (e-mails). Sem ela, e-mails são apenas "pulados" |
+| `NOTIFICATIONS_FROM` | remetente verificado no Resend (ex.: `Barber Agência <no-reply@barberagencia.com>`) |
 
 > A `NEXT_PUBLIC_SUPABASE_ANON_KEY` (publishable) é pública por design — pode ir no bundle.
 > Segredos (`SUPABASE_SERVICE_ROLE_KEY`, senha do banco) **nunca** entram no git; só nas env vars da Vercel.
@@ -37,8 +41,8 @@ DATABASE_URL="postgresql://postgres.tusfxbnnrypjtzqcvpov:SENHA@aws-0-<REGIÃO>.p
 DIRECT_URL="postgresql://postgres.tusfxbnnrypjtzqcvpov:SENHA@aws-0-<REGIÃO>.pooler.supabase.com:5432/postgres"
 ```
 
-> O M0 ainda **não consulta o banco** (usa tenant de referência), então o deploy sobe e
-> funciona mesmo antes de o banco estar conectado. A conexão real passa a ser necessária no M2/M3.
+> O runtime usa **supabase-js (HTTPS/RLS)** — o `DATABASE_URL`/`DIRECT_URL` (Prisma) são usados
+> apenas para migrations/tipos. Para o app funcionar, basta o Supabase com as tabelas criadas (ver 3b).
 
 ## 3. Migrations (rodar localmente, uma vez que o pooler esteja configurado)
 ```bash
@@ -53,7 +57,11 @@ O runtime usa **supabase-js (HTTPS/RLS)**, então não precisa do pooler para fu
 1. Supabase → **SQL Editor** → **New query**.
 2. Cole e rode **`supabase/schema.sql`** (tabelas + RLS + trigger de onboarding + RPC).
 3. Cole e rode **`supabase/seed.sql`** (tenant "Barbearia Oliveira 01" + serviços/combos/barbeiros).
-4. Em **Authentication → Providers → Email**: para testar sem confirmar e-mail, desative "Confirm email" (ou confirme pelo link).
+4. Rode **em ordem** as demais migrações `supabase/schema-*.sql` — elas adicionam recursos ao longo do tempo:
+   - `schema-2..13` / `schema-*.sql` (RPCs de convite/agenda, comanda `appointment_items`, planos de horário fixo, Storage `avatars`, etc.);
+   - `schema-14` (contratos), `schema-15` (entitlements + limite de barbeiros), `schema-16` (fila), `schema-17` (foto de produto + bucket `products`), `schema-18` (serviço no plano fixo), `schema-19`/`schema-20` (fila modo Totem + padrão App).
+   > O script local `dbadmin.mjs` também aplica um arquivo `.sql` inteiro (`node dbadmin.mjs supabase/schema-XX.sql`).
+5. Em **Authentication → Providers → Email**: para testar sem confirmar e-mail, desative "Confirm email" (ou confirme pelo link).
 
 ### Criar um assinante de teste (saldo de cortes)
 Após um usuário se cadastrar (o trigger cria profile+client+membership CLIENT), rode no SQL Editor:
@@ -76,3 +84,16 @@ where user_id = (select id from auth.users where email = 'ADMIN@exemplo.com');
 - Domínio da plataforma (master) → `NEXT_PUBLIC_MASTER_HOST`.
 - Cada barbearia = subdomínio `*.barber.app` (wildcard) ou domínio próprio (plano Advanced).
 - Configurar o wildcard `*.barber.app` em Vercel → Domains quando o domínio estiver pronto.
+
+## 5. Gateway de WhatsApp (serviço separado, sempre ligado)
+O envio de WhatsApp é feito por um serviço Node à parte (**`wa-gateway/`**, Baileys) que precisa
+ficar **sempre online** (socket persistente). Ele **não** roda na Vercel.
+
+- **Onde hospedar:** Railway (guia em `wa-gateway/DEPLOY-RAILWAY.md`) — recomendado; ou Oracle Cloud
+  Always Free (`wa-gateway/DEPLOY-ORACLE.md`); ou Render Starter. **Planos grátis que hibernam/suspendem
+  não servem** para produção.
+- **Variáveis do gateway:** `WA_SERVICE_TOKEN` (igual ao do app), `SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `PORT` (injetado pelo host). Root Directory = `wa-gateway`.
+- **Ligar ao app:** setar `WA_SERVICE_URL` (URL pública do gateway) e `WA_SERVICE_TOKEN` na Vercel e **redeploy**.
+- **Conectar cada barbearia:** admin → Configurações → WhatsApp → **Conectar** (lê o QR). As sessões
+  ficam no Supabase (`wa_sessions`) e **re-hidratam** sozinhas após restart.
