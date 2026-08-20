@@ -12,16 +12,11 @@ export type QueueBoardItem = {
 };
 
 /** Painel/board da fila de hoje (números + 1º nome + barbeiro). Service-role, escopo do tenant. */
-export async function getQueueBoard(tenantId: string): Promise<{ serving: QueueBoardItem[]; waiting: QueueBoardItem[] }> {
+export async function getQueueBoard(
+  tenantId: string
+): Promise<{ serving: QueueBoardItem[]; waiting: QueueBoardItem[]; lastDone: QueueBoardItem | null; doneCount: number }> {
   const admin = createSupabaseAdminClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
-  const { data } = await admin
-    .from("queue_entries")
-    .select("id, ticket_number, status, clients(name), barbers(name)")
-    .eq("tenant_id", tenantId)
-    .eq("day", today)
-    .in("status", ["WAITING", "IN_SERVICE"])
-    .order("ticket_number", { ascending: true });
 
   const map = (r: any): QueueBoardItem => ({
     id: r.id,
@@ -30,10 +25,32 @@ export async function getQueueBoard(tenantId: string): Promise<{ serving: QueueB
     firstName: ((r.clients?.name as string) ?? "").split(" ")[0] || "Cliente",
     barber: (r.barbers?.name as string) ?? null,
   });
+
+  const [{ data }, { data: doneRows, count: doneCount }] = await Promise.all([
+    admin
+      .from("queue_entries")
+      .select("id, ticket_number, status, clients(name), barbers(name)")
+      .eq("tenant_id", tenantId)
+      .eq("day", today)
+      .in("status", ["WAITING", "IN_SERVICE"])
+      .order("ticket_number", { ascending: true }),
+    admin
+      .from("queue_entries")
+      .select("id, ticket_number, status, clients(name), barbers(name)", { count: "exact" })
+      .eq("tenant_id", tenantId)
+      .eq("day", today)
+      .eq("status", "DONE")
+      .order("ended_at", { ascending: false })
+      .limit(1),
+  ]);
+
   const rows = (data ?? []).map(map);
+  const lastDone = (doneRows ?? []).map(map)[0] ?? null;
   return {
     serving: rows.filter((r) => r.status === "IN_SERVICE"),
     waiting: rows.filter((r) => r.status === "WAITING"),
+    lastDone,
+    doneCount: doneCount ?? 0,
   };
 }
 

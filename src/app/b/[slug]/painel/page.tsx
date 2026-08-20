@@ -14,5 +14,13 @@ export default async function PainelFilaPage({ params }: { params: Promise<{ slu
   if (!config.enabled) notFound();
 
   const board = await getQueueBoard(tenant.id);
-  return <PainelView name={tenant.name} serving={board.serving} waiting={board.waiting} />;
+  return (
+    <PainelView
+      name={tenant.name}
+      serving={board.serving}
+      waiting={board.waiting}
+      lastDone={board.lastDone}
+      doneCount={board.doneCount}
+    />
+  );
 }
