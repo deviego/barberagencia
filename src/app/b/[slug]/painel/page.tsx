@@ -20,6 +20,7 @@ export default async function PainelFilaPage({ params }: { params: Promise<{ slu
       serving={board.serving}
       waiting={board.waiting}
       lastDone={board.lastDone}
+      lastCalled={board.lastCalled}
       doneCount={board.doneCount}
     />
   );
