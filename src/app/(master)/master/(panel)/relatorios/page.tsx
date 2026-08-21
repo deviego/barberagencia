@@ -1,5 +1,6 @@
 import { getMonthlyReport } from "@/features/platform/report";
 import { PrintButton } from "@/features/platform/components/print-button";
+import { SendReportButton } from "@/features/platform/components/send-report-button";
 import { formatBRL } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,10 @@ export default async function RelatoriosPage() {
             Barber Agência · <span className="capitalize">{r.period.label}</span> · consolidado da plataforma
           </p>
         </div>
-        <PrintButton />
+        <div className="flex flex-wrap items-start gap-2 print:hidden">
+          <PrintButton />
+          <SendReportButton />
+        </div>
       </div>
 
       {/* KPIs da plataforma */}

@@ -8,6 +8,24 @@ import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
 import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
 
+/** MASTER: dispara o envio do relatório mensal AGORA (WhatsApp), via gateway. */
+export async function sendReportNow(ym?: string) {
+  const user = await getSessionUser();
+  if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
+  const base = process.env.WA_SERVICE_URL;
+  const token = process.env.WA_SERVICE_TOKEN;
+  if (!base || !token) return { ok: false as const, error: "Gateway não configurado (WA_SERVICE_URL/TOKEN)." };
+  try {
+    const url = `${base.replace(/\/$/, "")}/report/run${ym ? `?ym=${encodeURIComponent(ym)}` : ""}`;
+    const res = await fetch(url, { method: "POST", headers: { "x-wa-token": token }, signal: AbortSignal.timeout(60000) });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; out?: { phone: string; ok: boolean; error?: string }[] };
+    if (!res.ok || data.ok === false) return { ok: false as const, error: data.error || `Gateway respondeu ${res.status}` };
+    return { ok: true as const, out: data.out ?? [] };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Falha de rede" };
+  }
+}
+
 function tempPassword() {
   return "Bb" + randomUUID().replace(/-/g, "").slice(0, 10) + "#7";
 }
