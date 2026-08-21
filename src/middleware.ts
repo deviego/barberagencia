@@ -10,6 +10,7 @@ const PUBLIC_PREFIXES = [
   "/master/login", "/master/auth",
   "/b",
   "/design-system", "/termos", "/privacidade", "/convite", "/documentacao",
+  "/api/master/report", // protegido por token próprio (não exige sessão)
 ];
 /** Páginas de login: se já logado (na área), redireciona para a home da área. */
 const AUTH_PAGES = ["/client/login", "/client/cadastro", "/client/otp", "/admin/login", "/master/login"];
