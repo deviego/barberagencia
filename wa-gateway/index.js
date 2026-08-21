@@ -225,7 +225,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "report-v7";
+const BUILD = "report-v8";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -429,21 +429,48 @@ function renderReportPdf(kind, rep) {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
+    const fmtPct = (g) => {
+      if (!g || g.pct == null) return "—";
+      const s = g.pct >= 0 ? "+" : "";
+      return `${s}${g.pct.toFixed(0)}%`;
+    };
+
     if (kind === "barbershop") {
-      pdfTitle(doc, rep.name || "Barbearia", `Relatório · ${rep.period?.label ?? ""}`);
+      pdfTitle(doc, rep.name || "Barbearia", `Relatório detalhado · ${rep.period?.label ?? ""}`);
       kpiGrid(doc, [
         { label: "Entradas", value: brl(rep.entradas) },
         { label: "Saídas", value: brl(rep.saidas) },
-        { label: "Resultado", value: brl((rep.entradas || 0) - (rep.saidas || 0)) },
+        { label: "Resultado", value: brl(rep.liquido ?? (rep.entradas || 0) - (rep.saidas || 0)) },
+        { label: "Atendimentos", value: rep.appointments ?? 0 },
+        { label: "Ticket médio", value: brl(rep.ticketMedio) },
+        { label: "Receita recorrente (MRR)", value: brl(rep.mrr) },
         { label: "Novos clientes", value: rep.newClients ?? 0 },
         { label: "Clientes (total)", value: rep.totalClients ?? 0 },
-        { label: "Assinantes", value: rep.subscribers ?? 0 },
-        { label: "Atendimentos", value: rep.appointments ?? 0 },
+        { label: "Assinantes ativos", value: rep.subscribers ?? 0 },
       ]);
+
+      if (rep.growth) {
+        table(doc, `Crescimento vs. período anterior (${rep.prevPeriodLabel ?? ""})`,
+          [{ label: "Indicador", width: 3 }, { label: "Atual", width: 1.6, align: "right" }, { label: "Anterior", width: 1.6, align: "right" }, { label: "Variação", width: 1.2, align: "right" }],
+          [
+            ["Entradas", brl(rep.growth.entradas?.value), brl(rep.growth.entradas?.prev), fmtPct(rep.growth.entradas)],
+            ["Novos clientes", String(rep.growth.newClients?.value ?? 0), String(rep.growth.newClients?.prev ?? 0), fmtPct(rep.growth.newClients)],
+            ["Atendimentos", String(rep.growth.appointments?.value ?? 0), String(rep.growth.appointments?.prev ?? 0), fmtPct(rep.growth.appointments)],
+          ]);
+      }
+
       table(doc, "Faturamento por método", [{ label: "Método", width: 3 }, { label: "Total", width: 2, align: "right" }],
         (rep.byMethod || []).map((m) => [m.method, brl(m.total)]));
       table(doc, "Faturamento por serviço", [{ label: "Serviço", width: 3 }, { label: "Qtd", width: 1, align: "right" }, { label: "Valor", width: 2, align: "right" }],
         (rep.byService || []).map((s) => [s.name, String(s.qty), brl(s.value)]));
+      table(doc, "Produtos vendidos (PDV)", [{ label: "Produto", width: 3 }, { label: "Qtd", width: 1, align: "right" }, { label: "Valor", width: 2, align: "right" }],
+        (rep.byProduct || []).map((s) => [s.name, String(s.qty), brl(s.value)]));
+      table(doc, "Faturamento por dia", [{ label: "Dia", width: 2 }, { label: "Entradas", width: 2, align: "right" }, { label: "Saídas", width: 2, align: "right" }],
+        (rep.daily || []).map((d) => [d.date, brl(d.entradas), brl(d.saidas)]));
+      table(doc, "Melhores clientes (receita)", [{ label: "Cliente", width: 3 }, { label: "Lançam.", width: 1, align: "right" }, { label: "Receita", width: 2, align: "right" }],
+        (rep.topClients || []).map((c) => [c.name, String(c.count), brl(c.total)]));
+      table(doc, "Assinantes ativos", [{ label: "Cliente", width: 3 }, { label: "Plano", width: 2 }, { label: "Mensalidade", width: 1.6, align: "right" }],
+        (rep.subscribersList || []).map((s) => [s.clientName, s.planName, brl(s.priceBrl)]));
       table(doc, "Novos clientes no período", [{ label: "Nome", width: 3 }, { label: "Telefone", width: 2 }, { label: "Cadastro", width: 1.4, align: "right" }],
         (rep.newClientsList || []).map((c) => [c.name, c.phone || "—", c.date]));
     } else {

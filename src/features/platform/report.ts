@@ -7,19 +7,30 @@ const num = (v: any) => Number(v ?? 0);
 
 export type ServiceRow = { name: string; qty: number; value: number };
 
+export type Growth = { value: number; prev: number; pct: number | null };
+
 export type BarbershopReport = {
   tenantId: string;
   name: string;
   phone: string | null;
   period: { label: string; startISO: string; endISO: string };
+  prevPeriodLabel: string;
   totalClients: number;
   newClients: number;
   subscribers: number;
   appointments: number;
   entradas: number;
   saidas: number;
+  liquido: number;
+  ticketMedio: number;
+  mrr: number;
+  growth: { entradas: Growth; newClients: Growth; appointments: Growth };
   byMethod: { method: string; total: number }[];
   byService: ServiceRow[];
+  byProduct: ServiceRow[];
+  topClients: { name: string; total: number; count: number }[];
+  subscribersList: { clientName: string; planName: string; priceBrl: number }[];
+  daily: { date: string; entradas: number; saidas: number }[];
   newClientsList: { name: string; phone: string | null; date: string }[];
 };
 
@@ -145,7 +156,7 @@ export async function getMonthlyReport(ref?: Date): Promise<MonthlyReport> {
     }))
     .sort((a, b) => b.entradas - a.entradas);
 
-  const byService = await servicesBreakdown(admin, null, startISO, endISO);
+  const byService = await itemsBreakdown(admin, null, startISO, endISO, "service");
 
   return {
     period: { label, startISO, endISO },
@@ -167,22 +178,29 @@ export async function getMonthlyReport(ref?: Date): Promise<MonthlyReport> {
   };
 }
 
-/** Faturamento/serviços realizados por serviço, em um período (opcionalmente por barbearia). */
-async function servicesBreakdown(admin: any, tenantId: string | null, fromISO: string, toISO: string): Promise<ServiceRow[]> {
+/** Itens realizados por nome (serviço OU produto), num período (opcionalmente por barbearia). */
+async function itemsBreakdown(
+  admin: any,
+  tenantId: string | null,
+  fromISO: string,
+  toISO: string,
+  kind: "service" | "product",
+): Promise<ServiceRow[]> {
+  const fallback = kind === "product" ? "Produto" : "Serviço";
   const map = new Map<string, { qty: number; value: number }>();
   const add = (name: string, qty: number, value: number) => {
-    const k = name || "Serviço";
+    const k = name || fallback;
     const cur = map.get(k) ?? { qty: 0, value: 0 };
     cur.qty += qty;
     cur.value += value;
     map.set(k, cur);
   };
 
-  // Itens de comanda (agendamentos) — não cobertos pelo plano contam como faturamento.
+  // Itens de comanda (agendamentos) — cobertos pelo plano não contam como faturamento.
   let aq = admin
     .from("appointment_items")
     .select("name, price_brl, qty, covered_by_plan, tenant_id, created_at")
-    .eq("kind", "service")
+    .eq("kind", kind)
     .gte("created_at", fromISO)
     .lt("created_at", toISO);
   if (tenantId) aq = aq.eq("tenant_id", tenantId);
@@ -198,7 +216,7 @@ async function servicesBreakdown(admin: any, tenantId: string | null, fromISO: s
   const salesRes = await sq;
   const saleIds = ((salesRes.data ?? []) as Row[]).map((s) => s.id);
   if (saleIds.length) {
-    const siRes = await admin.from("sale_items").select("name, price_brl, qty, kind, sale_id").eq("kind", "service").in("sale_id", saleIds);
+    const siRes = await admin.from("sale_items").select("name, price_brl, qty, kind, sale_id").eq("kind", kind).in("sale_id", saleIds);
     for (const r of (siRes.data ?? []) as Row[]) {
       const qty = num(r.qty) || 1;
       add(r.name as string, qty, num(r.price_brl) * qty);
@@ -218,51 +236,144 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
   const endISO = end.toISOString();
   const label = `${start.toLocaleDateString("pt-BR")} — ${new Date(end.getTime() - 86400000).toLocaleDateString("pt-BR")}`;
 
+  // Período anterior de mesmo tamanho (para crescimento).
+  const lenMs = end.getTime() - start.getTime();
+  const prevStart = new Date(start.getTime() - lenMs);
+  const prevStartISO = prevStart.toISOString();
+  const prevEndISO = startISO;
+  const prevLabel = `${prevStart.toLocaleDateString("pt-BR")} — ${new Date(start.getTime() - 86400000).toLocaleDateString("pt-BR")}`;
+
   const { data: t } = await admin.from("tenants").select("id, name").eq("id", tenantId).maybeSingle();
   if (!t) return null;
   const { data: settings } = await admin.from("tenant_settings").select("phone").eq("tenant_id", tenantId).maybeSingle();
 
-  const [clientsRes, newRes, subsRes, apptRes, finRes, byService] = await Promise.all([
+  const [
+    clientsRes,
+    clientNamesRes,
+    newRes,
+    prevNewRes,
+    subsRes,
+    apptRes,
+    prevApptRes,
+    finRes,
+    prevFinRes,
+    byService,
+    byProduct,
+  ] = await Promise.all([
     admin.from("clients").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    admin.from("clients").select("id, name").eq("tenant_id", tenantId),
     admin.from("clients").select("id, name, phone, created_at").eq("tenant_id", tenantId).gte("created_at", startISO).lt("created_at", endISO).order("created_at"),
-    admin.from("client_subscriptions").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "ACTIVE"),
+    admin.from("clients").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("created_at", prevStartISO).lt("created_at", prevEndISO),
+    admin
+      .from("client_subscriptions")
+      .select("id, status, clients(name), combo_plans(name, price_brl)")
+      .eq("tenant_id", tenantId)
+      .eq("status", "ACTIVE"),
     admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("start_at", startISO).lt("start_at", endISO).neq("status", "CANCELLED"),
-    admin.from("financial_entries").select("type, amount_brl, method, occurred_at").eq("tenant_id", tenantId).gte("occurred_at", startISO).lt("occurred_at", endISO),
-    servicesBreakdown(admin, tenantId, startISO, endISO),
+    admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("start_at", prevStartISO).lt("start_at", prevEndISO).neq("status", "CANCELLED"),
+    admin.from("financial_entries").select("type, amount_brl, method, ref_client, occurred_at").eq("tenant_id", tenantId).gte("occurred_at", startISO).lt("occurred_at", endISO),
+    admin.from("financial_entries").select("type, amount_brl").eq("tenant_id", tenantId).eq("type", "REVENUE").gte("occurred_at", prevStartISO).lt("occurred_at", prevEndISO),
+    itemsBreakdown(admin, tenantId, startISO, endISO, "service"),
+    itemsBreakdown(admin, tenantId, startISO, endISO, "product"),
   ]);
+
+  const clientName = new Map(((clientNamesRes.data ?? []) as Row[]).map((c) => [c.id as string, c.name as string]));
 
   const fins = (finRes.data ?? []) as Row[];
   let entradas = 0;
   let saidas = 0;
   const methodMap = new Map<string, number>();
+  const clientRev = new Map<string, { total: number; count: number }>();
+  const dayMap = new Map<string, { entradas: number; saidas: number }>();
   for (const f of fins) {
     const amt = num(f.amount_brl);
+    const dayKey = new Date(f.occurred_at as string).toISOString().slice(0, 10);
+    const day = dayMap.get(dayKey) ?? { entradas: 0, saidas: 0 };
     if (f.type === "REVENUE") {
       entradas += amt;
+      day.entradas += amt;
       const m = (f.method as string) ?? "—";
       methodMap.set(m, (methodMap.get(m) ?? 0) + amt);
-    } else saidas += amt;
+      if (f.ref_client) {
+        const cur = clientRev.get(f.ref_client) ?? { total: 0, count: 0 };
+        cur.total += amt;
+        cur.count += 1;
+        clientRev.set(f.ref_client, cur);
+      }
+    } else {
+      saidas += amt;
+      day.saidas += amt;
+    }
+    dayMap.set(dayKey, day);
   }
+
   const byMethod = [...methodMap.entries()].map(([method, total]) => ({ method: METHOD_LABEL[method] ?? method, total })).sort((a, b) => b.total - a.total);
+
+  const topClients = [...clientRev.entries()]
+    .map(([cid, v]) => ({ name: clientName.get(cid) ?? "Cliente", total: v.total, count: v.count }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 15);
+
+  const daily = [...dayMap.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([d, v]) => ({ date: new Date(`${d}T12:00:00`).toLocaleDateString("pt-BR"), entradas: v.entradas, saidas: v.saidas }));
+
+  const subscribersList = ((subsRes.data ?? []) as Row[]).map((s) => {
+    const client = Array.isArray(s.clients) ? s.clients[0] : s.clients;
+    const plan = Array.isArray(s.combo_plans) ? s.combo_plans[0] : s.combo_plans;
+    return {
+      clientName: (client?.name as string) ?? "Cliente",
+      planName: (plan?.name as string) ?? "Plano",
+      priceBrl: num(plan?.price_brl),
+    };
+  });
+  const mrr = subscribersList.reduce((a, s) => a + s.priceBrl, 0);
+
   const newList = ((newRes.data ?? []) as Row[]).map((c) => ({
     name: c.name as string,
     phone: (c.phone as string) ?? null,
     date: new Date(c.created_at as string).toLocaleDateString("pt-BR"),
   }));
 
+  const appointments = apptRes.count ?? 0;
+  const ticketMedio = appointments > 0 ? entradas / appointments : 0;
+
+  // Crescimento vs período anterior.
+  const prevEntradas = ((prevFinRes.data ?? []) as Row[]).reduce((a, f) => a + num(f.amount_brl), 0);
+  const prevNew = prevNewRes.count ?? 0;
+  const prevAppt = prevApptRes.count ?? 0;
+  const growthOf = (value: number, prev: number): Growth => ({
+    value,
+    prev,
+    pct: prev > 0 ? ((value - prev) / prev) * 100 : null,
+  });
+
   return {
     tenantId,
     name: t.name as string,
     phone: (settings?.phone as string) ?? null,
     period: { label, startISO, endISO },
+    prevPeriodLabel: prevLabel,
     totalClients: clientsRes.count ?? 0,
     newClients: newList.length,
-    subscribers: subsRes.count ?? 0,
-    appointments: apptRes.count ?? 0,
+    subscribers: subscribersList.length,
+    appointments,
     entradas,
     saidas,
+    liquido: entradas - saidas,
+    ticketMedio,
+    mrr,
+    growth: {
+      entradas: growthOf(entradas, prevEntradas),
+      newClients: growthOf(newList.length, prevNew),
+      appointments: growthOf(appointments, prevAppt),
+    },
     byMethod,
     byService,
+    byProduct,
+    topClients,
+    subscribersList,
+    daily,
     newClientsList: newList,
   };
 }
