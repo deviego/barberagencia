@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, Check, Download, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+type Variant = "classic" | "logo";
+
 type Props = {
   /** URL pública da barbearia (para onde o QR leva o cliente). */
   publicUrl: string;
@@ -22,6 +24,7 @@ type Props = {
 
 const POSTER_W = 1080;
 const POSTER_H = 1350;
+const FONT = "'Segoe UI', system-ui, sans-serif";
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -54,6 +57,14 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+/** Desenha a imagem cobrindo (cover) a área, cortando o excedente. */
+function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+  const r = Math.max(w / img.width, h / img.height);
+  const iw = img.width * r;
+  const ih = img.height * r;
+  ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+}
+
 /** Desenha a logo (ou as iniciais) centralizada num quadrado branco arredondado. */
 function drawLogoBadge(
   ctx: CanvasRenderingContext2D,
@@ -66,7 +77,6 @@ function drawLogoBadge(
 ) {
   const x = cx - side / 2;
   const y = cy - side / 2;
-  // "buraco" branco no meio do QR
   ctx.save();
   ctx.fillStyle = "#FFFFFF";
   roundRect(ctx, x, y, side, side, side * 0.18);
@@ -81,7 +91,6 @@ function drawLogoBadge(
     const h = logo.height * ratio;
     ctx.drawImage(logo, cx - w / 2, cy - h / 2, w, h);
   } else {
-    // Sem logo: círculo com as iniciais.
     const r = side * 0.42;
     ctx.save();
     ctx.fillStyle = accent;
@@ -91,7 +100,7 @@ function drawLogoBadge(
     ctx.fillStyle = "#FFFFFF";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `bold ${Math.round(side * 0.34)}px 'Segoe UI', system-ui, sans-serif`;
+    ctx.font = `bold ${Math.round(side * 0.34)}px ${FONT}`;
     ctx.fillText((logoText || "??").slice(0, 2).toUpperCase(), cx, cy + side * 0.02);
     ctx.restore();
   }
@@ -102,10 +111,11 @@ export function ClientQr(props: Props) {
   const posterRef = useRef<HTMLCanvasElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [ready, setReady] = useState(false);
+  const [variant, setVariant] = useState<Variant>("classic");
   const insta = normalizeInstagram(instagram);
   const domain = publicUrl.replace(/^https?:\/\//, "");
 
-  /** Desenha o QR + logo dentro de um quadrado (usado no cartaz e no "só QR"). */
+  /** QR + logo dentro de um quadrado (usado nos cartazes e no "só QR"). */
   const drawQrSquare = useCallback(
     (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, qr: HTMLImageElement, logo: HTMLImageElement | null) => {
       ctx.drawImage(qr, x, y, size, size);
@@ -114,16 +124,14 @@ export function ClientQr(props: Props) {
     [logoText, accent],
   );
 
-  /** Desenha o cartaz completo (parede/banner). */
-  const drawPoster = useCallback(
+  /** Cartaz clássico: fundo branco, cartão do QR limpo. */
+  const drawClassic = useCallback(
     (ctx: CanvasRenderingContext2D, qr: HTMLImageElement, logo: HTMLImageElement | null) => {
       const W = POSTER_W;
       const H = POSTER_H;
       ctx.clearRect(0, 0, W, H);
-      // fundo
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, W, H);
-      // moldura
       ctx.strokeStyle = accent;
       ctx.lineWidth = 6;
       roundRect(ctx, 30, 30, W - 60, H - 60, 30);
@@ -132,27 +140,23 @@ export function ClientQr(props: Props) {
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
 
-      // nome (encolhe para caber)
       let fontSize = 68;
       ctx.fillStyle = "#14110E";
       do {
-        ctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+        ctx.font = `bold ${fontSize}px ${FONT}`;
         if (ctx.measureText(name).width <= 860) break;
         fontSize -= 3;
       } while (fontSize > 34);
       ctx.fillText(name, W / 2, 175);
 
-      // tracinho de destaque
       ctx.fillStyle = accent;
       roundRect(ctx, W / 2 - 46, 205, 92, 6, 3);
       ctx.fill();
 
-      // subtítulo
       ctx.fillStyle = "#6B6B6B";
-      ctx.font = `500 34px 'Segoe UI', system-ui, sans-serif`;
+      ctx.font = `500 34px ${FONT}`;
       ctx.fillText("Agende e cadastre-se pelo celular", W / 2, 275);
 
-      // cartão do QR
       const card = 720;
       const cx = (W - card) / 2;
       const cy = 330;
@@ -172,27 +176,123 @@ export function ClientQr(props: Props) {
       const qrPad = 46;
       drawQrSquare(ctx, cx + qrPad, cy + qrPad, card - qrPad * 2, qr, logo);
 
-      // chamada
       ctx.fillStyle = "#14110E";
-      ctx.font = `600 32px 'Segoe UI', system-ui, sans-serif`;
+      ctx.font = `600 32px ${FONT}`;
       ctx.fillText("Aponte a câmera do celular e toque no link", W / 2, cy + card + 78);
 
-      // link
       ctx.fillStyle = accent;
-      ctx.font = `bold 32px 'Segoe UI', system-ui, sans-serif`;
+      ctx.font = `bold 32px ${FONT}`;
       ctx.fillText(domain, W / 2, cy + card + 132);
 
-      // instagram
       if (insta) {
         ctx.fillStyle = "#6B6B6B";
-        ctx.font = `500 30px 'Segoe UI', system-ui, sans-serif`;
+        ctx.font = `500 30px ${FONT}`;
         ctx.fillText(insta, W / 2, cy + card + 182);
       }
     },
     [accent, name, domain, insta, drawQrSquare],
   );
 
-  // Renderiza o preview do cartaz quando as imagens carregam.
+  /** Cartaz com a logo de fundo: a logo "emoldura" o QR. */
+  const drawLogoStyle = useCallback(
+    (ctx: CanvasRenderingContext2D, qr: HTMLImageElement, logo: HTMLImageElement | null) => {
+      const W = POSTER_W;
+      const H = POSTER_H;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, W, H);
+
+      // fundo = logo (cover) dentro da moldura arredondada
+      ctx.save();
+      roundRect(ctx, 30, 30, W - 60, H - 60, 30);
+      ctx.clip();
+      if (logo) {
+        drawCover(ctx, logo, 30, 30, W - 60, H - 60);
+      } else {
+        ctx.fillStyle = accent;
+        ctx.fillRect(30, 30, W - 60, H - 60);
+      }
+      // escurece p/ legibilidade dos textos brancos
+      const g = ctx.createLinearGradient(0, 30, 0, H - 30);
+      g.addColorStop(0, "rgba(15,12,10,0.74)");
+      g.addColorStop(0.42, "rgba(15,12,10,0.42)");
+      g.addColorStop(1, "rgba(15,12,10,0.80)");
+      ctx.fillStyle = g;
+      ctx.fillRect(30, 30, W - 60, H - 60);
+      ctx.restore();
+
+      // moldura
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 6;
+      roundRect(ctx, 30, 30, W - 60, H - 60, 30);
+      ctx.stroke();
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+
+      // nome (branco com sombra)
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 2;
+      let fontSize = 68;
+      ctx.fillStyle = "#FFFFFF";
+      do {
+        ctx.font = `bold ${fontSize}px ${FONT}`;
+        if (ctx.measureText(name).width <= 860) break;
+        fontSize -= 3;
+      } while (fontSize > 34);
+      ctx.fillText(name, W / 2, 175);
+      ctx.restore();
+
+      ctx.fillStyle = accent;
+      roundRect(ctx, W / 2 - 46, 205, 92, 6, 3);
+      ctx.fill();
+
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.55)";
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.font = `500 34px ${FONT}`;
+      ctx.fillText("Agende e cadastre-se pelo celular", W / 2, 275);
+      ctx.restore();
+
+      // painel branco do QR (menor: a logo aparece em volta)
+      const card = 600;
+      const cx = (W - card) / 2;
+      const cy = 360;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.40)";
+      ctx.shadowBlur = 44;
+      ctx.shadowOffsetY = 16;
+      ctx.fillStyle = "#FFFFFF";
+      roundRect(ctx, cx, cy, card, card, 32);
+      ctx.fill();
+      ctx.restore();
+
+      const qrPad = 44;
+      drawQrSquare(ctx, cx + qrPad, cy + qrPad, card - qrPad * 2, qr, logo);
+
+      // textos inferiores (brancos)
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = `600 32px ${FONT}`;
+      ctx.fillText("Aponte a câmera do celular e toque no link", W / 2, cy + card + 84);
+      ctx.font = `bold 32px ${FONT}`;
+      ctx.fillText(domain, W / 2, cy + card + 138);
+      if (insta) {
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.font = `500 30px ${FONT}`;
+        ctx.fillText(insta, W / 2, cy + card + 188);
+      }
+      ctx.restore();
+    },
+    [accent, name, domain, insta, drawQrSquare],
+  );
+
+  // Renderiza o preview quando as imagens carregam ou o estilo muda.
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -205,13 +305,13 @@ export function ClientQr(props: Props) {
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      drawPoster(ctx, qr, logo);
+      (variant === "logo" ? drawLogoStyle : drawClassic)(ctx, qr, logo);
       setReady(true);
     })();
     return () => {
       alive = false;
     };
-  }, [qrDataUrl, logoDataUrl, drawPoster]);
+  }, [qrDataUrl, logoDataUrl, variant, drawClassic, drawLogoStyle]);
 
   function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
     const a = document.createElement("a");
@@ -221,7 +321,7 @@ export function ClientQr(props: Props) {
   }
 
   function baixarCartaz() {
-    if (posterRef.current) downloadCanvas(posterRef.current, `cartaz-${slug}.png`);
+    if (posterRef.current) downloadCanvas(posterRef.current, `cartaz-${variant}-${slug}.png`);
   }
 
   async function baixarQr() {
@@ -256,8 +356,30 @@ export function ClientQr(props: Props) {
       </div>
       <p className="text-caption text-text-2">
         QR único da sua barbearia — leva o cliente direto para a sua página, onde ele agenda e se cadastra.
-        Baixe o cartaz pronto (com a sua logo), imprima e cole na parede ou use em um banner.
+        Escolha o modelo do cartaz, baixe (com a sua logo), imprima e cole na parede ou use em um banner.
       </p>
+
+      {/* Seletor de modelo */}
+      <div className="inline-flex w-fit rounded-md border border-border bg-surface-2 p-0.5">
+        <button
+          type="button"
+          onClick={() => setVariant("classic")}
+          className={`rounded px-3 py-1.5 text-caption font-semibold transition ${
+            variant === "classic" ? "bg-accent text-accent-contrast shadow-sm" : "text-text-muted hover:text-text"
+          }`}
+        >
+          Cartão clássico
+        </button>
+        <button
+          type="button"
+          onClick={() => setVariant("logo")}
+          className={`rounded px-3 py-1.5 text-caption font-semibold transition ${
+            variant === "logo" ? "bg-accent text-accent-contrast shadow-sm" : "text-text-muted hover:text-text"
+          }`}
+        >
+          Com a logo de fundo
+        </button>
+      </div>
 
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
         {/* Preview do cartaz */}
@@ -284,6 +406,11 @@ export function ClientQr(props: Props) {
             {copied ? "Link copiado!" : "Copiar link"}
           </Button>
           <p className="mt-1 break-all text-caption text-text-muted">{domain}</p>
+          {variant === "logo" && !logoDataUrl && (
+            <p className="text-caption text-warning-strong">
+              Envie a logo acima (White-label) para o fundo ficar com a sua marca — sem logo, usamos a cor de destaque.
+            </p>
+          )}
           <p className="text-caption text-text-muted">
             Dica: o cartaz tem 1080×1350 — ótimo para imprimir (A4/A5) ou postar nos stories.
           </p>
