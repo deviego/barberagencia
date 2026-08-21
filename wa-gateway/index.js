@@ -1,6 +1,8 @@
 import express from "express";
 import QRCode from "qrcode";
 import pino from "pino";
+import cron from "node-cron";
+import PDFDocument from "pdfkit";
 import { createClient } from "@supabase/supabase-js";
 import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 import { makeSupabaseAuthState } from "./auth-state.js";
@@ -9,6 +11,14 @@ const PORT = process.env.PORT || 8080;
 const TOKEN = process.env.WA_SERVICE_TOKEN;
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Relatório mensal (automação): consome o app, gera PDF e envia no WhatsApp.
+const REPORT = {
+  appUrl: (process.env.APP_REPORT_URL || "").replace(/\/$/, ""), // ex.: https://www.barberagencia.com
+  token: process.env.REPORT_TOKEN || "",
+  senderSession: process.env.REPORT_SENDER_SESSION || "", // tenant_id da sessão remetente (Barber Agência)
+  recipients: (process.env.REPORT_RECIPIENTS || "").split(",").map((s) => s.trim()).filter(Boolean),
+};
 
 if (!TOKEN || !SUPABASE_URL || !SERVICE_KEY) {
   console.error("Faltam envs: WA_SERVICE_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY");
@@ -215,7 +225,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "resilient-v5";
+const BUILD = "report-v6";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -319,11 +329,116 @@ app.post("/sessions/:tenantId/logout", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ============================ Relatório mensal (PDF + WhatsApp) =============
+const brl = (n) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(n) || 0);
+
+/** Gera o PDF do relatório a partir do JSON do app. Retorna um Buffer. */
+function buildReportPdf(rep) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 42 });
+    const chunks = [];
+    doc.on("data", (c) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    const p = rep.platform || {};
+    doc.fillColor("#111").fontSize(20).text("Barber Agência — Relatório mensal");
+    doc.moveDown(0.2).fillColor("#666").fontSize(11).text(`Período: ${rep.period?.label ?? ""}`);
+    doc.moveDown().fillColor("#111").fontSize(13).text("Consolidado da plataforma");
+    doc.moveDown(0.3).fontSize(11);
+    const line = (k, v) => doc.text(`${k}: ${v}`);
+    line("Entradas", brl(p.entradas));
+    line("Saídas", brl(p.saidas));
+    line("Resultado (líquido)", brl(p.liquido));
+    line("Barbearias", `${p.barbershops ?? 0} (${p.activeBarbershops ?? 0} ativas)`);
+    line("Clientes", `${p.clients ?? 0} (+${p.newClients ?? 0} no mês)`);
+    line("Assinantes ativos", `${p.subscribers ?? 0}`);
+
+    doc.moveDown().fontSize(13).text("Entradas por método").moveDown(0.3).fontSize(11);
+    (p.byMethod || []).forEach((m) => line(m.method, brl(m.total)));
+    if (!(p.byMethod || []).length) doc.fillColor("#666").text("—").fillColor("#111");
+
+    doc.moveDown().fontSize(13).text("Receita por cliente (top 15)").moveDown(0.3).fontSize(11);
+    (p.topClients || []).forEach((c, i) => line(`${i + 1}. ${c.name} — ${c.tenantName}`, brl(c.total)));
+    if (!(p.topClients || []).length) doc.fillColor("#666").text("—").fillColor("#111");
+
+    doc.addPage().fontSize(13).text("Por barbearia").moveDown(0.4).fontSize(10);
+    (rep.perBarbershop || []).forEach((b) => {
+      doc.text(
+        `${b.name}  ·  ${b.plan}  ·  clientes ${b.clients} (+${b.newClients})  ·  assinantes ${b.subscribers}  ·  entradas ${brl(b.entradas)}  ·  saídas ${brl(b.saidas)}`
+      );
+      doc.moveDown(0.2);
+    });
+    doc.end();
+  });
+}
+
+/** Envia um documento (PDF) por WhatsApp a partir de uma sessão conectada. */
+async function sendDocument(tenantId, phone, buffer, fileName, caption) {
+  await ensureSession(tenantId);
+  const s = await waitConnected(tenantId, 15_000);
+  if (s?.status !== "connected" || !s.sock) return { ok: false, error: "sessão remetente não conectada" };
+  const { jid, exists } = await resolveJid(s.sock, phone);
+  if (exists === false) return { ok: false, error: "número não está no WhatsApp" };
+  await s.sock.sendMessage(jid, { document: buffer, fileName, mimetype: "application/pdf", caption });
+  return { ok: true };
+}
+
+/** Busca o relatório no app, gera o PDF e envia para os destinatários configurados. */
+async function runMonthlyReport(ym) {
+  if (!REPORT.appUrl || !REPORT.token) throw new Error("APP_REPORT_URL / REPORT_TOKEN ausentes");
+  if (!REPORT.senderSession) throw new Error("REPORT_SENDER_SESSION ausente (sessão remetente)");
+  if (!REPORT.recipients.length) throw new Error("REPORT_RECIPIENTS ausente");
+
+  const qs = new URLSearchParams({ token: REPORT.token });
+  if (ym) qs.set("ym", ym);
+  const res = await fetch(`${REPORT.appUrl}/api/master/report?${qs.toString()}`, { signal: AbortSignal.timeout(30000) });
+  if (!res.ok) throw new Error(`app respondeu ${res.status}`);
+  const rep = await res.json();
+
+  const pdf = await buildReportPdf(rep);
+  const fileName = `relatorio-${(rep.period?.label || "mensal").replace(/\s+/g, "-")}.pdf`;
+  const caption = `📊 Barber Agência — Relatório mensal (${rep.period?.label ?? ""})`;
+
+  const out = [];
+  for (const phone of REPORT.recipients) {
+    try {
+      const r = await sendDocument(REPORT.senderSession, phone, pdf, fileName, caption);
+      out.push({ phone, ...r });
+    } catch (e) {
+      out.push({ phone, ok: false, error: e?.message });
+    }
+  }
+  log.info({ out }, "relatório mensal enviado");
+  return out;
+}
+
+// Disparo manual do relatório (para testar): POST /report/run  (?ym=YYYY-MM opcional)
+app.post("/report/run", async (req, res) => {
+  try {
+    const out = await runMonthlyReport(req.query.ym);
+    res.json({ ok: true, out });
+  } catch (e) {
+    log.error(e, "report/run");
+    res.status(500).json({ ok: false, error: e?.message });
+  }
+});
+
 app.listen(PORT, () => {
   log.info(`wa-gateway ouvindo na porta ${PORT}`);
   rehydrate().catch((e) => log.error(e, "rehydrate"));
   setInterval(tickWatchdog, 20_000).unref();
   setInterval(() => tickReconnectDown().catch(() => {}), WATCHDOG_MS).unref();
+
+  // Cron mensal: dia 1, 09:00 (America/Sao_Paulo) → gera e envia o relatório.
+  if (REPORT.appUrl && REPORT.token && REPORT.senderSession && REPORT.recipients.length) {
+    cron.schedule("0 9 1 * *", () => runMonthlyReport().catch((e) => log.error(e, "cron report")), {
+      timezone: "America/Sao_Paulo",
+    });
+    log.info({ recipients: REPORT.recipients.length }, "cron do relatório mensal ativo (dia 1, 09:00 BRT)");
+  } else {
+    log.info("relatório mensal inativo (defina APP_REPORT_URL, REPORT_TOKEN, REPORT_SENDER_SESSION, REPORT_RECIPIENTS)");
+  }
 });
 
 // --- Keep-alive: o próprio serviço bate na sua URL pública a cada 10 min ---
