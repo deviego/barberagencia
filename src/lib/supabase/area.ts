@@ -26,8 +26,8 @@ export const AREA_HEADER = "x-bb-area";
 
 /** Deriva a área a partir do caminho da rota. */
 export function areaKeyFor(pathname: string): AreaKey {
-  if (pathname.startsWith("/admin") || pathname.startsWith("/rede")) return "admin";
-  if (pathname.startsWith("/master")) return "master";
+  if (pathname.startsWith("/admin") || pathname.startsWith("/rede") || pathname.startsWith("/api/admin")) return "admin";
+  if (pathname.startsWith("/master") || pathname.startsWith("/api/master")) return "master";
   return "client";
 }
 
