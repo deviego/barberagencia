@@ -225,7 +225,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "report-v6";
+const BUILD = "report-v7";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -329,46 +329,145 @@ app.post("/sessions/:tenantId/logout", async (req, res) => {
   res.json({ ok: true });
 });
 
-// ============================ Relatório mensal (PDF + WhatsApp) =============
+// ============================ Relatório (PDF profissional + WhatsApp) =======
 const brl = (n) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(n) || 0);
+const ACCENT = "#C9A24B";
+const PAGE = { margin: 40, top: 40 };
 
-/** Gera o PDF do relatório a partir do JSON do app. Retorna um Buffer. */
-function buildReportPdf(rep) {
+function pdfTitle(doc, title, subtitle) {
+  doc.fillColor(ACCENT).font("Helvetica-Bold").fontSize(22).text(title);
+  if (subtitle) doc.fillColor("#666").font("Helvetica").fontSize(11).text(subtitle);
+  const now = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  doc.fillColor("#999").fontSize(9).text(`Gerado em ${now}`);
+  doc.moveDown(0.8);
+  const y = doc.y;
+  doc.moveTo(PAGE.margin, y).lineTo(doc.page.width - PAGE.margin, y).strokeColor("#E5E0D6").lineWidth(1).stroke();
+  doc.moveDown(0.8);
+}
+
+function kpiGrid(doc, items) {
+  // items: [{label, value}] — 3 por linha, caixas com borda.
+  const cols = 3;
+  const gap = 10;
+  const w = (doc.page.width - PAGE.margin * 2 - gap * (cols - 1)) / cols;
+  const h = 46;
+  let x = PAGE.margin;
+  let y = doc.y;
+  items.forEach((it, i) => {
+    if (i > 0 && i % cols === 0) {
+      y += h + gap;
+      x = PAGE.margin;
+    }
+    doc.roundedRect(x, y, w, h, 6).strokeColor("#E5E0D6").lineWidth(1).stroke();
+    doc.fillColor("#888").font("Helvetica").fontSize(8).text(String(it.label).toUpperCase(), x + 10, y + 8, { width: w - 20 });
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(15).text(String(it.value), x + 10, y + 20, { width: w - 20 });
+    x += w + gap;
+  });
+  doc.x = PAGE.margin;
+  doc.y = y + h + 16;
+}
+
+function table(doc, title, columns, rows) {
+  // columns: [{ label, width, align? 'right' }] (widths somam ~ contentWidth); rows: string[][]
+  const contentW = doc.page.width - PAGE.margin * 2;
+  const totalW = columns.reduce((a, c) => a + c.width, 0);
+  const scale = contentW / totalW;
+  const w = columns.map((c) => c.width * scale);
+  const rowH = 20;
+
+  const ensure = (need) => {
+    if (doc.y + need > doc.page.height - PAGE.margin) {
+      doc.addPage();
+      doc.y = PAGE.top;
+    }
+  };
+  const drawHead = () => {
+    if (title) {
+      doc.fillColor("#111").font("Helvetica-Bold").fontSize(12).text(title, PAGE.margin, doc.y);
+      doc.moveDown(0.3);
+    }
+    const y = doc.y;
+    doc.rect(PAGE.margin, y, contentW, rowH).fill("#F3EFE6");
+    let x = PAGE.margin;
+    doc.fillColor("#5b5342").font("Helvetica-Bold").fontSize(9);
+    columns.forEach((c, i) => {
+      doc.text(String(c.label).toUpperCase(), x + 6, y + 6, { width: w[i] - 12, align: c.align || "left" });
+      x += w[i];
+    });
+    doc.y = y + rowH;
+  };
+
+  ensure(rowH * 3);
+  drawHead();
+  doc.font("Helvetica").fontSize(9.5).fillColor("#222");
+  rows.forEach((r, idx) => {
+    ensure(rowH);
+    const y = doc.y;
+    if (idx % 2 === 1) doc.rect(PAGE.margin, y, contentW, rowH).fill("#FBFAF7");
+    let x = PAGE.margin;
+    doc.fillColor("#222");
+    columns.forEach((c, i) => {
+      doc.text(String(r[i] ?? ""), x + 6, y + 5.5, { width: w[i] - 12, align: c.align || "left", ellipsis: true });
+      x += w[i];
+    });
+    doc.y = y + rowH;
+  });
+  if (!rows.length) {
+    const y = doc.y;
+    doc.fillColor("#999").font("Helvetica-Oblique").fontSize(9).text("Sem dados no período.", PAGE.margin + 6, y + 5);
+    doc.y = y + rowH;
+  }
+  doc.moveDown(1);
+}
+
+/** Renderiza o PDF profissional (kind: 'platform' | 'barbershop'). Retorna Buffer. */
+function renderReportPdf(kind, rep) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 42 });
+    const doc = new PDFDocument({ size: "A4", margin: PAGE.margin });
     const chunks = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const p = rep.platform || {};
-    doc.fillColor("#111").fontSize(20).text("Barber Agência — Relatório mensal");
-    doc.moveDown(0.2).fillColor("#666").fontSize(11).text(`Período: ${rep.period?.label ?? ""}`);
-    doc.moveDown().fillColor("#111").fontSize(13).text("Consolidado da plataforma");
-    doc.moveDown(0.3).fontSize(11);
-    const line = (k, v) => doc.text(`${k}: ${v}`);
-    line("Entradas", brl(p.entradas));
-    line("Saídas", brl(p.saidas));
-    line("Resultado (líquido)", brl(p.liquido));
-    line("Barbearias", `${p.barbershops ?? 0} (${p.activeBarbershops ?? 0} ativas)`);
-    line("Clientes", `${p.clients ?? 0} (+${p.newClients ?? 0} no mês)`);
-    line("Assinantes ativos", `${p.subscribers ?? 0}`);
-
-    doc.moveDown().fontSize(13).text("Entradas por método").moveDown(0.3).fontSize(11);
-    (p.byMethod || []).forEach((m) => line(m.method, brl(m.total)));
-    if (!(p.byMethod || []).length) doc.fillColor("#666").text("—").fillColor("#111");
-
-    doc.moveDown().fontSize(13).text("Receita por cliente (top 15)").moveDown(0.3).fontSize(11);
-    (p.topClients || []).forEach((c, i) => line(`${i + 1}. ${c.name} — ${c.tenantName}`, brl(c.total)));
-    if (!(p.topClients || []).length) doc.fillColor("#666").text("—").fillColor("#111");
-
-    doc.addPage().fontSize(13).text("Por barbearia").moveDown(0.4).fontSize(10);
-    (rep.perBarbershop || []).forEach((b) => {
-      doc.text(
-        `${b.name}  ·  ${b.plan}  ·  clientes ${b.clients} (+${b.newClients})  ·  assinantes ${b.subscribers}  ·  entradas ${brl(b.entradas)}  ·  saídas ${brl(b.saidas)}`
-      );
-      doc.moveDown(0.2);
-    });
+    if (kind === "barbershop") {
+      pdfTitle(doc, rep.name || "Barbearia", `Relatório · ${rep.period?.label ?? ""}`);
+      kpiGrid(doc, [
+        { label: "Entradas", value: brl(rep.entradas) },
+        { label: "Saídas", value: brl(rep.saidas) },
+        { label: "Resultado", value: brl((rep.entradas || 0) - (rep.saidas || 0)) },
+        { label: "Novos clientes", value: rep.newClients ?? 0 },
+        { label: "Clientes (total)", value: rep.totalClients ?? 0 },
+        { label: "Assinantes", value: rep.subscribers ?? 0 },
+        { label: "Atendimentos", value: rep.appointments ?? 0 },
+      ]);
+      table(doc, "Faturamento por método", [{ label: "Método", width: 3 }, { label: "Total", width: 2, align: "right" }],
+        (rep.byMethod || []).map((m) => [m.method, brl(m.total)]));
+      table(doc, "Faturamento por serviço", [{ label: "Serviço", width: 3 }, { label: "Qtd", width: 1, align: "right" }, { label: "Valor", width: 2, align: "right" }],
+        (rep.byService || []).map((s) => [s.name, String(s.qty), brl(s.value)]));
+      table(doc, "Novos clientes no período", [{ label: "Nome", width: 3 }, { label: "Telefone", width: 2 }, { label: "Cadastro", width: 1.4, align: "right" }],
+        (rep.newClientsList || []).map((c) => [c.name, c.phone || "—", c.date]));
+    } else {
+      const p = rep.platform || {};
+      pdfTitle(doc, "Barber Agência", `Relatório da plataforma · ${rep.period?.label ?? ""}`);
+      kpiGrid(doc, [
+        { label: "Entradas", value: brl(p.entradas) },
+        { label: "Saídas", value: brl(p.saidas) },
+        { label: "Resultado", value: brl(p.liquido) },
+        { label: "Barbearias", value: `${p.barbershops ?? 0} (${p.activeBarbershops ?? 0} ativas)` },
+        { label: "Clientes", value: `${p.clients ?? 0} (+${p.newClients ?? 0})` },
+        { label: "Assinantes", value: p.subscribers ?? 0 },
+      ]);
+      table(doc, "Entradas por método", [{ label: "Método", width: 3 }, { label: "Total", width: 2, align: "right" }],
+        (p.byMethod || []).map((m) => [m.method, brl(m.total)]));
+      table(doc, "Faturamento por serviço", [{ label: "Serviço", width: 3 }, { label: "Qtd", width: 1, align: "right" }, { label: "Valor", width: 2, align: "right" }],
+        (rep.byService || []).map((s) => [s.name, String(s.qty), brl(s.value)]));
+      table(doc, "Receita por cliente (top 15)", [{ label: "Cliente", width: 2.4 }, { label: "Barbearia", width: 2.2 }, { label: "Receita", width: 1.4, align: "right" }],
+        (p.topClients || []).map((c) => [c.name, c.tenantName, brl(c.total)]));
+      table(doc, "Por barbearia", [
+        { label: "Barbearia", width: 2.4 }, { label: "Plano", width: 1.2 }, { label: "Clientes", width: 1, align: "right" },
+        { label: "Novos", width: 0.9, align: "right" }, { label: "Assin.", width: 0.9, align: "right" }, { label: "Entradas", width: 1.4, align: "right" },
+      ], (rep.perBarbershop || []).map((b) => [b.name, b.plan, String(b.clients), String(b.newClients), String(b.subscribers), brl(b.entradas)]));
+    }
     doc.end();
   });
 }
@@ -384,42 +483,76 @@ async function sendDocument(tenantId, phone, buffer, fileName, caption) {
   return { ok: true };
 }
 
-/** Busca o relatório no app, gera o PDF e envia para os destinatários configurados. */
-async function runMonthlyReport(ym) {
+/** Busca {kind, report} no app. params: {ym?} (plataforma) ou {tenant, from?, to?} (barbearia). */
+async function fetchReport(params) {
   if (!REPORT.appUrl || !REPORT.token) throw new Error("APP_REPORT_URL / REPORT_TOKEN ausentes");
-  if (!REPORT.senderSession) throw new Error("REPORT_SENDER_SESSION ausente (sessão remetente)");
-  if (!REPORT.recipients.length) throw new Error("REPORT_RECIPIENTS ausente");
-
   const qs = new URLSearchParams({ token: REPORT.token });
-  if (ym) qs.set("ym", ym);
+  for (const [k, v] of Object.entries(params || {})) if (v) qs.set(k, v);
   const res = await fetch(`${REPORT.appUrl}/api/master/report?${qs.toString()}`, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error(`app respondeu ${res.status}`);
-  const rep = await res.json();
+  return res.json(); // { kind, report }
+}
 
-  const pdf = await buildReportPdf(rep);
-  const fileName = `relatorio-${(rep.period?.label || "mensal").replace(/\s+/g, "-")}.pdf`;
-  const caption = `📊 Barber Agência — Relatório mensal (${rep.period?.label ?? ""})`;
-
+/** Cron/manual: relatório da plataforma para os destinatários fixos. */
+async function runMonthlyReport(ym) {
+  if (!REPORT.senderSession) throw new Error("REPORT_SENDER_SESSION ausente (sessão remetente)");
+  if (!REPORT.recipients.length) throw new Error("REPORT_RECIPIENTS ausente");
+  const { kind, report } = await fetchReport({ ym });
+  const pdf = await renderReportPdf(kind, report);
+  const fileName = `relatorio-plataforma-${(report.period?.label || "mensal").replace(/\s+/g, "-")}.pdf`;
+  const caption = `📊 Barber Agência — Relatório da plataforma (${report.period?.label ?? ""})`;
   const out = [];
   for (const phone of REPORT.recipients) {
     try {
-      const r = await sendDocument(REPORT.senderSession, phone, pdf, fileName, caption);
-      out.push({ phone, ...r });
+      out.push({ phone, ...(await sendDocument(REPORT.senderSession, phone, pdf, fileName, caption)) });
     } catch (e) {
       out.push({ phone, ok: false, error: e?.message });
     }
   }
-  log.info({ out }, "relatório mensal enviado");
+  log.info({ out }, "relatório da plataforma enviado");
   return out;
 }
 
-// Disparo manual do relatório (para testar): POST /report/run  (?ym=YYYY-MM opcional)
+// Renderiza o PDF a partir de {kind, report} — usado pelo app no "Baixar PDF".
+app.post("/render-report", async (req, res) => {
+  try {
+    const { kind, report } = req.body || {};
+    if (!report) return res.status(400).json({ error: "report obrigatório" });
+    const pdf = await renderReportPdf(kind === "barbershop" ? "barbershop" : "platform", report);
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+  } catch (e) {
+    log.error(e, "render-report");
+    res.status(500).json({ error: "render_failed" });
+  }
+});
+
+// Relatório da plataforma — disparo manual (para os destinatários fixos).
 app.post("/report/run", async (req, res) => {
   try {
-    const out = await runMonthlyReport(req.query.ym);
-    res.json({ ok: true, out });
+    res.json({ ok: true, out: await runMonthlyReport(req.query.ym) });
   } catch (e) {
     log.error(e, "report/run");
+    res.status(500).json({ ok: false, error: e?.message });
+  }
+});
+
+// Relatório de UMA barbearia → envia para o telefone dela. body: { tenant, from?, to?, phone? }
+app.post("/report/send", async (req, res) => {
+  try {
+    if (!REPORT.senderSession) throw new Error("REPORT_SENDER_SESSION ausente");
+    const { tenant, from, to, phone } = req.body || {};
+    if (!tenant) return res.status(400).json({ ok: false, error: "tenant obrigatório" });
+    const { report } = await fetchReport({ tenant, from, to });
+    const dest = phone || report.phone;
+    if (!dest) return res.status(400).json({ ok: false, error: "barbearia sem telefone cadastrado" });
+    const pdf = await renderReportPdf("barbershop", report);
+    const fileName = `relatorio-${(report.name || "barbearia").replace(/\s+/g, "-")}.pdf`;
+    const caption = `📊 ${report.name} — Relatório (${report.period?.label ?? ""})`;
+    const r = await sendDocument(REPORT.senderSession, dest, pdf, fileName, caption);
+    res.json({ ok: r.ok, error: r.error, phone: dest });
+  } catch (e) {
+    log.error(e, "report/send");
     res.status(500).json({ ok: false, error: e?.message });
   }
 });

@@ -26,6 +26,28 @@ export async function sendReportNow(ym?: string) {
   }
 }
 
+/** MASTER: envia o relatório de UMA barbearia (período) para o WhatsApp dela. */
+export async function sendBarbershopReport(tenantId: string, from?: string, to?: string) {
+  const user = await getSessionUser();
+  if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
+  const base = process.env.WA_SERVICE_URL;
+  const token = process.env.WA_SERVICE_TOKEN;
+  if (!base || !token) return { ok: false as const, error: "Gateway não configurado (WA_SERVICE_URL/TOKEN)." };
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/report/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-wa-token": token },
+      body: JSON.stringify({ tenant: tenantId, from, to }),
+      signal: AbortSignal.timeout(60000),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; phone?: string };
+    if (!res.ok || data.ok === false) return { ok: false as const, error: data.error || `Gateway respondeu ${res.status}` };
+    return { ok: true as const, phone: data.phone };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Falha de rede" };
+  }
+}
+
 function tempPassword() {
   return "Bb" + randomUUID().replace(/-/g, "").slice(0, 10) + "#7";
 }

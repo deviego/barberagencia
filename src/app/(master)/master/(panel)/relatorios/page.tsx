@@ -1,5 +1,6 @@
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getMonthlyReport } from "@/features/platform/report";
-import { PrintButton } from "@/features/platform/components/print-button";
 import { SendReportButton } from "@/features/platform/components/send-report-button";
 import { formatBRL } from "@/lib/utils";
 
@@ -22,7 +23,11 @@ export default async function RelatoriosPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-2 print:hidden">
-          <PrintButton />
+          <a href="/api/master/report/pdf" target="_blank" rel="noopener noreferrer">
+            <Button variant="outline">
+              <Download size={16} /> Baixar PDF
+            </Button>
+          </a>
           <SendReportButton />
         </div>
       </div>
@@ -71,6 +76,23 @@ export default async function RelatoriosPage() {
           )}
         </Panel>
       </div>
+
+      {/* Faturamento por serviço */}
+      <Panel title="Faturamento por serviço">
+        {r.byService.length ? (
+          <Table head={["Serviço", "Qtd", "Valor"]}>
+            {r.byService.map((s, i) => (
+              <tr key={i} className="border-b border-border-subtle">
+                <td className="px-4 py-2 text-text">{s.name}</td>
+                <td className="px-4 py-2 text-right text-text-2 tabular">{s.qty}</td>
+                <td className="px-4 py-2 text-right text-text tabular">{formatBRL(s.value)}</td>
+              </tr>
+            ))}
+          </Table>
+        ) : (
+          <Empty>Sem serviços registrados no período.</Empty>
+        )}
+      </Panel>
 
       {/* Por barbearia */}
       <Panel title="Por barbearia">

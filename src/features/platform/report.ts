@@ -5,8 +5,27 @@ import { normalizeSaasPlan } from "@/lib/entitlements";
 type Row = Record<string, any>;
 const num = (v: any) => Number(v ?? 0);
 
+export type ServiceRow = { name: string; qty: number; value: number };
+
+export type BarbershopReport = {
+  tenantId: string;
+  name: string;
+  phone: string | null;
+  period: { label: string; startISO: string; endISO: string };
+  totalClients: number;
+  newClients: number;
+  subscribers: number;
+  appointments: number;
+  entradas: number;
+  saidas: number;
+  byMethod: { method: string; total: number }[];
+  byService: ServiceRow[];
+  newClientsList: { name: string; phone: string | null; date: string }[];
+};
+
 export type MonthlyReport = {
   period: { label: string; startISO: string; endISO: string };
+  byService: ServiceRow[];
   platform: {
     barbershops: number;
     activeBarbershops: number;
@@ -126,8 +145,11 @@ export async function getMonthlyReport(ref?: Date): Promise<MonthlyReport> {
     }))
     .sort((a, b) => b.entradas - a.entradas);
 
+  const byService = await servicesBreakdown(admin, null, startISO, endISO);
+
   return {
     period: { label, startISO, endISO },
+    byService,
     platform: {
       barbershops: tenants.length,
       activeBarbershops: tenants.filter((t) => (t.status ?? "ACTIVE") === "ACTIVE").length,
@@ -142,5 +164,105 @@ export async function getMonthlyReport(ref?: Date): Promise<MonthlyReport> {
       topClients,
     },
     perBarbershop,
+  };
+}
+
+/** Faturamento/serviços realizados por serviço, em um período (opcionalmente por barbearia). */
+async function servicesBreakdown(admin: any, tenantId: string | null, fromISO: string, toISO: string): Promise<ServiceRow[]> {
+  const map = new Map<string, { qty: number; value: number }>();
+  const add = (name: string, qty: number, value: number) => {
+    const k = name || "Serviço";
+    const cur = map.get(k) ?? { qty: 0, value: 0 };
+    cur.qty += qty;
+    cur.value += value;
+    map.set(k, cur);
+  };
+
+  // Itens de comanda (agendamentos) — não cobertos pelo plano contam como faturamento.
+  let aq = admin
+    .from("appointment_items")
+    .select("name, price_brl, qty, covered_by_plan, tenant_id, created_at")
+    .eq("kind", "service")
+    .gte("created_at", fromISO)
+    .lt("created_at", toISO);
+  if (tenantId) aq = aq.eq("tenant_id", tenantId);
+  const aRes = await aq;
+  for (const r of (aRes.data ?? []) as Row[]) {
+    const qty = num(r.qty) || 1;
+    add(r.name as string, qty, r.covered_by_plan ? 0 : num(r.price_brl) * qty);
+  }
+
+  // Itens de venda (PDV/balcão).
+  let sq = admin.from("sales").select("id, tenant_id, created_at").gte("created_at", fromISO).lt("created_at", toISO);
+  if (tenantId) sq = sq.eq("tenant_id", tenantId);
+  const salesRes = await sq;
+  const saleIds = ((salesRes.data ?? []) as Row[]).map((s) => s.id);
+  if (saleIds.length) {
+    const siRes = await admin.from("sale_items").select("name, price_brl, qty, kind, sale_id").eq("kind", "service").in("sale_id", saleIds);
+    for (const r of (siRes.data ?? []) as Row[]) {
+      const qty = num(r.qty) || 1;
+      add(r.name as string, qty, num(r.price_brl) * qty);
+    }
+  }
+
+  return [...map.entries()].map(([name, v]) => ({ name, qty: v.qty, value: v.value })).sort((a, b) => b.value - a.value);
+}
+
+/** Relatório de UMA barbearia num período (de/até). Padrão: mês atual. */
+export async function getBarbershopReport(tenantId: string, from?: Date, to?: Date): Promise<BarbershopReport | null> {
+  const admin = createSupabaseAdminClient();
+  const now = new Date();
+  const start = from ?? new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+  const end = to ?? new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0);
+  const startISO = start.toISOString();
+  const endISO = end.toISOString();
+  const label = `${start.toLocaleDateString("pt-BR")} — ${new Date(end.getTime() - 86400000).toLocaleDateString("pt-BR")}`;
+
+  const { data: t } = await admin.from("tenants").select("id, name").eq("id", tenantId).maybeSingle();
+  if (!t) return null;
+  const { data: settings } = await admin.from("tenant_settings").select("phone").eq("tenant_id", tenantId).maybeSingle();
+
+  const [clientsRes, newRes, subsRes, apptRes, finRes, byService] = await Promise.all([
+    admin.from("clients").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    admin.from("clients").select("id, name, phone, created_at").eq("tenant_id", tenantId).gte("created_at", startISO).lt("created_at", endISO).order("created_at"),
+    admin.from("client_subscriptions").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "ACTIVE"),
+    admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("start_at", startISO).lt("start_at", endISO).neq("status", "CANCELLED"),
+    admin.from("financial_entries").select("type, amount_brl, method, occurred_at").eq("tenant_id", tenantId).gte("occurred_at", startISO).lt("occurred_at", endISO),
+    servicesBreakdown(admin, tenantId, startISO, endISO),
+  ]);
+
+  const fins = (finRes.data ?? []) as Row[];
+  let entradas = 0;
+  let saidas = 0;
+  const methodMap = new Map<string, number>();
+  for (const f of fins) {
+    const amt = num(f.amount_brl);
+    if (f.type === "REVENUE") {
+      entradas += amt;
+      const m = (f.method as string) ?? "—";
+      methodMap.set(m, (methodMap.get(m) ?? 0) + amt);
+    } else saidas += amt;
+  }
+  const byMethod = [...methodMap.entries()].map(([method, total]) => ({ method: METHOD_LABEL[method] ?? method, total })).sort((a, b) => b.total - a.total);
+  const newList = ((newRes.data ?? []) as Row[]).map((c) => ({
+    name: c.name as string,
+    phone: (c.phone as string) ?? null,
+    date: new Date(c.created_at as string).toLocaleDateString("pt-BR"),
+  }));
+
+  return {
+    tenantId,
+    name: t.name as string,
+    phone: (settings?.phone as string) ?? null,
+    period: { label, startISO, endISO },
+    totalClients: clientsRes.count ?? 0,
+    newClients: newList.length,
+    subscribers: subsRes.count ?? 0,
+    appointments: apptRes.count ?? 0,
+    entradas,
+    saidas,
+    byMethod,
+    byService,
+    newClientsList: newList,
   };
 }

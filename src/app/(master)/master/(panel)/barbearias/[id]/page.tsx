@@ -14,6 +14,7 @@ import { getUpgradeRequestsForTenant } from "@/features/plan/data";
 import { MasterPlanPanel } from "@/features/plan/components/master-plan-panel";
 import { getQueueConfig } from "@/features/queue/data";
 import { QueueEnableToggle } from "@/features/queue/components/queue-enable-toggle";
+import { BarbershopReport } from "@/features/platform/components/barbershop-report";
 import { formatBRL } from "@/lib/utils";
 
 const PLAN_LABEL: Record<string, string> = {
@@ -158,6 +159,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       </Section>
 
       <MasterPlanPanel tenantId={t.id} plan={t.saasPlan} requests={upgradeReqs} />
+
+      <BarbershopReport tenantId={t.id} />
 
       <QueueEnableToggle tenantId={t.id} enabled={queueConfig.enabled} />
 
