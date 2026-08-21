@@ -15,6 +15,7 @@ import { headers } from "next/headers";
 import { getQueueConfig, getTotemToken } from "@/features/queue/data";
 import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
 import { TotemConfig } from "@/features/queue/components/totem-config";
+import { ClientQr } from "@/features/admin/components/client-qr";
 
 export default async function ConfigPage() {
   const [tenant, branding, unit, contract, planUsage] = await Promise.all([
@@ -27,14 +28,34 @@ export default async function ConfigPage() {
   const contractView = buildContractView(contract);
   const queueCfg = await getQueueConfig(tenant.id);
 
+  const h = await headers();
+  const host = h.get("host") ?? "";
+  const proto = host.includes("localhost") ? "http" : "https";
+
+  // QR público da barbearia (cartaz para a parede) — leva o cliente à página dele.
+  const publicUrl = `${proto}://${host}/b/${tenant.subdomain}`;
+  const publicQr = await QRCode.toDataURL(publicUrl, { margin: 1, width: 600, errorCorrectionLevel: "H" });
+  // Logo embutida como data URL (evita canvas "tainted" ao exportar o PNG).
+  const logoUrl = branding?.logo_url ?? tenant.branding.logoUrl ?? null;
+  let logoData: string | null = null;
+  if (logoUrl) {
+    try {
+      const res = await fetch(logoUrl);
+      if (res.ok) {
+        const ct = res.headers.get("content-type") ?? "image/png";
+        const b64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+        logoData = `data:${ct};base64,${b64}`;
+      }
+    } catch {
+      logoData = null;
+    }
+  }
+
   // Link + QR do totem (quando a fila está ativa).
   let totem: { url: string; qr: string } | null = null;
   if (queueCfg.enabled) {
     const token = await getTotemToken(tenant.id);
     if (token) {
-      const h = await headers();
-      const host = h.get("host") ?? "";
-      const proto = host.includes("localhost") ? "http" : "https";
       const url = `${proto}://${host}/b/${tenant.subdomain}/totem?k=${token}`;
       totem = { url, qr: await QRCode.toDataURL(url, { margin: 1, width: 220 }) };
     }
@@ -67,6 +88,17 @@ export default async function ConfigPage() {
           initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
         />
       </section>
+
+      <ClientQr
+        publicUrl={publicUrl}
+        slug={tenant.subdomain}
+        qrDataUrl={publicQr}
+        logoDataUrl={logoData}
+        logoText={tenant.branding.logoText}
+        name={tenant.name}
+        instagram={branding?.instagram ?? tenant.branding.instagram ?? null}
+        accent={branding?.accent ?? "#C9A24B"}
+      />
 
       <WhatsAppConnect />
 
