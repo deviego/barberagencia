@@ -430,12 +430,12 @@ app.listen(PORT, () => {
   setInterval(tickWatchdog, 20_000).unref();
   setInterval(() => tickReconnectDown().catch(() => {}), WATCHDOG_MS).unref();
 
-  // Cron mensal: dia 1, 09:00 (America/Sao_Paulo) → gera e envia o relatório.
+  // Cron mensal: dia 21, 09:00 (America/Sao_Paulo) → gera e envia o relatório.
   if (REPORT.appUrl && REPORT.token && REPORT.senderSession && REPORT.recipients.length) {
-    cron.schedule("0 9 1 * *", () => runMonthlyReport().catch((e) => log.error(e, "cron report")), {
+    cron.schedule("0 9 21 * *", () => runMonthlyReport().catch((e) => log.error(e, "cron report")), {
       timezone: "America/Sao_Paulo",
     });
-    log.info({ recipients: REPORT.recipients.length }, "cron do relatório mensal ativo (dia 1, 09:00 BRT)");
+    log.info({ recipients: REPORT.recipients.length }, "cron do relatório mensal ativo (dia 21, 09:00 BRT)");
   } else {
     log.info("relatório mensal inativo (defina APP_REPORT_URL, REPORT_TOKEN, REPORT_SENDER_SESSION, REPORT_RECIPIENTS)");
   }
