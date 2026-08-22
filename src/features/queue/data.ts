@@ -128,6 +128,46 @@ export async function getAdminQueue(): Promise<AdminQueueItem[]> {
   }));
 }
 
+export type QueueDay = { day: string; total: number; done: number; left: number; waiting: number };
+export type QueueHistory = { today: QueueDay; days: QueueDay[] };
+
+const emptyDay = (day: string): QueueDay => ({ day, total: 0, done: 0, left: 0, waiting: 0 });
+
+/**
+ * Histórico diário das senhas da fila (últimos `days` dias, fuso America/Sao_Paulo).
+ * Retorna o resumo de hoje + a lista de dias COM movimento (mais recente primeiro).
+ * Sob RLS (política de admin do tenant).
+ */
+export async function getQueueHistory(days = 14): Promise<QueueHistory> {
+  const supabase = await createSupabaseServerClient();
+  const tz = "America/Sao_Paulo";
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+  // início do período (today - (days-1)), calculado ao meio-dia UTC p/ evitar deslize de fuso.
+  const startDate = new Date(`${today}T12:00:00Z`);
+  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+  const startDay = startDate.toISOString().slice(0, 10);
+
+  const { data } = await supabase
+    .from("queue_entries")
+    .select("day, status")
+    .gte("day", startDay)
+    .lte("day", today)
+    .order("day", { ascending: false });
+
+  const map = new Map<string, QueueDay>();
+  for (const r of (data ?? []) as { day: string; status: string }[]) {
+    const d = map.get(r.day) ?? emptyDay(r.day);
+    d.total += 1;
+    if (r.status === "DONE") d.done += 1;
+    else if (r.status === "LEFT") d.left += 1;
+    else d.waiting += 1; // WAITING | IN_SERVICE (ainda em aberto)
+    map.set(r.day, d);
+  }
+
+  const daysList = [...map.values()].sort((a, b) => (a.day < b.day ? 1 : -1));
+  return { today: map.get(today) ?? emptyDay(today), days: daysList };
+}
+
 /** Barbeiros que participam da fila (para o cliente escolher, se a flag permitir). */
 export async function getQueueBarbers(tenantId: string): Promise<{ id: string; name: string }[]> {
   const admin = createSupabaseAdminClient();

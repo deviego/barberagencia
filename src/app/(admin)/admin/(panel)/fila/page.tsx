@@ -7,7 +7,8 @@ import { hasEntitlement, minPlanForFeature } from "@/lib/entitlements";
 import { LockedFeature } from "@/features/plan/components/locked-feature";
 import { AdminFila } from "@/features/queue/components/admin-fila";
 import { TotemAccess } from "@/features/queue/components/totem-access";
-import { getAdminQueue, getQueueConfig, getTotemToken } from "@/features/queue/data";
+import { QueueHistory } from "@/features/queue/components/queue-history";
+import { getAdminQueue, getQueueConfig, getQueueHistory, getTotemToken } from "@/features/queue/data";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,11 @@ export default async function AdminFilaPage() {
 
   // QR: no modo totem, aponta para o kiosk (abrir no iPad); no app, para a fila do cliente.
   const qrTarget = totemOn && totemUrl ? totemUrl : filaUrl;
-  const [items, qrDataUrl] = await Promise.all([getAdminQueue(), QRCode.toDataURL(qrTarget, { margin: 1, width: 240 })]);
+  const [items, qrDataUrl, history] = await Promise.all([
+    getAdminQueue(),
+    QRCode.toDataURL(qrTarget, { margin: 1, width: 240 }),
+    getQueueHistory(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,6 +76,8 @@ export default async function AdminFilaPage() {
 
         <TotemAccess totemUrl={totemUrl} painelUrl={painelUrl} qrDataUrl={qrDataUrl} totemOn={totemOn && !!totemUrl} />
       </div>
+
+      <QueueHistory data={history} />
     </div>
   );
 }
