@@ -11,7 +11,7 @@ export function LandingHeader() {
   return (
     <header
       className="sticky top-0 z-50 border-b border-border"
-      style={{ background: "rgba(13,13,13,0.82)", backdropFilter: "blur(12px)" }}
+      style={{ background: "var(--bb-header-bg)", backdropFilter: "blur(12px)" }}
     >
       <div className="mx-auto flex max-w-[1240px] flex-nowrap items-center justify-between gap-5 px-5 py-3.5 sm:px-8">
         {/* Marca */}

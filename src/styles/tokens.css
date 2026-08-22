@@ -17,6 +17,8 @@
   --bb-danger: #FF385C; --bb-danger-strong: #B31935; --bb-danger-bg: #FFEBEF;
   --bb-info: #5556EE; --bb-info-bg: #EEEEFD;
 
+  --bb-header-bg: rgba(13,13,13,0.82); /* fallback; sobrescrito por tema (dark/light) */
+
   --bb-radius-sm: 4px; --bb-radius-md: 8px; --bb-radius-lg: 16px; --bb-radius-pill: 999px;
   --bb-shadow-sm: 0 2px 3px 0 rgba(0,0,0,0.08);
   --bb-shadow-md: 0 4px 8px 0 rgba(0,0,0,0.10);
@@ -30,6 +32,7 @@
   --bb-text: #F5F1E8; --bb-text-2: #B9B2A4; --bb-text-muted: #7A756B; --bb-text-inverse: #171717;
   --bb-accent: #C9A24B; --bb-accent-hover: #DDB86A; --bb-accent-down: #A8842F; --bb-accent-wash: rgba(201,162,75,0.12);
   --bb-focus: #DDB86A;
+  --bb-header-bg: rgba(13,13,13,0.82); /* header translúcido da landing */
   /* Washes semânticos do tema DARK (sobrescrevem os solids claros do bloco fixo) */
   --bb-success-bg: rgba(8,212,139,0.14);
   --bb-warning-bg: rgba(255,200,57,0.14);
@@ -45,6 +48,7 @@
   --bb-text: #171717; --bb-text-2: #565248; --bb-text-muted: #948D7F; --bb-text-inverse: #FAFAF7;
   --bb-accent: #A8842F; --bb-accent-hover: #7D611F; --bb-accent-down: #7D611F; --bb-accent-wash: rgba(168,132,47,0.10);
   --bb-focus: #A8842F;
+  --bb-header-bg: rgba(255,255,255,0.82); /* header translúcido da landing (modo claro) */
   /* No tema light os neutros altos são CLAREADOS (conforme handoff 02) —
      afeta o anel do CutMeter e o disabled do modal de termos. */
   --bb-n50:#FAFAF7; --bb-n100:#F0EEE8; --bb-n200:#DCD8CE; --bb-n300:#B9B2A4; --bb-n400:#948D7F; --bb-n500:#7A756B; --bb-n600:#948D7F; --bb-n700:#DCD8CE; --bb-n800:#F0EEE8; --bb-n900:#14130E;

@@ -40,3 +40,6 @@ Slide*.jpeg
 Slide*.JPG.jpeg
 /Unclear message.zip
 tsconfig.tsbuildinfo
+
+# relatórios locais de segurança (gstack)
+/.gstack/
