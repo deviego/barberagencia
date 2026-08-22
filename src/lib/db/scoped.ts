@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
 
 /**
- * Modelos tenant-scoped: toda query passa a filtrar/injetar tenantId
- * automaticamente. Enforcement PRIMÁRIO de isolamento multi-tenant
- * (RLS no Postgres é a defesa em profundidade).
+ * ⚠️ NÃO EM USO no runtime. O isolamento multi-tenant EFETIVO é o RLS no Postgres
+ * (policies com `auth_tenant_id()`) somado ao filtro `tenant_id` manual nas queries
+ * supabase-js. Este helper (Prisma) existe apenas como alternativa histórica e não é
+ * importado em lugar nenhum. Se for adotar, torná-lo a via única; caso contrário, remover.
+ *
+ * Modelos tenant-scoped: toda query passaria a filtrar/injetar tenantId automaticamente.
  */
 const TENANT_MODELS = new Set([
   "Barber",
@@ -34,8 +37,7 @@ const READ_OPS = new Set([
 ]);
 
 /**
- * Retorna um Prisma Client escopado ao tenant. Use SEMPRE este client nas
- * queries de negócio; nunca `prisma` cru para dados tenant-scoped.
+ * Retorna um Prisma Client escopado ao tenant. (Atualmente não utilizado — ver nota acima.)
  */
 export function getScopedDb(tenantId: string) {
   return prisma.$extends({

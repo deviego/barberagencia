@@ -2,7 +2,8 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
+import { getRequestOrigin } from "@/lib/http";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
@@ -188,10 +189,7 @@ export async function createTenant(input: {
     .eq("tenant_id", tenant.id);
 
   // Link do painel admin (o tenant é resolvido pela membership no login) + link do cliente
-  const h = await headers();
-  const host = h.get("host") ?? "";
-  const proto = host.includes("localhost") ? "http" : "https";
-  const origin = host ? `${proto}://${host}` : "";
+  const origin = await getRequestOrigin();
 
   revalidatePath("/master");
   revalidatePath("/master/barbearias");

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { getRequestOrigin } from "@/lib/http";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
@@ -156,10 +156,7 @@ export async function createInvite(values: { name?: string; phone?: string; emai
 
   // Dispara o convite (WhatsApp/e-mail) com o link do portal.
   try {
-    const hdrs = await headers();
-    const host = hdrs.get("host") ?? "";
-    const proto = host.includes("localhost") ? "http" : "https";
-    const link = `${proto}://${host}/convite/${token}`;
+    const link = `${await getRequestOrigin()}/convite/${token}`;
     const tenant = await getCurrentTenant();
     await notifyInvite({
       name: values.name ?? null,

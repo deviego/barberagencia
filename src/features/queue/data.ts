@@ -2,6 +2,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
+import { safeEqual } from "@/lib/crypto/safe-equal";
 
 export type QueueBoardItem = {
   id: string;
@@ -195,7 +196,7 @@ export async function getTotemData(slug: string, token: string): Promise<TotemDa
     .select("id, name, queue_enabled, totem_token")
     .eq("subdomain", slug)
     .maybeSingle();
-  if (!t?.totem_token || t.totem_token !== token || !t.queue_enabled) return null;
+  if (!t?.queue_enabled || !safeEqual(t?.totem_token as string | null, token)) return null;
 
   const [{ data: s }, services, barbers] = await Promise.all([
     admin.from("tenant_settings").select("queue_pick_barber, queue_mode, queue_plan_requires_service").eq("tenant_id", t.id).maybeSingle(),

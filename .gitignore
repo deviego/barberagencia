@@ -11,9 +11,9 @@ next-env.d.ts
 # production
 /build
 
-# env
-.env
-.env*.local
+# env (ignora todos os .env, exceto o exemplo com placeholders)
+.env*
+!.env.example
 
 # prisma
 # (keep schema + migrations; ignore generated client if custom output used)

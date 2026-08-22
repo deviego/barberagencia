@@ -111,10 +111,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  // Headers de segurança (CSP/HSTS/etc.) são aplicados globalmente em next.config.mjs
+  // (cobrem também redirects e assets estáticos que o matcher do middleware exclui).
   return response;
 }
 

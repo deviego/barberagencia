@@ -2,11 +2,10 @@ import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getMonthlyReport } from "@/features/platform/report";
 import { SendReportButton } from "@/features/platform/components/send-report-button";
+import { PLAN_LABEL } from "@/features/contract/view";
 import { formatBRL } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-const PLAN_LABEL: Record<string, string> = { personal: "Personal", essencial: "Essencial", advance: "Advance" };
 
 export default async function RelatoriosPage() {
   const r = await getMonthlyReport();

@@ -11,7 +11,7 @@ import { ContractSection } from "@/features/contract/components/contract-section
 import { getPlanUsage } from "@/lib/plan/effective";
 import { PlanUsage } from "@/features/plan/components/plan-usage";
 import QRCode from "qrcode";
-import { headers } from "next/headers";
+import { getRequestOrigin } from "@/lib/http";
 import { getQueueConfig, getTotemToken } from "@/features/queue/data";
 import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
 import { TotemConfig } from "@/features/queue/components/totem-config";
@@ -28,12 +28,10 @@ export default async function ConfigPage() {
   const contractView = buildContractView(contract);
   const queueCfg = await getQueueConfig(tenant.id);
 
-  const h = await headers();
-  const host = h.get("host") ?? "";
-  const proto = host.includes("localhost") ? "http" : "https";
+  const origin = await getRequestOrigin();
 
   // QR público da barbearia (cartaz para a parede) — leva o cliente à página dele.
-  const publicUrl = `${proto}://${host}/b/${tenant.subdomain}`;
+  const publicUrl = `${origin}/b/${tenant.subdomain}`;
   const publicQr = await QRCode.toDataURL(publicUrl, { margin: 1, width: 600, errorCorrectionLevel: "H" });
   // Logo embutida como data URL (evita canvas "tainted" ao exportar o PNG).
   const logoUrl = branding?.logo_url ?? tenant.branding.logoUrl ?? null;
@@ -56,7 +54,7 @@ export default async function ConfigPage() {
   if (queueCfg.enabled) {
     const token = await getTotemToken(tenant.id);
     if (token) {
-      const url = `${proto}://${host}/b/${tenant.subdomain}/totem?k=${token}`;
+      const url = `${origin}/b/${tenant.subdomain}/totem?k=${token}`;
       totem = { url, qr: await QRCode.toDataURL(url, { margin: 1, width: 220 }) };
     }
   }

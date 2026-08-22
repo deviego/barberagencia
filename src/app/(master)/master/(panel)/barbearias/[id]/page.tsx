@@ -17,12 +17,6 @@ import { QueueEnableToggle } from "@/features/queue/components/queue-enable-togg
 import { BarbershopReport } from "@/features/platform/components/barbershop-report";
 import { formatBRL } from "@/lib/utils";
 
-const PLAN_LABEL: Record<string, string> = {
-  personal: "Personal",
-  essencial: "Essencial",
-  advance: "Advance",
-};
-
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [t, contract, upgradeReqs, queueConfig] = await Promise.all([
@@ -54,7 +48,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           <div>
             <h1 className="text-h3 font-bold text-text">{t.name}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <Badge variant="accent">{PLAN_LABEL[t.saasPlan] ?? t.saasPlan}</Badge>
+              <Badge variant="accent">{CONTRACT_PLAN_LABEL[t.saasPlan] ?? t.saasPlan}</Badge>
               <Badge variant={t.status === "ACTIVE" ? "success" : "warning"}>
                 {t.status === "ACTIVE" ? "Ativa" : t.status}
               </Badge>

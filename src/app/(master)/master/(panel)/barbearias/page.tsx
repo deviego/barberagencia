@@ -4,13 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EnterAdminButton } from "@/features/platform/components/enter-admin-button";
 import { getTenants } from "@/features/platform/data";
+import { PLAN_LABEL } from "@/features/contract/view";
 import { formatBRL } from "@/lib/utils";
-
-const PLAN_LABEL: Record<string, string> = {
-  personal: "Personal",
-  essencial: "Essencial",
-  advance: "Advance",
-};
 
 export default async function BarbeariasPage() {
   const tenants = await getTenants();

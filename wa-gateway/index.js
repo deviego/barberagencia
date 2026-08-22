@@ -3,9 +3,19 @@ import QRCode from "qrcode";
 import pino from "pino";
 import cron from "node-cron";
 import PDFDocument from "pdfkit";
+import { timingSafeEqual } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 import { makeSupabaseAuthState } from "./auth-state.js";
+
+/** Compara strings em tempo constante (mitiga timing attack). */
+function safeEqual(a, b) {
+  if (!a || !b) return false;
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 const PORT = process.env.PORT || 8080;
 const TOKEN = process.env.WA_SERVICE_TOKEN;
@@ -34,7 +44,7 @@ process.on("unhandledRejection", (e) => log.error({ err: e?.message ?? String(e)
 process.on("uncaughtException", (e) => log.error({ err: e?.message ?? String(e) }, "uncaughtException"));
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "5mb" })); // relatórios podem ser grandes; evita 100kb default
 
 /** sessions: tenantId -> { sock, status, qr, number, attempts, connectingSince, starting } */
 const sessions = new Map();
@@ -221,11 +231,11 @@ async function tickReconnectDown() {
 // --- auth middleware ---
 app.use((req, res, next) => {
   if (req.path === "/health") return next();
-  if (req.get("x-wa-token") !== TOKEN) return res.status(401).json({ error: "unauthorized" });
+  if (!safeEqual(req.get("x-wa-token"), TOKEN)) return res.status(401).json({ error: "unauthorized" });
   next();
 });
 
-const BUILD = "report-v8";
+const BUILD = "report-v9";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -513,9 +523,14 @@ async function sendDocument(tenantId, phone, buffer, fileName, caption) {
 /** Busca {kind, report} no app. params: {ym?} (plataforma) ou {tenant, from?, to?} (barbearia). */
 async function fetchReport(params) {
   if (!REPORT.appUrl || !REPORT.token) throw new Error("APP_REPORT_URL / REPORT_TOKEN ausentes");
-  const qs = new URLSearchParams({ token: REPORT.token });
+  const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params || {})) if (v) qs.set(k, v);
-  const res = await fetch(`${REPORT.appUrl}/api/master/report?${qs.toString()}`, { signal: AbortSignal.timeout(30000) });
+  const q = qs.toString();
+  // Token vai no HEADER (não na query) para não vazar em logs/Referer.
+  const res = await fetch(`${REPORT.appUrl}/api/master/report${q ? `?${q}` : ""}`, {
+    headers: { "x-report-token": REPORT.token },
+    signal: AbortSignal.timeout(30000),
+  });
   if (!res.ok) throw new Error(`app respondeu ${res.status}`);
   return res.json(); // { kind, report }
 }

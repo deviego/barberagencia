@@ -1,17 +1,8 @@
 import { NextResponse } from "next/server";
 import { getMonthlyReport, getBarbershopReport } from "@/features/platform/report";
-import { getSessionUser } from "@/lib/auth/session";
-import { isMaster } from "@/lib/rbac";
+import { authorizeReport } from "./_auth";
 
 export const dynamic = "force-dynamic";
-
-/** Autoriza por token compartilhado (gateway) OU sessão MASTER (download no painel). */
-async function authorize(url: URL): Promise<boolean> {
-  const token = process.env.REPORT_TOKEN;
-  if (token && url.searchParams.get("token") === token) return true;
-  const user = await getSessionUser();
-  return !!user?.role && isMaster(user.role);
-}
 
 function parseDate(s: string | null): Date | undefined {
   if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
@@ -26,7 +17,7 @@ function parseDate(s: string | null): Date | undefined {
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  if (!(await authorize(url))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await authorizeReport(request))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const tenant = url.searchParams.get("tenant");
   if (tenant) {

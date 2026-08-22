@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { headers } from "next/headers";
+import { getRequestOrigin } from "@/lib/http";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getEffectivePlan } from "@/lib/plan/effective";
@@ -44,16 +44,14 @@ export default async function AdminFilaPage() {
     );
   }
 
-  const h = await headers();
-  const host = h.get("host") ?? "";
-  const proto = host.includes("localhost") ? "http" : "https";
+  const origin = await getRequestOrigin();
   const token = await getTotemToken(tenant.id);
   const totemOn = config.mode === "TOTEM" || config.mode === "BOTH";
   const appOn = config.mode === "APP" || config.mode === "BOTH";
 
-  const totemUrl = token ? `${proto}://${host}/b/${tenant.subdomain}/totem?k=${token}` : null;
-  const filaUrl = `${proto}://${host}/b/${tenant.subdomain}/fila`;
-  const painelUrl = `${proto}://${host}/b/${tenant.subdomain}/painel`;
+  const totemUrl = token ? `${origin}/b/${tenant.subdomain}/totem?k=${token}` : null;
+  const filaUrl = `${origin}/b/${tenant.subdomain}/fila`;
+  const painelUrl = `${origin}/b/${tenant.subdomain}/painel`;
 
   // QR: no modo totem, aponta para o kiosk (abrir no iPad); no app, para a fila do cliente.
   const qrTarget = totemOn && totemUrl ? totemUrl : filaUrl;

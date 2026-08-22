@@ -8,6 +8,7 @@ import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { notifyWelcome } from "@/server/notifications/notify";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { AREA_HEADER } from "@/lib/supabase/area";
+import { getRequestOrigin } from "@/lib/http";
 
 /** Encerra a sessão da ÁREA atual (limpa o cookie dela) e volta ao login da área. */
 export async function logout() {
@@ -29,10 +30,8 @@ export async function sendWelcomeEmail() {
   const phone = (user.user_metadata?.phone as string | undefined) ?? null;
   const tenant = await getCurrentTenant();
   try {
-    const hdrs = await headers();
-    const host = hdrs.get("host") ?? "";
-    const proto = host.includes("localhost") ? "http" : "https";
-    const link = host ? `${proto}://${host}/client` : null;
+    const origin = await getRequestOrigin();
+    const link = origin ? `${origin}/client` : null;
     await notifyWelcome(user.email, name, tenant.name, { phone, link, tenantId: tenant.id });
   } catch {
     /* não bloqueia o cadastro se a boas-vindas falhar */

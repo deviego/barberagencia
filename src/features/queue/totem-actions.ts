@@ -1,10 +1,19 @@
 "use server";
 
 import { randomUUID, randomBytes } from "crypto";
-import { headers } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
+import { isUnitAdmin } from "@/lib/rbac";
+import { safeEqual } from "@/lib/crypto/safe-equal";
+import { getRequestOrigin } from "@/lib/http";
 import { notifyInvite } from "@/server/notifications/notify";
+
+/** Sessão de admin da barbearia (UNIT_ADMIN+ ou MASTER). Retorna o tenantId ou null. */
+async function requireAdminTenant() {
+  const user = await getSessionUser();
+  if (!user?.tenantId || !user.role || !isUnitAdmin(user.role)) return null;
+  return user.tenantId;
+}
 
 const onlyDigits = (s: string) => (s || "").replace(/\D/g, "");
 
@@ -17,7 +26,7 @@ async function validateTotem(slug: string, token: string) {
     .select("id, name, totem_token")
     .eq("subdomain", slug)
     .maybeSingle();
-  if (!t?.totem_token || t.totem_token !== token) return null;
+  if (!t || !safeEqual(t.totem_token as string | null, token)) return null;
   return { id: t.id as string, name: t.name as string };
 }
 
@@ -86,10 +95,8 @@ export async function totemRegister(
       phone,
       expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
     });
-    const h = await headers();
-    const host = h.get("host") ?? "";
-    const proto = host.includes("localhost") ? "http" : "https";
-    const link = host ? `${proto}://${host}/convite/${inviteToken}` : "";
+    const origin = await getRequestOrigin();
+    const link = origin ? `${origin}/convite/${inviteToken}` : "";
     await notifyInvite({ name, phone, email: null, tenantName: tenant.name, tenantId: tenant.id, link });
   } catch {
     /* boas-vindas não bloqueiam o cadastro */
@@ -120,37 +127,37 @@ export async function totemJoinQueue(
   return { ok: true as const, ticket: row?.ticket_number as number, id: row?.id as string };
 }
 
-/** MASTER/ADMIN: regenera o token do totem (invalida o link antigo). */
+/** ADMIN (UNIT_ADMIN+/MASTER): regenera o token do totem (invalida o link antigo). */
 export async function regenerateTotemToken() {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const tenantId = await requireAdminTenant();
+  if (!tenantId) return { ok: false as const, error: "Acesso negado." };
   const admin = createSupabaseAdminClient();
   const token = randomBytes(24).toString("hex");
-  const { error } = await admin.from("tenants").update({ totem_token: token }).eq("id", user.tenantId);
+  const { error } = await admin.from("tenants").update({ totem_token: token }).eq("id", tenantId);
   if (error) return { ok: false as const, error: error.message };
   return { ok: true as const, token };
 }
 
-/** ADMIN: modo da fila (TOTEM | APP | BOTH). */
+/** ADMIN (UNIT_ADMIN+/MASTER): modo da fila (TOTEM | APP | BOTH). */
 export async function setQueueMode(mode: "TOTEM" | "APP" | "BOTH") {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const tenantId = await requireAdminTenant();
+  if (!tenantId) return { ok: false as const, error: "Acesso negado." };
   const admin = createSupabaseAdminClient();
   const { error } = await admin
     .from("tenant_settings")
-    .upsert({ tenant_id: user.tenantId, queue_mode: mode }, { onConflict: "tenant_id" });
+    .upsert({ tenant_id: tenantId, queue_mode: mode }, { onConflict: "tenant_id" });
   if (error) return { ok: false as const, error: error.message };
   return { ok: true as const };
 }
 
-/** ADMIN: cliente de plano também escolhe serviço no totem. */
+/** ADMIN (UNIT_ADMIN+/MASTER): cliente de plano também escolhe serviço no totem. */
 export async function setQueuePlanRequiresService(enabled: boolean) {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const tenantId = await requireAdminTenant();
+  if (!tenantId) return { ok: false as const, error: "Acesso negado." };
   const admin = createSupabaseAdminClient();
   const { error } = await admin
     .from("tenant_settings")
-    .upsert({ tenant_id: user.tenantId, queue_plan_requires_service: enabled }, { onConflict: "tenant_id" });
+    .upsert({ tenant_id: tenantId, queue_plan_requires_service: enabled }, { onConflict: "tenant_id" });
   if (error) return { ok: false as const, error: error.message };
   return { ok: true as const };
 }

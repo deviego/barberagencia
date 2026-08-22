@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import { getMonthlyReport, getBarbershopReport } from "@/features/platform/report";
-import { getSessionUser } from "@/lib/auth/session";
-import { isMaster } from "@/lib/rbac";
+import { authorizeReport } from "../_auth";
 
 export const dynamic = "force-dynamic";
 
-async function authorize(url: URL): Promise<boolean> {
-  const token = process.env.REPORT_TOKEN;
-  if (token && url.searchParams.get("token") === token) return true;
-  const user = await getSessionUser();
-  return !!user?.role && isMaster(user.role);
+/** Nome de arquivo seguro para o header Content-Disposition (sem aspas/CRLF/path). */
+function safeFileName(base: string): string {
+  return base.replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "relatorio";
 }
 
 function parseDate(s: string | null): Date | undefined {
@@ -27,7 +24,7 @@ function parseDate(s: string | null): Date | undefined {
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  if (!(await authorize(url))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await authorizeReport(request))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const base = process.env.WA_SERVICE_URL;
   const token = process.env.WA_SERVICE_TOKEN;
@@ -48,7 +45,7 @@ export async function GET(request: Request) {
     if (!r) return NextResponse.json({ error: "not_found" }, { status: 404 });
     kind = "barbershop";
     report = r;
-    fileName = `relatorio-${r.name.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+    fileName = `${safeFileName(`relatorio-${r.name.toLowerCase()}`)}.pdf`;
   } else {
     const ym = url.searchParams.get("ym");
     let ref: Date | undefined;
@@ -77,6 +74,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Falha de rede com o gateway" }, { status: 502 });
+    console.error("[report/pdf] falha ao renderizar no gateway:", e);
+    return NextResponse.json({ error: "Falha ao gerar o PDF." }, { status: 502 });
   }
 }
