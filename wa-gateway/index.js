@@ -235,7 +235,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "report-v10";
+const BUILD = "report-v11";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -460,6 +460,8 @@ function renderReportPdf(kind, rep) {
         { label: "Atendimentos pela fila", value: rep.queue?.done ?? 0 },
         { label: "Horário de pico", value: rep.peak?.busiestHour ?? "—" },
         { label: "Dia + movimentado", value: rep.peak?.busiestWeekday ?? "—" },
+        { label: "Plano da barbearia", value: (rep.saasPlan ?? "—") + (rep.saasTrial ? " (teste)" : "") },
+        { label: "Atend. cobertos por plano", value: rep.planCoveredAppts ?? 0 },
       ]);
 
       if (rep.growth) {
@@ -478,6 +480,8 @@ function renderReportPdf(kind, rep) {
         (rep.byService || []).map((s) => [s.name, String(s.qty), brl(s.value)]));
       table(doc, "Produtos vendidos (PDV)", [{ label: "Produto", width: 3 }, { label: "Qtd", width: 1, align: "right" }, { label: "Valor", width: 2, align: "right" }],
         (rep.byProduct || []).map((s) => [s.name, String(s.qty), brl(s.value)]));
+      table(doc, "Produtos (catálogo)", [{ label: "Produto", width: 3 }, { label: "Preço", width: 1.4, align: "right" }, { label: "Estoque", width: 1, align: "right" }, { label: "Status", width: 1.2 }],
+        (rep.productsCatalog || []).map((p) => [p.name, brl(p.priceBrl), String(p.stock), p.active ? "Ativo" : "Inativo"]));
       table(doc, "Faturamento por dia", [{ label: "Dia", width: 2 }, { label: "Entradas", width: 2, align: "right" }, { label: "Saídas", width: 2, align: "right" }],
         (rep.daily || []).map((d) => [d.date, brl(d.entradas), brl(d.saidas)]));
       table(doc, "Saídas por categoria", [{ label: "Categoria", width: 3 }, { label: "Total", width: 2, align: "right" }],
@@ -494,6 +498,10 @@ function renderReportPdf(kind, rep) {
         (rep.campaigns || []).map((c) => [c.name, c.segment, c.status, String(c.reach), c.date]));
       table(doc, "Melhores clientes (receita)", [{ label: "Cliente", width: 3 }, { label: "Lançam.", width: 1, align: "right" }, { label: "Receita", width: 2, align: "right" }],
         (rep.topClients || []).map((c) => [c.name, String(c.count), brl(c.total)]));
+      table(doc, "Planos e assinantes ativos", [{ label: "Plano", width: 3 }, { label: "Assinantes", width: 1.4, align: "right" }, { label: "Mensalidade", width: 1.6, align: "right" }, { label: "MRR", width: 1.6, align: "right" }],
+        (rep.plans || []).map((p) => [p.name, String(p.subscribers), brl(p.priceBrl), brl(p.mrr)]));
+      table(doc, "Uso dos planos por cliente (cortes)", [{ label: "Cliente", width: 3 }, { label: "Plano", width: 2 }, { label: "Usados/Total", width: 1.4, align: "right" }, { label: "Saldo", width: 1, align: "right" }],
+        (rep.subscribersUsage || []).map((s) => [s.clientName, s.planName, `${s.used}/${s.total}`, String(s.saldo)]));
       table(doc, "Assinantes ativos", [{ label: "Cliente", width: 3 }, { label: "Plano", width: 2 }, { label: "Mensalidade", width: 1.6, align: "right" }],
         (rep.subscribersList || []).map((s) => [s.clientName, s.planName, brl(s.priceBrl)]));
       table(doc, "Últimos atendimentos", [{ label: "Data/hora", width: 1.5 }, { label: "Cliente", width: 2 }, { label: "Serviço", width: 1.8 }, { label: "Barbeiro", width: 1.5 }, { label: "Status", width: 1.3 }],

@@ -13,6 +13,9 @@ export type ApptRow = { datetime: string; clientName: string; serviceName: strin
 export type PeakBucket = { label: string; count: number };
 export type Peak = { busiestHour: string; busiestWeekday: string; hours: PeakBucket[]; weekdays: PeakBucket[] };
 export type SourceSplit = { fila: number; outros: number; total: number };
+export type PlanRow = { name: string; subscribers: number; priceBrl: number; mrr: number };
+export type SubUsage = { clientName: string; planName: string; total: number; used: number; saldo: number };
+export type ProductRow = { name: string; priceBrl: number; stock: number; active: boolean };
 
 export type Growth = { value: number; prev: number; pct: number | null };
 
@@ -46,6 +49,12 @@ export type BarbershopReport = {
   peak: Peak;
   bySource: SourceSplit;
   recentAppointments: ApptRow[];
+  saasPlan: string;
+  saasTrial: string | null;
+  plans: PlanRow[];
+  planCoveredAppts: number;
+  subscribersUsage: SubUsage[];
+  productsCatalog: ProductRow[];
 };
 
 export type MonthlyReport = {
@@ -272,9 +281,14 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
   const prevEndISO = startISO;
   const prevLabel = `${prevStart.toLocaleDateString("pt-BR")} — ${new Date(start.getTime() - 86400000).toLocaleDateString("pt-BR")}`;
 
-  const { data: t } = await admin.from("tenants").select("id, name").eq("id", tenantId).maybeSingle();
+  const { data: t } = await admin.from("tenants").select("id, name, saas_plan").eq("id", tenantId).maybeSingle();
   if (!t) return null;
   const { data: settings } = await admin.from("tenant_settings").select("phone").eq("tenant_id", tenantId).maybeSingle();
+  const { data: contract } = await admin
+    .from("tenant_contracts")
+    .select("trial_enabled, trial_ends_at, status")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
 
   const startDayStr = start.toISOString().slice(0, 10);
   const endDayStr = end.toISOString().slice(0, 10);
@@ -296,6 +310,8 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     apptListRes,
     campaignsRes,
     queueRes,
+    productsRes,
+    planCoveredRes,
   ] = await Promise.all([
     admin.from("clients").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     admin.from("clients").select("id, name").eq("tenant_id", tenantId),
@@ -303,7 +319,7 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     admin.from("clients").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("created_at", prevStartISO).lt("created_at", prevEndISO),
     admin
       .from("client_subscriptions")
-      .select("id, status, clients(name), combo_plans(name, price_brl)")
+      .select("id, status, saldo_cortes, combo_plan_id, clients(name), combo_plans(name, price_brl, cuts)")
       .eq("tenant_id", tenantId)
       .eq("status", "ACTIVE"),
     admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("start_at", startISO).lt("start_at", endISO).neq("status", "CANCELLED"),
@@ -317,6 +333,8 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     admin.from("appointments").select("id, start_at, status, barber_id, service_id, client_id").eq("tenant_id", tenantId).gte("start_at", startISO).lt("start_at", endISO).neq("status", "CANCELLED").order("start_at", { ascending: false }),
     admin.from("campaigns").select("name, segment, status, reach, scheduled_at, created_at").eq("tenant_id", tenantId).gte("created_at", startISO).lt("created_at", endISO).order("created_at", { ascending: false }),
     admin.from("queue_entries").select("status, appointment_id").eq("tenant_id", tenantId).gte("day", startDayStr).lt("day", endDayStr),
+    admin.from("products").select("name, price_brl, stock, active").eq("tenant_id", tenantId).is("deleted_at", null).order("name"),
+    admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("consumed_from_plan", true).gte("start_at", startISO).lt("start_at", endISO).neq("status", "CANCELLED"),
   ]);
 
   const clientName = new Map(((clientNamesRes.data ?? []) as Row[]).map((c) => [c.id as string, c.name as string]));
@@ -368,16 +386,37 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
     .map(([d, v]) => ({ date: new Date(`${d}T12:00:00`).toLocaleDateString("pt-BR"), entradas: v.entradas, saidas: v.saidas }));
 
-  const subscribersList = ((subsRes.data ?? []) as Row[]).map((s) => {
+  const subsRows = (subsRes.data ?? []) as Row[];
+  const planAgg = new Map<string, { name: string; subscribers: number; priceBrl: number }>();
+  const subscribersList: { clientName: string; planName: string; priceBrl: number }[] = [];
+  const subscribersUsage: SubUsage[] = [];
+  for (const s of subsRows) {
     const client = Array.isArray(s.clients) ? s.clients[0] : s.clients;
     const plan = Array.isArray(s.combo_plans) ? s.combo_plans[0] : s.combo_plans;
-    return {
-      clientName: (client?.name as string) ?? "Cliente",
-      planName: (plan?.name as string) ?? "Plano",
-      priceBrl: num(plan?.price_brl),
-    };
-  });
+    const clientNm = (client?.name as string) ?? "Cliente";
+    const planNm = (plan?.name as string) ?? "Plano";
+    const price = num(plan?.price_brl);
+    const totalCuts = num(plan?.cuts);
+    const saldo = num(s.saldo_cortes);
+    subscribersList.push({ clientName: clientNm, planName: planNm, priceBrl: price });
+    subscribersUsage.push({ clientName: clientNm, planName: planNm, total: totalCuts, used: Math.max(0, totalCuts - saldo), saldo });
+    const key = (s.combo_plan_id as string) ?? planNm;
+    const agg = planAgg.get(key) ?? { name: planNm, subscribers: 0, priceBrl: price };
+    agg.subscribers += 1;
+    planAgg.set(key, agg);
+  }
   const mrr = subscribersList.reduce((a, s) => a + s.priceBrl, 0);
+  const plans: PlanRow[] = [...planAgg.values()]
+    .map((p) => ({ name: p.name, subscribers: p.subscribers, priceBrl: p.priceBrl, mrr: p.priceBrl * p.subscribers }))
+    .sort((a, b) => b.mrr - a.mrr);
+
+  const productsCatalog: ProductRow[] = ((productsRes.data ?? []) as Row[]).map((p) => ({
+    name: p.name as string,
+    priceBrl: num(p.price_brl),
+    stock: num(p.stock),
+    active: p.active === true,
+  }));
+  const planCoveredAppts = planCoveredRes.count ?? 0;
 
   const newList = ((newRes.data ?? []) as Row[]).map((c) => ({
     name: c.name as string,
@@ -457,6 +496,15 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     pct: prev > 0 ? ((value - prev) / prev) * 100 : null,
   });
 
+  // Plano (SaaS) da barbearia + status de teste.
+  const SAAS_LABEL: Record<string, string> = { personal: "Personal", essencial: "Essencial", advance: "Advance" };
+  const saasPlan = SAAS_LABEL[normalizeSaasPlan(t.saas_plan)] ?? (t.saas_plan as string) ?? "—";
+  let saasTrial: string | null = null;
+  if (contract?.trial_enabled && contract?.trial_ends_at) {
+    const ends = new Date(contract.trial_ends_at as string);
+    if (ends.getTime() > Date.now()) saasTrial = `Em teste até ${ends.toLocaleDateString("pt-BR")}`;
+  }
+
   return {
     tenantId,
     name: t.name as string,
@@ -491,5 +539,11 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     peak,
     bySource,
     recentAppointments,
+    saasPlan,
+    saasTrial,
+    plans,
+    planCoveredAppts,
+    subscribersUsage,
+    productsCatalog,
   };
 }
