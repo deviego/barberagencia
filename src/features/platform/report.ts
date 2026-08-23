@@ -6,6 +6,13 @@ type Row = Record<string, any>;
 const num = (v: any) => Number(v ?? 0);
 
 export type ServiceRow = { name: string; qty: number; value: number };
+export type NamedTotal = { name: string; total: number };
+export type BarberRow = { name: string; appts: number; revenue: number };
+export type CampaignRow = { name: string; segment: string; status: string; reach: number; date: string };
+export type ApptRow = { datetime: string; clientName: string; serviceName: string; barberName: string; status: string };
+export type PeakBucket = { label: string; count: number };
+export type Peak = { busiestHour: string; busiestWeekday: string; hours: PeakBucket[]; weekdays: PeakBucket[] };
+export type SourceSplit = { fila: number; outros: number; total: number };
 
 export type Growth = { value: number; prev: number; pct: number | null };
 
@@ -32,6 +39,13 @@ export type BarbershopReport = {
   subscribersList: { clientName: string; planName: string; priceBrl: number }[];
   daily: { date: string; entradas: number; saidas: number }[];
   newClientsList: { name: string; phone: string | null; date: string }[];
+  expensesByCategory: NamedTotal[];
+  campaigns: CampaignRow[];
+  queue: { total: number; done: number; left: number };
+  byBarber: BarberRow[];
+  peak: Peak;
+  bySource: SourceSplit;
+  recentAppointments: ApptRow[];
 };
 
 export type MonthlyReport = {
@@ -69,6 +83,21 @@ const METHOD_LABEL: Record<string, string> = {
   CASH: "Dinheiro",
   PLAN: "Plano",
 };
+
+const APPT_STATUS_LABEL: Record<string, string> = {
+  REQUESTED: "Solicitado",
+  CONFIRMED: "Confirmado",
+  SCHEDULED: "Agendado",
+  IN_SERVICE: "Em atendimento",
+  DONE: "Concluído",
+  COMPLETED: "Concluído",
+  CANCELLED: "Cancelado",
+  NO_SHOW: "Faltou",
+};
+
+const WEEKDAY_PT = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const WEEKDAY_EN_IDX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const TZ = "America/Sao_Paulo";
 
 /** Relatório mensal consolidado da plataforma + por barbearia. Mês de referência: `ref` (ou o atual). */
 export async function getMonthlyReport(ref?: Date): Promise<MonthlyReport> {
@@ -247,6 +276,9 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
   if (!t) return null;
   const { data: settings } = await admin.from("tenant_settings").select("phone").eq("tenant_id", tenantId).maybeSingle();
 
+  const startDayStr = start.toISOString().slice(0, 10);
+  const endDayStr = end.toISOString().slice(0, 10);
+
   const [
     clientsRes,
     clientNamesRes,
@@ -259,6 +291,11 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     prevFinRes,
     byService,
     byProduct,
+    barbersRes,
+    servicesRes,
+    apptListRes,
+    campaignsRes,
+    queueRes,
   ] = await Promise.all([
     admin.from("clients").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
     admin.from("clients").select("id, name").eq("tenant_id", tenantId),
@@ -271,13 +308,20 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
       .eq("status", "ACTIVE"),
     admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("start_at", startISO).lt("start_at", endISO).neq("status", "CANCELLED"),
     admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("start_at", prevStartISO).lt("start_at", prevEndISO).neq("status", "CANCELLED"),
-    admin.from("financial_entries").select("type, amount_brl, method, ref_client, occurred_at").eq("tenant_id", tenantId).gte("occurred_at", startISO).lt("occurred_at", endISO),
+    admin.from("financial_entries").select("type, amount_brl, method, ref_client, ref_barber, ref_kind, note, occurred_at").eq("tenant_id", tenantId).gte("occurred_at", startISO).lt("occurred_at", endISO),
     admin.from("financial_entries").select("type, amount_brl").eq("tenant_id", tenantId).eq("type", "REVENUE").gte("occurred_at", prevStartISO).lt("occurred_at", prevEndISO),
     itemsBreakdown(admin, tenantId, startISO, endISO, "service"),
     itemsBreakdown(admin, tenantId, startISO, endISO, "product"),
+    admin.from("barbers").select("id, name").eq("tenant_id", tenantId),
+    admin.from("services").select("id, name").eq("tenant_id", tenantId),
+    admin.from("appointments").select("id, start_at, status, barber_id, service_id, client_id").eq("tenant_id", tenantId).gte("start_at", startISO).lt("start_at", endISO).neq("status", "CANCELLED").order("start_at", { ascending: false }),
+    admin.from("campaigns").select("name, segment, status, reach, scheduled_at, created_at").eq("tenant_id", tenantId).gte("created_at", startISO).lt("created_at", endISO).order("created_at", { ascending: false }),
+    admin.from("queue_entries").select("status, appointment_id").eq("tenant_id", tenantId).gte("day", startDayStr).lt("day", endDayStr),
   ]);
 
   const clientName = new Map(((clientNamesRes.data ?? []) as Row[]).map((c) => [c.id as string, c.name as string]));
+  const barberName = new Map(((barbersRes.data ?? []) as Row[]).map((b) => [b.id as string, b.name as string]));
+  const serviceName = new Map(((servicesRes.data ?? []) as Row[]).map((s) => [s.id as string, s.name as string]));
 
   const fins = (finRes.data ?? []) as Row[];
   let entradas = 0;
@@ -285,6 +329,8 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
   const methodMap = new Map<string, number>();
   const clientRev = new Map<string, { total: number; count: number }>();
   const dayMap = new Map<string, { entradas: number; saidas: number }>();
+  const expenseMap = new Map<string, number>();
+  const barberRev = new Map<string, number>();
   for (const f of fins) {
     const amt = num(f.amount_brl);
     const dayKey = new Date(f.occurred_at as string).toISOString().slice(0, 10);
@@ -300,14 +346,18 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
         cur.count += 1;
         clientRev.set(f.ref_client, cur);
       }
+      if (f.ref_barber) barberRev.set(f.ref_barber, (barberRev.get(f.ref_barber) ?? 0) + amt);
     } else {
       saidas += amt;
       day.saidas += amt;
+      const cat = (f.ref_kind as string) || (f.note as string) || "Outros";
+      expenseMap.set(cat, (expenseMap.get(cat) ?? 0) + amt);
     }
     dayMap.set(dayKey, day);
   }
 
   const byMethod = [...methodMap.entries()].map(([method, total]) => ({ method: METHOD_LABEL[method] ?? method, total })).sort((a, b) => b.total - a.total);
+  const expensesByCategory = [...expenseMap.entries()].map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total);
 
   const topClients = [...clientRev.entries()]
     .map(([cid, v]) => ({ name: clientName.get(cid) ?? "Cliente", total: v.total, count: v.count }))
@@ -337,6 +387,65 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
 
   const appointments = apptRes.count ?? 0;
   const ticketMedio = appointments > 0 ? entradas / appointments : 0;
+
+  // --- Agendamentos: por barbeiro, pico (hora/dia) e últimos ---
+  const apptRows = (apptListRes.data ?? []) as Row[];
+  const barberAppts = new Map<string, number>();
+  const hourCounts = new Array(24).fill(0);
+  const weekdayCounts = new Array(7).fill(0);
+  for (const a of apptRows) {
+    if (a.barber_id) barberAppts.set(a.barber_id, (barberAppts.get(a.barber_id) ?? 0) + 1);
+    const d = new Date(a.start_at as string);
+    const h = parseInt(d.toLocaleString("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false }), 10);
+    if (!Number.isNaN(h) && h >= 0 && h < 24) hourCounts[h] += 1;
+    const wi = WEEKDAY_EN_IDX[d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" })] ?? 0;
+    weekdayCounts[wi] += 1;
+  }
+
+  const byBarber: BarberRow[] = [...new Set([...barberAppts.keys(), ...barberRev.keys()])]
+    .map((id) => ({ name: barberName.get(id) ?? "Barbeiro", appts: barberAppts.get(id) ?? 0, revenue: barberRev.get(id) ?? 0 }))
+    .sort((a, b) => b.appts - a.appts || b.revenue - a.revenue);
+
+  const maxHour = hourCounts.reduce((mi, c, i, arr) => (c > arr[mi] ? i : mi), 0);
+  const maxWd = weekdayCounts.reduce((mi, c, i, arr) => (c > arr[mi] ? i : mi), 0);
+  const peak: Peak = {
+    busiestHour: appointments > 0 && hourCounts[maxHour] > 0 ? `${String(maxHour).padStart(2, "0")}h–${String(maxHour + 1).padStart(2, "0")}h` : "—",
+    busiestWeekday: appointments > 0 && weekdayCounts[maxWd] > 0 ? WEEKDAY_PT[maxWd] : "—",
+    hours: hourCounts.map((count, h) => ({ label: `${String(h).padStart(2, "0")}h`, count })).filter((b) => b.count > 0),
+    weekdays: weekdayCounts.map((count, i) => ({ label: WEEKDAY_PT[i], count })).filter((b) => b.count > 0),
+  };
+
+  const recentAppointments: ApptRow[] = apptRows.slice(0, 12).map((a) => {
+    const d = new Date(a.start_at as string);
+    return {
+      datetime: d.toLocaleString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+      clientName: clientName.get(a.client_id as string) ?? "Cliente",
+      serviceName: serviceName.get(a.service_id as string) ?? "—",
+      barberName: barberName.get(a.barber_id as string) ?? "—",
+      status: APPT_STATUS_LABEL[a.status as string] ?? (a.status as string) ?? "—",
+    };
+  });
+
+  // --- Canal do agendamento (detectável hoje: via fila x demais) ---
+  const queueRows = (queueRes.data ?? []) as Row[];
+  const queueApptIds = new Set(queueRows.map((q) => q.appointment_id).filter(Boolean));
+  const fila = apptRows.filter((a) => queueApptIds.has(a.id)).length;
+  const bySource: SourceSplit = { fila, outros: apptRows.length - fila, total: apptRows.length };
+
+  const queue = {
+    total: queueRows.length,
+    done: queueRows.filter((q) => q.status === "DONE").length,
+    left: queueRows.filter((q) => q.status === "LEFT").length,
+  };
+
+  // --- Campanhas do período ---
+  const campaigns: CampaignRow[] = ((campaignsRes.data ?? []) as Row[]).map((c) => ({
+    name: (c.name as string) ?? "Campanha",
+    segment: (c.segment as string) ?? "—",
+    status: (c.status as string) ?? "—",
+    reach: num(c.reach),
+    date: new Date((c.scheduled_at as string) ?? (c.created_at as string)).toLocaleDateString("pt-BR"),
+  }));
 
   // Crescimento vs período anterior.
   const prevEntradas = ((prevFinRes.data ?? []) as Row[]).reduce((a, f) => a + num(f.amount_brl), 0);
@@ -375,5 +484,12 @@ export async function getBarbershopReport(tenantId: string, from?: Date, to?: Da
     subscribersList,
     daily,
     newClientsList: newList,
+    expensesByCategory,
+    campaigns,
+    queue,
+    byBarber,
+    peak,
+    bySource,
+    recentAppointments,
   };
 }

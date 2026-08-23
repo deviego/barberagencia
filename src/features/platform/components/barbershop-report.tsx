@@ -39,9 +39,10 @@ export function BarbershopReport({ tenantId }: { tenantId: string }) {
       </div>
       <p className="text-caption text-text-2">
         Escolha o período e gere o relatório profissional em PDF: resumo financeiro (entradas, saídas, resultado,
-        ticket médio e receita recorrente), crescimento vs. período anterior, faturamento por método, por serviço e
-        produtos vendidos, faturamento por dia, melhores clientes, assinantes ativos e novos clientes. Baixe o PDF ou
-        envie direto no WhatsApp da barbearia.
+        ticket médio e MRR), crescimento vs. período anterior, faturamento por método/serviço/produtos, saídas por
+        categoria, faturamento por dia, atendimentos por barbeiro, horários e dias de pico, canal do agendamento (fila
+        x balcão), campanhas, atendimentos pela fila, últimos atendimentos, melhores clientes, assinantes e novos
+        clientes. Baixe o PDF ou envie direto no WhatsApp da barbearia.
       </p>
 
       <div className="flex flex-wrap items-end gap-3">

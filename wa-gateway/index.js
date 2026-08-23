@@ -235,7 +235,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "report-v9";
+const BUILD = "report-v10";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -457,6 +457,9 @@ function renderReportPdf(kind, rep) {
         { label: "Novos clientes", value: rep.newClients ?? 0 },
         { label: "Clientes (total)", value: rep.totalClients ?? 0 },
         { label: "Assinantes ativos", value: rep.subscribers ?? 0 },
+        { label: "Atendimentos pela fila", value: rep.queue?.done ?? 0 },
+        { label: "Horário de pico", value: rep.peak?.busiestHour ?? "—" },
+        { label: "Dia + movimentado", value: rep.peak?.busiestWeekday ?? "—" },
       ]);
 
       if (rep.growth) {
@@ -477,10 +480,24 @@ function renderReportPdf(kind, rep) {
         (rep.byProduct || []).map((s) => [s.name, String(s.qty), brl(s.value)]));
       table(doc, "Faturamento por dia", [{ label: "Dia", width: 2 }, { label: "Entradas", width: 2, align: "right" }, { label: "Saídas", width: 2, align: "right" }],
         (rep.daily || []).map((d) => [d.date, brl(d.entradas), brl(d.saidas)]));
+      table(doc, "Saídas por categoria", [{ label: "Categoria", width: 3 }, { label: "Total", width: 2, align: "right" }],
+        (rep.expensesByCategory || []).map((e) => [e.name, brl(e.total)]));
+      table(doc, "Atendimentos por barbeiro", [{ label: "Barbeiro", width: 3 }, { label: "Atend.", width: 1, align: "right" }, { label: "Receita", width: 2, align: "right" }],
+        (rep.byBarber || []).map((b) => [b.name, String(b.appts), brl(b.revenue)]));
+      table(doc, "Fluxo por horário", [{ label: "Horário", width: 2 }, { label: "Atendimentos", width: 2, align: "right" }],
+        (rep.peak?.hours || []).map((h) => [h.label, String(h.count)]));
+      table(doc, "Fluxo por dia da semana", [{ label: "Dia", width: 2 }, { label: "Atendimentos", width: 2, align: "right" }],
+        (rep.peak?.weekdays || []).map((w) => [w.label, String(w.count)]));
+      table(doc, "Canal do agendamento", [{ label: "Canal", width: 3 }, { label: "Atendimentos", width: 2, align: "right" }],
+        rep.bySource ? [["Pela fila (totem)", String(rep.bySource.fila)], ["App / Balcão", String(rep.bySource.outros)]] : []);
+      table(doc, "Campanhas no período", [{ label: "Campanha", width: 2.4 }, { label: "Segmento", width: 1.6 }, { label: "Status", width: 1.2 }, { label: "Alcance", width: 1, align: "right" }, { label: "Data", width: 1.2, align: "right" }],
+        (rep.campaigns || []).map((c) => [c.name, c.segment, c.status, String(c.reach), c.date]));
       table(doc, "Melhores clientes (receita)", [{ label: "Cliente", width: 3 }, { label: "Lançam.", width: 1, align: "right" }, { label: "Receita", width: 2, align: "right" }],
         (rep.topClients || []).map((c) => [c.name, String(c.count), brl(c.total)]));
       table(doc, "Assinantes ativos", [{ label: "Cliente", width: 3 }, { label: "Plano", width: 2 }, { label: "Mensalidade", width: 1.6, align: "right" }],
         (rep.subscribersList || []).map((s) => [s.clientName, s.planName, brl(s.priceBrl)]));
+      table(doc, "Últimos atendimentos", [{ label: "Data/hora", width: 1.5 }, { label: "Cliente", width: 2 }, { label: "Serviço", width: 1.8 }, { label: "Barbeiro", width: 1.5 }, { label: "Status", width: 1.3 }],
+        (rep.recentAppointments || []).map((a) => [a.datetime, a.clientName, a.serviceName, a.barberName, a.status]));
       table(doc, "Novos clientes no período", [{ label: "Nome", width: 3 }, { label: "Telefone", width: 2 }, { label: "Cadastro", width: 1.4, align: "right" }],
         (rep.newClientsList || []).map((c) => [c.name, c.phone || "—", c.date]));
     } else {
