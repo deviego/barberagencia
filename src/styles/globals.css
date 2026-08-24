@@ -29,3 +29,23 @@
     outline-offset: 3px;
   }
 }
+
+/* Impressão do contrato: mostra só o documento (.contract-print) quando o
+   ContractPrintButton ativa `printing-contract` no body. */
+@media print {
+  body.printing-contract * {
+    visibility: hidden !important;
+  }
+  body.printing-contract .contract-print,
+  body.printing-contract .contract-print * {
+    visibility: visible !important;
+  }
+  body.printing-contract .contract-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}

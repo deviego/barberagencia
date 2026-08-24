@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import { isMaster } from "@/lib/rbac";
+import { isMaster, isUnitAdmin } from "@/lib/rbac";
 import { ACCEPT_TEXT, CONTRACT_VERSION } from "./parties";
 import { contractPlainText } from "./template";
 import { CONTRACT_COLS as COLS, contractToFields, contractDataComplete, type TenantContract } from "./view";
@@ -101,5 +101,49 @@ export async function updateContractData(input: ContractDataInput) {
 
   if (error) return { ok: false as const, error: error.message };
   revalidatePath(`/master/barbearias/${input.tenantId}`);
+  return { ok: true as const };
+}
+
+export type OwnContractDataInput = Omit<ContractDataInput, "tenantId">;
+
+/** ADMIN da barbearia preenche/edita os dados legais do PRÓPRIO contrato (antes de assinar). */
+export async function updateOwnContractData(input: OwnContractDataInput) {
+  const user = await getSessionUser();
+  if (!user?.role || !isUnitAdmin(user.role) || !user.tenantId)
+    return { ok: false as const, error: "Acesso negado." };
+
+  const admin = createSupabaseAdminClient();
+  // Não permite editar dados após assinar (integridade do documento).
+  const { data: c } = await admin
+    .from("tenant_contracts")
+    .select("status")
+    .eq("tenant_id", user.tenantId)
+    .maybeSingle();
+  if ((c as { status?: string } | null)?.status === "SIGNED")
+    return { ok: false as const, error: "Contrato já assinado — os dados não podem ser alterados." };
+
+  const t = (s?: string) => (s && s.trim() ? s.trim() : null);
+  const { error } = await admin
+    .from("tenant_contracts")
+    .update({
+      legal_name: t(input.legalName),
+      trade_name: t(input.tradeName),
+      doc_type: t(input.docType),
+      doc_number: t(input.docNumber),
+      responsible_name: t(input.responsibleName),
+      responsible_cpf: t(input.responsibleCpf),
+      address_street: t(input.addressStreet),
+      address_city: t(input.addressCity),
+      address_state: t(input.addressState),
+      address_zip: t(input.addressZip),
+      contact_email: t(input.contactEmail),
+      contact_phone: t(input.contactPhone),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("tenant_id", user.tenantId);
+
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin", "layout");
+  revalidatePath("/admin/config");
   return { ok: true as const };
 }

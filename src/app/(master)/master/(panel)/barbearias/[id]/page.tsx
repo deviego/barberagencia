@@ -8,10 +8,12 @@ import { BarChart } from "@/features/platform/components/bar-chart";
 import { EnterAdminButton } from "@/features/platform/components/enter-admin-button";
 import { getTenantDetail } from "@/features/platform/data";
 import { getTenantContractById } from "@/features/contract/data";
-import { buildContractView, PLAN_LABEL as CONTRACT_PLAN_LABEL } from "@/features/contract/view";
+import { buildContractView, contractToData, PLAN_LABEL as CONTRACT_PLAN_LABEL } from "@/features/contract/view";
 import { MasterContractPanel } from "@/features/contract/components/master-contract-panel";
 import { getUpgradeRequestsForTenant } from "@/features/plan/data";
 import { MasterPlanPanel } from "@/features/plan/components/master-plan-panel";
+import { getSaasBilling } from "@/features/billing/data";
+import { MasterBillingPanel } from "@/features/billing/components/master-billing-panel";
 import { getQueueConfig } from "@/features/queue/data";
 import { QueueEnableToggle } from "@/features/queue/components/queue-enable-toggle";
 import { BarbershopReport } from "@/features/platform/components/barbershop-report";
@@ -19,11 +21,12 @@ import { formatBRL } from "@/lib/utils";
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [t, contract, upgradeReqs, queueConfig] = await Promise.all([
+  const [t, contract, upgradeReqs, queueConfig, billing] = await Promise.all([
     getTenantDetail(id),
     getTenantContractById(id),
     getUpgradeRequestsForTenant(id),
     getQueueConfig(id),
+    getSaasBilling(id),
   ]);
   if (!t) notFound();
   const contractView = buildContractView(contract);
@@ -154,6 +157,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
 
       <MasterPlanPanel tenantId={t.id} plan={t.saasPlan} requests={upgradeReqs} />
 
+      {billing && <MasterBillingPanel tenantId={t.id} billing={billing} />}
+
       <BarbershopReport tenantId={t.id} />
 
       <QueueEnableToggle tenantId={t.id} enabled={queueConfig.enabled} />
@@ -162,19 +167,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
         <MasterContractPanel
           tenantId={t.id}
           view={contractView}
-          planLabel={contract?.plan ? CONTRACT_PLAN_LABEL[contract.plan] ?? contract.plan : null}
-          initial={{
-            legalName: contract?.legal_name ?? "",
-            tradeName: contract?.trade_name ?? t.name,
-            docType: (contract?.doc_type as "CNPJ" | "CPF") ?? "CNPJ",
-            docNumber: contract?.doc_number ?? "",
-            responsibleName: contract?.responsible_name ?? "",
-            responsibleCpf: contract?.responsible_cpf ?? "",
-            addressStreet: contract?.address_street ?? "",
-            addressCity: contract?.address_city ?? "",
-            addressState: contract?.address_state ?? "",
-            addressZip: contract?.address_zip ?? "",
-          }}
+          initial={{ ...contractToData(contract), tradeName: contract?.trade_name ?? t.name }}
         />
       )}
     </div>

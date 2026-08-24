@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PosButton } from "@/features/admin/components/pos-drawer";
 import { OnboardingModal } from "@/features/admin/components/onboarding-modal";
+import { ContractCtaBanner } from "@/features/contract/components/contract-cta-banner";
+import { getTenantContract } from "@/features/contract/data";
+import { buildContractView } from "@/features/contract/view";
 import { formatBRL } from "@/lib/utils";
 import { getClients, getDashboard, getProducts, getServices, getUnitSettings } from "@/features/admin/data";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
@@ -24,14 +27,17 @@ const STATUS: Record<string, { label: string; variant: React.ComponentProps<type
 };
 
 export default async function AdminDashboard() {
-  const [d, services, products, clients, tenant, unit] = await Promise.all([
+  const [d, services, products, clients, tenant, unit, contract] = await Promise.all([
     getDashboard(),
     getServices(),
     getProducts(),
     getClients(),
     getCurrentTenant(),
     getUnitSettings(),
+    getTenantContract(),
   ]);
+  const contractView = buildContractView(contract);
+  const showContractCta = contractView != null && contractView.signature.status !== "SIGNED";
   const max = Math.max(1, ...d.revenue6m.map((m) => m.value));
   const today = d.today as { id: string; start_at: string; status: string; clients: unknown; services: unknown; combo_plans: unknown }[];
 
@@ -42,6 +48,7 @@ export default async function AdminDashboard() {
   return (
     <div className="flex flex-col gap-6">
       <OnboardingModal show={showOnboarding} barbershop={tenant.name} />
+      {showContractCta && <ContractCtaBanner dataComplete={contractView!.dataComplete} />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-h3 font-bold text-text">Dashboard</h1>

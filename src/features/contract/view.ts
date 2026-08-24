@@ -41,6 +41,40 @@ export type ContractView = {
   dataComplete: boolean;
 };
 
+/** Valores editáveis dos dados cadastrais do contrato (form compartilhado master/admin). */
+export type ContractDataValue = {
+  legalName: string;
+  tradeName: string;
+  docType: "CNPJ" | "CPF";
+  docNumber: string;
+  responsibleName: string;
+  responsibleCpf: string;
+  addressStreet: string;
+  addressCity: string;
+  addressState: string;
+  addressZip: string;
+  contactEmail: string;
+  contactPhone: string;
+};
+
+/** Extrai os valores editáveis da linha do banco (para semear o formulário). */
+export function contractToData(c: TenantContract | null): ContractDataValue {
+  return {
+    legalName: c?.legal_name ?? "",
+    tradeName: c?.trade_name ?? "",
+    docType: (c?.doc_type as "CNPJ" | "CPF") ?? "CNPJ",
+    docNumber: c?.doc_number ?? "",
+    responsibleName: c?.responsible_name ?? "",
+    responsibleCpf: c?.responsible_cpf ?? "",
+    addressStreet: c?.address_street ?? "",
+    addressCity: c?.address_city ?? "",
+    addressState: c?.address_state ?? "",
+    addressZip: c?.address_zip ?? "",
+    contactEmail: c?.contact_email ?? "",
+    contactPhone: c?.contact_phone ?? "",
+  };
+}
+
 export const PLAN_LABEL: Record<string, string> = {
   personal: "Personal",
   essencial: "Essencial",

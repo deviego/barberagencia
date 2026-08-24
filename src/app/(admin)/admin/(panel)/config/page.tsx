@@ -6,7 +6,7 @@ import { WhatsAppConnect } from "@/features/admin/components/whatsapp-connect";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getBranding, getUnitSettings } from "@/features/admin/data";
 import { getTenantContract } from "@/features/contract/data";
-import { buildContractView } from "@/features/contract/view";
+import { buildContractView, contractToData } from "@/features/contract/view";
 import { ContractSection } from "@/features/contract/components/contract-section";
 import { getPlanUsage } from "@/lib/plan/effective";
 import { PlanUsage } from "@/features/plan/components/plan-usage";
@@ -113,7 +113,12 @@ export default async function ConfigPage() {
 
       <PlanUsage view={planUsage} />
 
-      {contractView && <ContractSection view={contractView} />}
+      {contractView && (
+        <ContractSection
+          view={contractView}
+          initial={{ ...contractToData(contract), tradeName: contract?.trade_name ?? tenant.name }}
+        />
+      )}
     </div>
   );
 }

@@ -24,7 +24,7 @@ export function ContractDocument({
     : null;
 
   return (
-    <article className="flex flex-col gap-4 text-body leading-relaxed text-text-2">
+    <article className="contract-print flex flex-col gap-4 text-body leading-relaxed text-text-2">
       <header className="text-center">
         <h2 className="text-h5 font-bold uppercase text-text">{title}</h2>
       </header>
