@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Copy, MessageCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { createTenant } from "@/features/platform/actions";
+import { listPartnersAction } from "@/features/partners/actions";
 import { maskPhoneBR, maskCPF, maskCNPJ, maskCEP, maskUF } from "@/lib/masks";
+import { REF_COOKIE } from "@/lib/partners/ref";
 
 const PLANS: { key: string; label: string }[] = [
   { key: "personal", label: "Personal" },
@@ -45,6 +47,8 @@ export default function OnboardingPage() {
   const [phone, setPhone] = useState("");
   const [trialEnabled, setTrialEnabled] = useState(true);
   const [queueEnabled, setQueueEnabled] = useState(false);
+  const [partners, setPartners] = useState<{ id: string; name: string; refCode: string }[]>([]);
+  const [partnerId, setPartnerId] = useState("");
   // Dados do contrato (ASSINANTE)
   const [docType, setDocType] = useState<"CNPJ" | "CPF">("CNPJ");
   const [docNumber, setDocNumber] = useState("");
@@ -59,6 +63,18 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Carrega parceiros e pré-seleciona pelo cookie de afiliado (?ref=CODE).
+  useEffect(() => {
+    listPartnersAction().then((list) => {
+      setPartners(list);
+      const ref = document.cookie.split("; ").find((c) => c.startsWith(`${REF_COOKIE}=`))?.split("=")[1];
+      if (ref) {
+        const m = list.find((p) => p.refCode === decodeURIComponent(ref));
+        if (m) setPartnerId(m.id);
+      }
+    });
+  }, []);
 
   function onName(v: string) {
     setName(v);
@@ -77,6 +93,7 @@ export default function OnboardingPage() {
         phone,
         trialEnabled,
         queueEnabled,
+        referredByPartnerId: partnerId || undefined,
         contract: {
           legalName,
           tradeName: name,
@@ -229,6 +246,21 @@ export default function OnboardingPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Indicado por (parceiro)</Label>
+        <select
+          value={partnerId}
+          onChange={(e) => setPartnerId(e.target.value)}
+          className="h-10 rounded-md border border-border bg-surface px-3 text-body text-text"
+        >
+          <option value="">— nenhum —</option>
+          {partners.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+        <span className="text-caption text-text-muted">Atribui esta barbearia ao parceiro que a indicou (comissão/relatório).</span>
       </div>
 
       <div className="flex flex-col gap-1.5">

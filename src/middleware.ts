@@ -2,6 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { AREA_HEADER, STAFF, areaFromKey, areaKeyFor, type AreaKey } from "@/lib/supabase/area";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
+import { REF_COOKIE, normalizeRefCode } from "@/lib/partners/ref";
+
+/** Grava o cookie de indicação (?ref=CODE), se presente, em qualquer resposta. */
+function applyRefCookie(request: NextRequest, res: NextResponse): NextResponse {
+  const ref = normalizeRefCode(request.nextUrl.searchParams.get("ref"));
+  if (ref) res.cookies.set(REF_COOKIE, ref, { path: "/", maxAge: 60 * 60 * 24 * 90, sameSite: "lax" });
+  return res;
+}
 
 /** Rotas públicas (sem sessão). Todo o resto exige login. */
 const PUBLIC_PREFIXES = [
@@ -59,7 +67,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Raiz = landing page pública (marketing). Não exige sessão.
-  if (path === "/") return NextResponse.next();
+  // Também captura o cookie de afiliado (?ref=CODE) para atribuição de indicação.
+  if (path === "/") return applyRefCookie(request, NextResponse.next());
   if (OLD_REDIRECTS[path])
     return NextResponse.redirect(new URL(OLD_REDIRECTS[path] + request.nextUrl.search, request.url));
 
@@ -113,7 +122,7 @@ export async function middleware(request: NextRequest) {
 
   // Headers de segurança (CSP/HSTS/etc.) são aplicados globalmente em next.config.mjs
   // (cobrem também redirects e assets estáticos que o matcher do middleware exclui).
-  return response;
+  return applyRefCookie(request, response);
 }
 
 export const config = {

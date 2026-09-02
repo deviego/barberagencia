@@ -43,3 +43,7 @@ tsconfig.tsbuildinfo
 
 # relatórios locais de segurança (gstack)
 /.gstack/
+
+# marketing (projeto Remotino local — não versionar deps/renders)
+marketing/remotion/node_modules/
+marketing/remotion/out/

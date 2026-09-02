@@ -8,6 +8,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
 import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
+import { REF_COOKIE } from "@/lib/partners/ref";
 
 /** MASTER: dispara o envio do relatório mensal AGORA (WhatsApp), via gateway. */
 export async function sendReportNow(ym?: string) {
@@ -89,6 +90,7 @@ export async function createTenant(input: {
   phone?: string;
   trialEnabled?: boolean;
   queueEnabled?: boolean;
+  referredByPartnerId?: string;
   contract?: {
     legalName?: string;
     tradeName?: string;
@@ -118,13 +120,25 @@ export async function createTenant(input: {
   const { data: exists } = await admin.from("tenants").select("id").eq("subdomain", subdomain).maybeSingle();
   if (exists) return { ok: false as const, error: "Já existe uma barbearia com esse slug." };
 
+  // Parceiro que indicou: do form, ou fallback pelo cookie de afiliado (?ref=CODE).
+  let referredByPartnerId: string | null = isUuid(input.referredByPartnerId) ? input.referredByPartnerId! : null;
+  if (!referredByPartnerId) {
+    const refCode = (await cookies()).get(REF_COOKIE)?.value;
+    if (refCode) {
+      const { data: partner } = await admin.from("partners").select("id").eq("ref_code", refCode).maybeSingle();
+      if (partner) referredByPartnerId = partner.id as string;
+    }
+  }
+
   // 1) tenant + branding
-  const { data: tenant, error: tErr } = await admin
-    .from("tenants")
-    .insert({ name, subdomain, saas_plan: input.plan, status: "ACTIVE", queue_enabled: input.queueEnabled ?? false })
-    .select("id")
-    .single();
-  if (tErr || !tenant) return { ok: false as const, error: tErr?.message ?? "Falha ao criar a barbearia." };
+  const baseRow = { name, subdomain, saas_plan: input.plan, status: "ACTIVE", queue_enabled: input.queueEnabled ?? false };
+  let ins = await admin.from("tenants").insert({ ...baseRow, referred_by_partner_id: referredByPartnerId }).select("id").single();
+  if (ins.error && /referred_by_partner_id/.test(ins.error.message)) {
+    // Coluna ainda não existe (schema-24 não aplicado) — cria sem atribuição.
+    ins = await admin.from("tenants").insert(baseRow).select("id").single();
+  }
+  const tenant = ins.data;
+  if (ins.error || !tenant) return { ok: false as const, error: ins.error?.message ?? "Falha ao criar a barbearia." };
 
   await admin.from("branding").insert({
     tenant_id: tenant.id,
