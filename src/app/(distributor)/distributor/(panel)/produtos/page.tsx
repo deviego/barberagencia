@@ -1,0 +1,34 @@
+import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-table";
+import { getProducts } from "@/features/admin/data";
+
+const columns: CrudColumn[] = [
+  { key: "image_url", label: "Foto", format: "image" },
+  { key: "name", label: "Produto" },
+  { key: "sku", label: "SKU" },
+  { key: "price_brl", label: "Preço", format: "price" },
+  { key: "stock", label: "Estoque", format: "stock" },
+  { key: "active", label: "Status", format: "activeBadge" },
+];
+
+/** Catálogo de produtos do distribuidor (mesma tabela `products`, escopada por RLS ao tenant). */
+export default async function DistributorProdutosPage() {
+  const rows = await getProducts();
+  return (
+    <CrudTable
+      table="products"
+      title="Catálogo de produtos"
+      newLabel="Novo produto"
+      rows={rows}
+      searchKeys={["name", "sku"]}
+      columns={columns}
+      fields={[
+        { name: "image_url", label: "Foto do produto", type: "image" },
+        { name: "name", label: "Nome do produto" },
+        { name: "sku", label: "SKU" },
+        { name: "price_brl", label: "Preço (R$)", type: "currency" },
+        { name: "cost_brl", label: "Custo (R$)", type: "currency" },
+        { name: "stock", label: "Estoque", type: "number" },
+      ]}
+    />
+  );
+}
