@@ -1,8 +1,16 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
 import { isDistributorPlan, distributorPlanInfo } from "@/lib/entitlements";
+
+/** Carteira de clientes do distribuidor logado (RLS escopa ao próprio tenant). */
+export async function getMyCustomers(): Promise<{ id: string; [key: string]: unknown }[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("distributor_customers").select("*").order("created_at", { ascending: false });
+  return (data ?? []) as { id: string; [key: string]: unknown }[];
+}
 
 export type DistributorRow = {
   id: string;

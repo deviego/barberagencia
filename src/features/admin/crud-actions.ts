@@ -33,6 +33,14 @@ const SCHEMAS: Record<string, CrudSchema> = {
   },
   barbers: { fields: ["name", "active"], numeric: [], path: "/admin/barbeiros" },
   clients: { fields: ["name", "email", "phone", "active"], numeric: [], path: "/admin/clientes" },
+  distributor_customers: {
+    fields: [
+      "trade_name", "legal_name", "contact_name", "contact_phone", "contact_email",
+      "address_street", "address_city", "address_state", "address_zip", "customer_tenant_id", "active",
+    ],
+    numeric: [],
+    path: "/distributor/clientes",
+  },
 };
 
 export async function saveRow(table: string, id: string | null, values: Record<string, unknown>) {
