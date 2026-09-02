@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
-import type { ResolvedTenant, SaasPlanKey } from "./types";
+import type { ResolvedTenant, SaasPlanKey, TenantKind } from "./types";
 
 export const TENANT_COOKIE = "bb_tenant";
 
@@ -16,6 +16,7 @@ const NEUTRAL_TENANT: ResolvedTenant = {
   customDomain: null,
   networkId: null,
   saasPlan: "advance",
+  kind: "BARBERSHOP",
   branding: { logoText: "BB", logoUrl: null, instagram: null },
 };
 
@@ -28,10 +29,16 @@ function mapPlan(v: string | null | undefined): SaasPlanKey {
 
 /** Carrega tenant + branding do banco usando o client informado (RLS ou service-role). */
 async function loadTenantWith(supabase: SB, where: { id?: string; subdomain?: string }): Promise<ResolvedTenant | null> {
-  let q = supabase.from("tenants").select("id, name, subdomain, custom_domain, saas_plan");
-  if (where.id) q = q.eq("id", where.id);
-  else if (where.subdomain) q = q.eq("subdomain", where.subdomain);
-  const { data: t } = await q.limit(1).maybeSingle();
+  const run = async (cols: string) => {
+    let q = supabase.from("tenants").select(cols);
+    if (where.id) q = q.eq("id", where.id);
+    else if (where.subdomain) q = q.eq("subdomain", where.subdomain);
+    return q.limit(1).maybeSingle();
+  };
+  // Tenta com `kind`; se a coluna ainda não existe (migração schema-25), tenta sem.
+  let res = await run("id, name, subdomain, custom_domain, saas_plan, kind");
+  if (res.error) res = await run("id, name, subdomain, custom_domain, saas_plan");
+  const t = res.data;
   if (!t) return null;
 
   const { data: b } = await supabase
@@ -47,6 +54,7 @@ async function loadTenantWith(supabase: SB, where: { id?: string; subdomain?: st
     customDomain: (t.custom_domain as string | null) ?? null,
     networkId: null,
     saasPlan: mapPlan(t.saas_plan as string | null),
+    kind: ((t.kind as string | undefined) === "DISTRIBUTOR" ? "DISTRIBUTOR" : "BARBERSHOP") as TenantKind,
     branding: {
       logoText: (b?.logo_text as string | null) ?? "BO",
       logoUrl: (b?.logo_url as string | null) ?? null,

@@ -2,7 +2,7 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
-import { PLANS, normalizeSaasPlan, planLabel } from "@/lib/entitlements";
+import { PLANS, normalizeSaasPlan, planLabel, isDistributorPlan, distributorPlanInfo } from "@/lib/entitlements";
 
 export type SaasPaymentRow = {
   amountBrl: number;
@@ -37,8 +37,11 @@ export async function getSaasBilling(tenantId: string): Promise<SaasBilling | nu
 
   const admin = createSupabaseAdminClient();
   const { data: t } = await admin.from("tenants").select("saas_plan, status").eq("id", tenantId).maybeSingle();
-  const planKey = normalizeSaasPlan(t?.saas_plan);
-  const priceBrl = PLANS[planKey].priceBRL;
+  const rawPlan = (t?.saas_plan as string | undefined) ?? null;
+  const isDist = isDistributorPlan(rawPlan);
+  const planKey = isDist ? (rawPlan as string) : normalizeSaasPlan(rawPlan);
+  const priceBrl = isDist ? distributorPlanInfo(rawPlan).priceBRL : PLANS[normalizeSaasPlan(rawPlan)].priceBRL;
+  const planLbl = isDist ? distributorPlanInfo(rawPlan).label : planLabel(normalizeSaasPlan(rawPlan));
 
   // Contrato: trial + paid_until (paid_until pode não existir se a migração não rodou).
   let trialEndsAt: string | null = null;
@@ -90,7 +93,7 @@ export async function getSaasBilling(tenantId: string): Promise<SaasBilling | nu
 
   return {
     plan: planKey,
-    planLabel: planLabel(planKey),
+    planLabel: planLbl,
     priceBrl,
     tenantStatus,
     trialEndsAt,

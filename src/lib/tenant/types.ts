@@ -16,6 +16,9 @@ export interface TenantBranding {
 
 export type SaasPlanKey = "personal" | "essencial" | "advance";
 
+/** Tipo de tenant: barbearia (padrão) ou distribuidor de produtos. */
+export type TenantKind = "BARBERSHOP" | "DISTRIBUTOR";
+
 /** Tenant resolvido a partir do host da requisição. */
 export interface ResolvedTenant {
   id: string;
@@ -24,5 +27,6 @@ export interface ResolvedTenant {
   customDomain?: string | null;
   networkId?: string | null;
   saasPlan: SaasPlanKey;
+  kind: TenantKind;
   branding: TenantBranding;
 }

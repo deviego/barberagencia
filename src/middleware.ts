@@ -16,12 +16,13 @@ const PUBLIC_PREFIXES = [
   "/client/login", "/client/cadastro", "/client/otp", "/client/recuperar-senha", "/client/redefinir-senha", "/client/auth",
   "/admin/login", "/admin/auth",
   "/master/login", "/master/auth",
+  "/distributor/login", "/distributor/auth",
   "/b",
   "/design-system", "/termos", "/privacidade", "/convite", "/documentacao",
   "/api/master/report", // protegido por token próprio (não exige sessão)
 ];
 /** Páginas de login: se já logado (na área), redireciona para a home da área. */
-const AUTH_PAGES = ["/client/login", "/client/cadastro", "/client/otp", "/admin/login", "/master/login"];
+const AUTH_PAGES = ["/client/login", "/client/cadastro", "/client/otp", "/admin/login", "/master/login", "/distributor/login"];
 
 /** Rotas antigas → novas (compatibilidade com links já divulgados). */
 const OLD_REDIRECTS: Record<string, string> = {
@@ -35,11 +36,12 @@ const OLD_REDIRECTS: Record<string, string> = {
 };
 
 function areaHome(key: AreaKey) {
-  return key === "admin" ? "/admin" : key === "master" ? "/master" : "/client";
+  return key === "admin" ? "/admin" : key === "master" ? "/master" : key === "distributor" ? "/distributor" : "/client";
 }
 function loginFor(path: string) {
   if (path.startsWith("/admin") || path.startsWith("/rede")) return "/admin/login";
   if (path.startsWith("/master")) return "/master/login";
+  if (path.startsWith("/distributor")) return "/distributor/login";
   return "/client/login";
 }
 function isPublic(path: string) {

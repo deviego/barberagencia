@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
 import { getRequestOrigin } from "@/lib/http";
-import { PLANS, normalizeSaasPlan, planLabel } from "@/lib/entitlements";
+import { PLANS, normalizeSaasPlan, planLabel, isDistributorPlan } from "@/lib/entitlements";
 
 export type PartnerType = "EMBAIXADORA" | "DIVULGADORA" | "DISTRIBUIDOR";
 export type CommissionKind = "PCT" | "FIXED" | "NONE";
@@ -65,8 +65,10 @@ function mapPartner(r: Record<string, unknown>): Partner {
 /** Barbearias (tenants) mínimas, para mapear nomes e o select de vínculo. */
 export async function listTenantsMini(): Promise<{ id: string; name: string }[]> {
   const admin = createSupabaseAdminClient();
-  const { data } = await admin.from("tenants").select("id, name").order("name");
-  return ((data ?? []) as Record<string, unknown>[]).map((t) => ({ id: t.id as string, name: t.name as string }));
+  const { data } = await admin.from("tenants").select("id, name, saas_plan").order("name");
+  return ((data ?? []) as Record<string, unknown>[])
+    .filter((t) => !isDistributorPlan(t.saas_plan as string))
+    .map((t) => ({ id: t.id as string, name: t.name as string }));
 }
 
 /** Lista de parceiros + nº de barbearias indicadas. Degrada para [] se a migração não foi aplicada. */

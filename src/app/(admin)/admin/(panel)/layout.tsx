@@ -24,6 +24,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     getTenantContract(),
   ]);
 
+  // Distribuidor logado não usa o painel de barbearia — vai para o painel próprio.
+  if (tenant.kind === "DISTRIBUTOR") redirect("/distributor");
+
   const contractView = buildContractView(contract);
   // Banner só durante o teste ativo e não assinado.
   const trialActive =

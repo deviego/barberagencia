@@ -157,6 +157,19 @@ export function normalizeSaasPlan(p: string | null | undefined): SaasPlanKey {
   return p === "personal" || p === "essencial" || p === "advance" ? p : "advance";
 }
 
+// ---- Planos do DISTRIBUIDOR (revendedor) — preços provisórios ----------------
+/** Planos do distribuidor. Ajustar `priceBRL` quando os valores forem definidos. */
+export const DISTRIBUTOR_PLANS: Record<string, { label: string; priceBRL: number }> = {
+  distribuidor: { label: "Distribuidor", priceBRL: 149.9 },
+};
+export const DISTRIBUTOR_PLAN_DEFAULT = "distribuidor";
+export function isDistributorPlan(key: string | null | undefined): boolean {
+  return !!key && key in DISTRIBUTOR_PLANS;
+}
+export function distributorPlanInfo(key: string | null | undefined): { label: string; priceBRL: number } {
+  return DISTRIBUTOR_PLANS[key ?? ""] ?? DISTRIBUTOR_PLANS[DISTRIBUTOR_PLAN_DEFAULT];
+}
+
 /** Plano mais barato que desbloqueia um recurso (para o CTA "disponível no plano X"). */
 export function minPlanForFeature(feature: FeatureKey): SaasPlanKey | null {
   for (const p of PLAN_ORDER) if (PLANS[p].features[feature]) return p;

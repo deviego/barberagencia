@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isDistributorPlan } from "@/lib/entitlements";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -67,13 +68,13 @@ function cumulativeByMonth(rows: Row[], dateField: string): Bar[] {
 export async function getPlatformStats() {
   const admin = createSupabaseAdminClient();
   const [tenantsRes, revenueRes, subsRes, plansRes] = await Promise.all([
-    admin.from("tenants").select("id, status, created_at"),
+    admin.from("tenants").select("id, status, created_at, saas_plan"),
     admin.from("financial_entries").select("amount_brl, occurred_at").eq("type", "REVENUE"),
     admin.from("client_subscriptions").select("status, combo_plan_id, created_at"),
     admin.from("combo_plans").select("id, price_brl"),
   ]);
 
-  const tenants = (tenantsRes.data ?? []) as Row[];
+  const tenants = ((tenantsRes.data ?? []) as Row[]).filter((t) => !isDistributorPlan(t.saas_plan as string));
   const revenue = (revenueRes.data ?? []) as Row[];
   const subs = (subsRes.data ?? []) as Row[];
   const plans = (plansRes.data ?? []) as Row[];
@@ -113,7 +114,7 @@ export async function getTenants() {
     admin.from("financial_entries").select("tenant_id, amount_brl, occurred_at").eq("type", "REVENUE"),
   ]);
 
-  const tenants = (tenantsRes.data ?? []) as Row[];
+  const tenants = ((tenantsRes.data ?? []) as Row[]).filter((t) => !isDistributorPlan(t.saas_plan as string));
   const countBy = (rows: Row[] | null, pred?: (r: Row) => boolean) => {
     const m = new Map<string, number>();
     for (const r of rows ?? []) {
