@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArrowLeft, ExternalLink, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, ExternalLink, MapPin, Phone, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/kpi-card";
 import { BarChart } from "@/features/platform/components/bar-chart";
@@ -60,7 +60,15 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <EnterAdminButton tenantId={t.id} label="Acessar painel admin" />
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/master/barbearias/${t.id}/importar`}
+              className="flex h-10 items-center gap-1.5 rounded-md border border-accent px-4 text-caption font-semibold text-accent transition hover:bg-accent-wash"
+            >
+              <Upload size={15} /> Importar dados
+            </Link>
+            <EnterAdminButton tenantId={t.id} label="Acessar painel admin" />
+          </div>
           <Link
             href={`/b/${t.subdomain}`}
             target="_blank"
