@@ -70,6 +70,19 @@ export function WhatsAppConnect() {
     });
   }
 
+  // Encerra qualquer sessão presa (limpa creds no gateway) e pede um QR novo.
+  function reset() {
+    setError(null);
+    startTransition(async () => {
+      await waLogout();
+      const s = await waConnect();
+      if (!s.ok) return setError(s.error ?? "Erro");
+      setState((s.status as State) ?? "connecting");
+      setQr(s.qr ?? null);
+      setNumber(s.number ?? null);
+    });
+  }
+
   function sendTest() {
     setTestMsg(null);
     startTransition(async () => {
@@ -132,18 +145,35 @@ export function WhatsAppConnect() {
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qr} alt="QR Code do WhatsApp" className="h-56 w-56 rounded-lg border border-border bg-white p-2" />
-          <button onClick={refresh} className="flex items-center gap-1 text-caption text-accent hover:underline">
-            <RefreshCw size={13} /> Atualizar
-          </button>
+          <div className="flex items-center gap-4">
+            <button onClick={refresh} className="flex items-center gap-1 text-caption text-accent hover:underline">
+              <RefreshCw size={13} /> Atualizar
+            </button>
+            <button onClick={reset} disabled={pending} className="flex items-center gap-1 text-caption text-text-muted hover:text-danger hover:underline">
+              Recomeçar do zero
+            </button>
+          </div>
         </div>
       ) : state === "connecting" || state === "loading" ? (
-        <div className="flex items-center gap-2 text-caption text-text-muted">
-          <Loader2 size={16} className="animate-spin" /> {state === "loading" ? "Verificando conexão…" : "Gerando QR code…"}
+        <div className="flex flex-col items-start gap-2">
+          <div className="flex items-center gap-2 text-caption text-text-muted">
+            <Loader2 size={16} className="animate-spin" /> {state === "loading" ? "Verificando conexão…" : "Gerando QR code…"}
+          </div>
+          {state === "connecting" && (
+            <button onClick={reset} disabled={pending} className="flex items-center gap-1 text-caption text-accent hover:underline">
+              <RefreshCw size={13} /> Não aparece o QR? Recomeçar do zero
+            </button>
+          )}
         </div>
       ) : (
-        <Button className="self-start" loading={pending} onClick={connect}>
-          Conectar WhatsApp
-        </Button>
+        <div className="flex flex-col items-start gap-2">
+          <Button loading={pending} onClick={connect}>
+            Conectar WhatsApp
+          </Button>
+          <button onClick={reset} disabled={pending} className="text-caption text-text-muted hover:text-accent hover:underline">
+            Problemas para conectar? Recomeçar do zero
+          </button>
+        </div>
       )}
     </section>
   );

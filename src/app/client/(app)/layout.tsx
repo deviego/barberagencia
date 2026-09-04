@@ -6,6 +6,7 @@ import { BottomNav } from "@/components/nav/bottom-nav";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getSessionUser } from "@/lib/auth/session";
 import { getActivePlanBalance } from "@/features/client/data";
+import { getQueueConfig } from "@/features/queue/data";
 import { Copyright } from "@/components/brand/copyright";
 import { exitClientPreview } from "@/features/auth/actions";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
@@ -26,6 +27,9 @@ export default async function ClientLayout({ children }: { children: React.React
   const hasPlan = balance !== null; // sem assinatura ativa → oculta "Meu plano"
   // Com plano e saldo > 0, "Agendar" vai direto ao horário; senão, escolhe serviço.
   const agendarHref = (balance ?? 0) > 0 ? "/client/agendar" : "/client/servicos";
+  // "Fila" só aparece quando a barbearia habilita a fila no modo app (APP ou BOTH).
+  const queueCfg = await getQueueConfig(tenant.id).catch(() => null);
+  const queueEnabled = !!queueCfg?.enabled && (queueCfg.mode === "APP" || queueCfg.mode === "BOTH");
   return (
     <div className="min-h-screen">
       {isAdmin && preview && (

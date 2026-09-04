@@ -31,14 +31,16 @@ async function gateway(path: string, init?: RequestInit): Promise<{ res?: Respon
 export async function waStatus(): Promise<WaStatus> {
   const { res, error } = await gateway("/status");
   if (error) return { ok: false, error };
-  const data = await res!.json().catch(() => ({}));
+  const data = (await res!.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res!.ok) return { ok: false, error: (data.error as string) ?? `Gateway respondeu ${res!.status}.` };
   return { ok: true, ...data };
 }
 
 export async function waConnect(): Promise<WaStatus> {
   const { res, error } = await gateway("/connect", { method: "POST" });
   if (error) return { ok: false, error };
-  const data = await res!.json().catch(() => ({}));
+  const data = (await res!.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res!.ok) return { ok: false, error: (data.error as string) ?? `Falha ao conectar (${res!.status}).` };
   return { ok: true, ...data };
 }
 

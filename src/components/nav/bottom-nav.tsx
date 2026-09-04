@@ -9,12 +9,16 @@ import { cn } from "@/lib/utils";
 export function BottomNav({
   agendarHref = "/client/servicos",
   hasPlan = true,
+  queueEnabled = false,
 }: {
   agendarHref?: string;
   hasPlan?: boolean;
+  queueEnabled?: boolean;
 }) {
   const pathname = usePathname();
-  const navItems = CLIENT_NAV.filter((i) => hasPlan || i.href !== "/client/meu-plano");
+  const navItems = CLIENT_NAV.filter(
+    (i) => (hasPlan || i.href !== "/client/meu-plano") && (queueEnabled || i.href !== "/client/fila")
+  );
   return (
     <nav className="fixed inset-x-0 bottom-0 z-sticky flex items-center justify-around border-t border-border bg-surface px-2 py-1.5 md:hidden">
       {navItems.map(({ href, label, icon: Icon }) => {

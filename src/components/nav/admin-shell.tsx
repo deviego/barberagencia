@@ -151,13 +151,19 @@ export function AdminShell({
       {/* Topbar full-width */}
       <header className="sticky top-0 z-drawer flex items-center justify-between gap-4 border-b border-border bg-surface px-5 py-2.5">
         <div className="flex items-center gap-3">
+          {/* Mobile: abre o menu de tela cheia. */}
           <button
-            onClick={() => {
-              setOpen((o) => !o); // desktop: colapsa a sidebar
-              setMobileNav((m) => !m); // mobile: abre o menu (overlay é md:hidden)
-            }}
+            onClick={() => setMobileNav(true)}
+            aria-label="Abrir menu"
+            className="flex rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent md:hidden"
+          >
+            <Menu size={20} />
+          </button>
+          {/* Desktop: colapsa/expande a sidebar. */}
+          <button
+            onClick={() => setOpen((o) => !o)}
             aria-label="Alternar menu"
-            className="flex rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
+            className="hidden rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent md:flex"
           >
             <Menu size={18} />
           </button>
@@ -270,7 +276,7 @@ export function AdminShell({
         </aside>
 
         <main className="flex flex-1 flex-col overflow-x-hidden">
-          <div className="flex-1 p-6">{children}</div>
+          <div className="flex-1 p-4 md:p-6">{children}</div>
           <Copyright className="border-t border-border py-3" />
         </main>
       </div>

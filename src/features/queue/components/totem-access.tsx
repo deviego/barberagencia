@@ -1,21 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check, ExternalLink, MonitorSmartphone, Tv } from "lucide-react";
+import { Copy, Check, ExternalLink, MonitorSmartphone, Tv, ListOrdered, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-/** Acesso ao totem e ao painel a partir do admin: QR para escanear + copiar link
- *  (o totem pode ficar em QUALQUER dispositivo: tablet, celular, TV, etc.). */
+/** Acesso ao totem, à fila do cliente (QR) e ao painel, a partir do admin.
+ *  - Totem: QR para abrir o kiosk no aparelho que fica no balcão.
+ *  - Fila (app): QR que o CLIENTE escaneia para entrar na fila, tirar a senha e
+ *    acompanhar pelo próprio celular — disponível sempre que o modo app está ligado.
+ *  - Painel: tela pública de chamada (TV). */
 export function TotemAccess({
   totemUrl,
-  painelUrl,
-  qrDataUrl,
+  totemQr,
   totemOn,
+  filaUrl,
+  filaQr,
+  appOn,
+  painelUrl,
 }: {
   totemUrl: string | null;
-  painelUrl: string;
-  qrDataUrl: string | null;
+  totemQr: string | null;
   totemOn: boolean;
+  filaUrl: string;
+  filaQr: string | null;
+  appOn: boolean;
+  painelUrl: string;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   function copy(text: string, key: string) {
@@ -32,9 +41,9 @@ export function TotemAccess({
           <div className="flex items-center gap-1.5 text-overline uppercase text-text-muted">
             <MonitorSmartphone size={14} /> Totem
           </div>
-          {qrDataUrl && (
+          {totemQr && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrDataUrl} alt="QR do totem" className="h-44 w-44 rounded-md border border-border" />
+            <img src={totemQr} alt="QR do totem" className="h-44 w-44 rounded-md border border-border" />
           )}
           <p className="text-caption text-text-2">
             Coloque o totem em <strong>qualquer dispositivo</strong> (tablet, celular, TV…). Escaneie o QR no
@@ -55,7 +64,40 @@ export function TotemAccess({
         </div>
       )}
 
-      {totemOn && totemUrl && <div className="h-px bg-border-subtle" />}
+      {totemOn && totemUrl && appOn && <div className="h-px bg-border-subtle" />}
+
+      {/* Fila do cliente (app) — QR público para o cliente entrar na fila */}
+      {appOn && (
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex items-center gap-1.5 text-overline uppercase text-text-muted">
+            <ListOrdered size={14} /> Fila do cliente (QR)
+          </div>
+          {filaQr && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={filaQr} alt="QR da fila do cliente" className="h-44 w-44 rounded-md border border-border" />
+          )}
+          <p className="text-caption text-text-2">
+            Cole este QR no balcão. O cliente escaneia, <strong>entra na fila, tira a senha</strong> e acompanha
+            a posição pelo próprio celular — sem precisar de totem.
+          </p>
+          <div className="flex w-full flex-col gap-2">
+            {filaQr && (
+              <a href={filaQr} download="qr-fila-cliente.png" className="w-full">
+                <Button size="sm" className="w-full">
+                  <Download size={15} /> Baixar QR da fila
+                </Button>
+              </a>
+            )}
+            <Button size="sm" variant="outline" onClick={() => copy(filaUrl, "fila")}>
+              {copied === "fila" ? <Check size={15} /> : <Copy size={15} />}
+              {copied === "fila" ? "Link copiado!" : "Copiar link da fila"}
+            </Button>
+          </div>
+          <p className="text-caption text-text-muted">Link público — pode divulgar à vontade.</p>
+        </div>
+      )}
+
+      {appOn && <div className="h-px bg-border-subtle" />}
 
       {/* Painel de chamada */}
       <div className="flex flex-col gap-2">

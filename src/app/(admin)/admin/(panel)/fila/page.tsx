@@ -54,12 +54,13 @@ export default async function AdminFilaPage() {
   const filaUrl = `${origin}/b/${tenant.subdomain}/fila`;
   const painelUrl = `${origin}/b/${tenant.subdomain}/painel`;
 
-  // QR: no modo totem, aponta para o kiosk (abrir no iPad); no app, para a fila do cliente.
-  const qrTarget = totemOn && totemUrl ? totemUrl : filaUrl;
-  const [items, qrDataUrl, history] = await Promise.all([
+  // QRs independentes: o do totem (kiosk, aberto no aparelho) e o da fila do
+  // cliente (o cliente escaneia, tira a senha e acompanha pelo próprio celular).
+  const [items, history, totemQr, filaQr] = await Promise.all([
     getAdminQueue(),
-    QRCode.toDataURL(qrTarget, { margin: 1, width: 240 }),
     getQueueHistory(),
+    totemOn && totemUrl ? QRCode.toDataURL(totemUrl, { margin: 1, width: 240 }) : Promise.resolve(null),
+    appOn ? QRCode.toDataURL(filaUrl, { margin: 1, width: 240 }) : Promise.resolve(null),
   ]);
 
   return (
@@ -74,7 +75,15 @@ export default async function AdminFilaPage() {
           <AdminFila items={items} />
         </section>
 
-        <TotemAccess totemUrl={totemUrl} painelUrl={painelUrl} qrDataUrl={qrDataUrl} totemOn={totemOn && !!totemUrl} />
+        <TotemAccess
+          totemUrl={totemUrl}
+          totemQr={totemQr}
+          totemOn={totemOn && !!totemUrl}
+          filaUrl={filaUrl}
+          filaQr={filaQr}
+          appOn={appOn}
+          painelUrl={painelUrl}
+        />
       </div>
 
       <QueueHistory data={history} />

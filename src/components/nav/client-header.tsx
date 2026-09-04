@@ -17,6 +17,7 @@ export function ClientHeader({
   avatarUrl,
   agendarHref = "/client/servicos",
   hasPlan = true,
+  queueEnabled = false,
 }: {
   logoText: string;
   logoUrl?: string | null;
@@ -26,10 +27,13 @@ export function ClientHeader({
   avatarUrl?: string | null;
   agendarHref?: string;
   hasPlan?: boolean;
+  queueEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const initials = getInitials(userName, userEmail);
-  const navItems = CLIENT_NAV.filter((i) => hasPlan || i.href !== "/client/meu-plano");
+  const navItems = CLIENT_NAV.filter(
+    (i) => (hasPlan || i.href !== "/client/meu-plano") && (queueEnabled || i.href !== "/client/fila")
+  );
   return (
     <header className="sticky top-0 z-sticky flex items-center justify-between border-b border-border bg-surface px-5 py-3 md:px-8">
       <Link href="/client" className="flex items-center gap-3 text-text">
