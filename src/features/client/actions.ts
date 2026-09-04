@@ -230,8 +230,10 @@ export async function addComandaItemClient(
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt || appt.client_id !== client.id) return { ok: false as const, error: "Pedido não encontrado" };
-  if (appt.service_started_at || !EDITAVEL.includes(appt.status as string))
-    return { ok: false as const, error: "Este pedido não pode mais ser alterado." };
+  // Pode adicionar até o pedido ser finalizado — inclusive DURANTE o atendimento
+  // (service_started_at setado, status ainda ativo). Só bloqueia se já finalizou/cancelou.
+  if (!EDITAVEL.includes(appt.status as string))
+    return { ok: false as const, error: "Este pedido já foi finalizado e não pode ser alterado." };
 
   const { error } = await supabase.from("appointment_items").insert({
     appointment_id: appointmentId,
