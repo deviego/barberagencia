@@ -26,8 +26,9 @@ export async function getDashboard() {
   const dayEnd = new Date(dayStart);
   dayEnd.setDate(dayEnd.getDate() + 1);
 
-  const [rev, apptsToday, subs, pending, sixRev, today] = await Promise.all([
+  const [rev, revDay, apptsToday, subs, pending, sixRev, today] = await Promise.all([
     supabase.from("financial_entries").select("amount_brl").eq("type", "REVENUE").gte("occurred_at", monthStart.toISOString()),
+    supabase.from("financial_entries").select("amount_brl").eq("type", "REVENUE").gte("occurred_at", dayStart.toISOString()).lt("occurred_at", dayEnd.toISOString()),
     supabase.from("appointments").select("id", { count: "exact", head: true }).gte("start_at", dayStart.toISOString()).lt("start_at", dayEnd.toISOString()),
     supabase.from("client_subscriptions").select("id", { count: "exact", head: true }).eq("status", "ACTIVE"),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "REQUESTED"),
@@ -36,6 +37,7 @@ export async function getDashboard() {
   ]);
 
   const revenueMonth = (rev.data ?? []).reduce((s, r) => s + Number(r.amount_brl), 0);
+  const revenueToday = (revDay.data ?? []).reduce((s, r) => s + Number(r.amount_brl), 0);
   const buckets = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     return { month: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), value: 0, current: i === 5 };
@@ -47,6 +49,7 @@ export async function getDashboard() {
   }
 
   return {
+    revenueToday,
     revenueMonth,
     apptsToday: apptsToday.count ?? 0,
     subscribers: subs.count ?? 0,
