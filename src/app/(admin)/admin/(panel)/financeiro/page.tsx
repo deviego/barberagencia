@@ -6,8 +6,9 @@ import { PosButton } from "@/features/admin/components/pos-drawer";
 import { WithdrawButton } from "@/features/admin/components/withdraw-button";
 import { FinanceFilter } from "@/features/admin/components/finance-filter";
 import { RequestReportButton } from "@/features/admin/components/request-report-button";
+import { BarberFinance } from "@/features/admin/components/barber-finance";
 import { formatBRL } from "@/lib/utils";
-import { getClients, getFinance, getFinanceDetails, getProducts, getServices } from "@/features/admin/data";
+import { getClients, getFinance, getFinanceByBarber, getFinanceDetails, getProducts, getServices } from "@/features/admin/data";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +48,10 @@ export default async function FinanceiroPage({
     label = dateStr === today ? `Hoje · ${format(base, "dd/MM")}` : `Dia ${format(base, "dd/MM")}`;
   }
 
-  const [fin, details, services, products, clients] = await Promise.all([
+  const [fin, details, byBarber, services, products, clients] = await Promise.all([
     getFinance(from.toISOString(), to.toISOString()),
     getFinanceDetails(from.toISOString(), to.toISOString()),
+    getFinanceByBarber(from.toISOString(), to.toISOString()),
     getServices(),
     getProducts(),
     getClients(),
@@ -170,6 +172,9 @@ export default async function FinanceiroPage({
           </div>
         )}
       </div>
+
+      {/* Faturamento por barbeiro (equipe ou individual) */}
+      <BarberFinance barbers={byBarber.barbers} detailed={byBarber.detailed} />
     </div>
   );
 }

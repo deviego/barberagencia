@@ -143,6 +143,51 @@ export async function getFinanceDetails(fromISO: string, toISO: string) {
 }
 export type ServiceStat = { name: string; value: number; qty: number; pct: number };
 
+/**
+ * Faturamento por barbeiro num período (base = agendamentos do barbeiro, com os
+ * itens de serviço). Receita = itens NÃO cobertos por plano (o que entra no caixa).
+ * Não inclui vendas de balcão sem barbeiro. Service-role escopado ao tenant.
+ */
+export async function getFinanceByBarber(fromISO: string, toISO: string) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { barbers: [] as BarberFinanceRow[], detailed: [] as BarberReceipt[] };
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .from("appointments")
+    .select("id, start_at, barber_id, payment_method, clients(name), barbers(name), appointment_items(name, qty, price_brl, kind, covered_by_plan)")
+    .eq("tenant_id", user.tenantId)
+    .gte("start_at", fromISO)
+    .lt("start_at", toISO)
+    .neq("status", "CANCELLED")
+    .order("start_at", { ascending: false });
+  const rows = (data ?? []) as Row[];
+
+  const summary = new Map<string, BarberFinanceRow>();
+  const detailed: BarberReceipt[] = [];
+  for (const a of rows) {
+    if (!a.barber_id) continue;
+    const items = (a.appointment_items as Row[]) ?? [];
+    const revenue = items.reduce((s, it) => s + (it.covered_by_plan ? 0 : Number(it.price_brl ?? 0) * Number(it.qty ?? 1)), 0);
+    const bid = a.barber_id as string;
+    const bname = (relOne(a.barbers)?.name as string) ?? "Barbeiro";
+    const cur = summary.get(bid) ?? { id: bid, name: bname, appts: 0, revenue: 0 };
+    cur.appts += 1;
+    cur.revenue += revenue;
+    summary.set(bid, cur);
+    detailed.push({
+      barberId: bid,
+      datetime: a.start_at as string,
+      clientName: (relOne(a.clients)?.name as string) ?? "Cliente",
+      method: (a.payment_method as string) ?? null,
+      total: revenue,
+      items: items.filter((it) => it.kind === "service").map((it) => ({ name: it.name as string, qty: Number(it.qty ?? 1) })),
+    });
+  }
+  return { barbers: [...summary.values()].sort((a, b) => b.revenue - a.revenue), detailed };
+}
+export type BarberFinanceRow = { id: string; name: string; appts: number; revenue: number };
+export type BarberReceipt = { barberId: string; datetime: string; clientName: string; method: string | null; total: number; items: { name: string; qty: number }[] };
+
 export async function getCampaigns() {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
