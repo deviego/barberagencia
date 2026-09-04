@@ -17,7 +17,7 @@ import { ADMIN_NAV } from "@/features/admin/nav";
 import { hasEntitlement } from "@/lib/entitlements";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { SaasPlanKey } from "@/lib/tenant/types";
-import { cn, getInitials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 /** Bip curto (Web Audio) — só toca após 1ª interação do usuário na página. */
 function playBeep() {
@@ -46,9 +46,6 @@ export function AdminShell({
   logoUrl,
   name,
   plan,
-  userName,
-  userEmail,
-  avatarUrl,
   pendingCount = 0,
   trialEndsAt,
   isMaster = false,
@@ -78,7 +75,6 @@ export function AdminShell({
   const prevCount = useRef(pendingCount);
 
   const items = ADMIN_NAV.filter((i) => !i.feature || hasEntitlement(plan, i.feature));
-  const initials = getInitials(userName, userEmail);
   const mobileItems = items.map((i) => ({
     href: i.href,
     label: i.label,
@@ -198,18 +194,6 @@ export function AdminShell({
             )}
           </Link>
           <ThemeToggle />
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt={initials} className="h-8 w-8 rounded-full object-cover" />
-          ) : (
-            <span
-              className="flex h-8 w-8 items-center justify-center rounded-full text-caption font-bold text-white"
-              style={{ background: "var(--bb-pole-blue)" }}
-            >
-              {initials}
-            </span>
-          )}
-          <LogoutButton />
         </div>
       </header>
 
