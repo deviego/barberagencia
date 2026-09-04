@@ -211,6 +211,32 @@ export async function getWorkingHours() {
   return data ?? [];
 }
 
+/** Espaçamento (min) entre horários da agenda. Default 30, limitado a 5–120. */
+export async function getSlotStep(): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("tenant_settings").select("slot_step_min").maybeSingle();
+  const v = Number(data?.slot_step_min ?? 30);
+  return Number.isFinite(v) ? Math.min(120, Math.max(5, v)) : 30;
+}
+
+/** Bloqueios/folgas futuros da agenda (barber_id null = barbearia inteira). */
+export async function getScheduleBlocks() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("schedule_blocks")
+    .select("id, barber_id, starts_at, ends_at, reason, barbers(name)")
+    .gte("ends_at", new Date().toISOString())
+    .order("starts_at", { ascending: true });
+  return (data ?? []) as {
+    id: string;
+    barber_id: string | null;
+    starts_at: string;
+    ends_at: string;
+    reason: string | null;
+    barbers: { name: string } | { name: string }[] | null;
+  }[];
+}
+
 /** Clientes ativos com o plano ativo (para o "Novo agendamento" vincular o combo). */
 export async function getClientsWithPlan() {
   const supabase = await createSupabaseServerClient();

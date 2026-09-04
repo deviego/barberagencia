@@ -29,7 +29,17 @@ const timeToMin = (t: string) => {
   return (h || 0) * 60 + (m || 0);
 };
 
-interface DayState { enabled: boolean; start: string; end: string }
+interface DayState {
+  enabled: boolean;
+  start: string;
+  end: string;
+  hasBreak: boolean;
+  breakStart: string;
+  breakEnd: string;
+}
+
+const timeCls =
+  "h-9 flex-1 rounded-md border border-border bg-inset px-2 text-body text-text focus:border-accent focus:outline-none disabled:opacity-40";
 
 function WorkingHoursEditor({
   barber,
@@ -47,10 +57,23 @@ function WorkingHoursEditor({
   const [days, setDays] = useState<Record<number, DayState>>(() => {
     const map: Record<number, DayState> = {};
     for (const d of DAYS) {
-      const row = hours.find((h) => h.weekday === d.wd);
-      map[d.wd] = row
-        ? { enabled: true, start: minToTime(row.start_min), end: minToTime(row.end_min) }
-        : { enabled: false, start: "09:00", end: "18:00" };
+      const rows = hours.filter((h) => h.weekday === d.wd).sort((a, b) => a.start_min - b.start_min);
+      const defaults = { hasBreak: false, breakStart: "12:00", breakEnd: "13:00" };
+      if (rows.length === 0) {
+        map[d.wd] = { enabled: false, start: "09:00", end: "18:00", ...defaults };
+      } else if (rows.length === 1) {
+        map[d.wd] = { enabled: true, start: minToTime(rows[0].start_min), end: minToTime(rows[0].end_min), ...defaults };
+      } else {
+        // 2+ janelas = expediente com intervalo (a lacuna entre a 1ª e a 2ª).
+        map[d.wd] = {
+          enabled: true,
+          start: minToTime(rows[0].start_min),
+          end: minToTime(rows[rows.length - 1].end_min),
+          hasBreak: true,
+          breakStart: minToTime(rows[0].end_min),
+          breakEnd: minToTime(rows[1].start_min),
+        };
+      }
     }
     return map;
   });
@@ -61,14 +84,28 @@ function WorkingHoursEditor({
 
   function save() {
     setError(null);
-    const entries = DAYS.filter((d) => days[d.wd].enabled).map((d) => ({
-      weekday: d.wd,
-      startMin: timeToMin(days[d.wd].start),
-      endMin: timeToMin(days[d.wd].end),
-    }));
-    if (entries.some((e) => e.endMin <= e.startMin)) {
-      setError("Em cada dia, o fim precisa ser maior que o início.");
-      return;
+    const entries: { weekday: number; startMin: number; endMin: number }[] = [];
+    for (const d of DAYS) {
+      const st = days[d.wd];
+      if (!st.enabled) continue;
+      const s = timeToMin(st.start);
+      const e = timeToMin(st.end);
+      if (e <= s) {
+        setError("Em cada dia, o fim precisa ser maior que o início.");
+        return;
+      }
+      if (st.hasBreak) {
+        const bs = timeToMin(st.breakStart);
+        const be = timeToMin(st.breakEnd);
+        if (!(s < bs && bs < be && be < e)) {
+          setError("O intervalo precisa ficar dentro do expediente (início < intervalo < fim).");
+          return;
+        }
+        entries.push({ weekday: d.wd, startMin: s, endMin: bs });
+        entries.push({ weekday: d.wd, startMin: be, endMin: e });
+      } else {
+        entries.push({ weekday: d.wd, startMin: s, endMin: e });
+      }
     }
     startTransition(async () => {
       const res = await saveWorkingHours(barber.id, entries);
@@ -88,26 +125,42 @@ function WorkingHoursEditor({
       {DAYS.map((d) => {
         const st = days[d.wd];
         return (
-          <div key={d.wd} className="flex items-center gap-2 rounded-md border border-border-subtle px-3 py-2">
-            <div className="flex w-24 items-center gap-2">
-              <Switch defaultChecked={st.enabled} onChange={(v) => set(d.wd, { enabled: v })} />
-              <span className="text-body text-text">{d.abbr}</span>
+          <div key={d.wd} className="flex flex-col gap-2 rounded-md border border-border-subtle px-3 py-2">
+            <div className="flex items-center gap-2">
+              <div className="flex w-24 items-center gap-2">
+                <Switch defaultChecked={st.enabled} onChange={(v) => set(d.wd, { enabled: v })} />
+                <span className="text-body text-text">{d.abbr}</span>
+              </div>
+              <input
+                type="time"
+                value={st.start}
+                disabled={!st.enabled}
+                onChange={(e) => set(d.wd, { start: e.target.value })}
+                className={timeCls}
+              />
+              <span className="text-text-muted">–</span>
+              <input
+                type="time"
+                value={st.end}
+                disabled={!st.enabled}
+                onChange={(e) => set(d.wd, { end: e.target.value })}
+                className={timeCls}
+              />
             </div>
-            <input
-              type="time"
-              value={st.start}
-              disabled={!st.enabled}
-              onChange={(e) => set(d.wd, { start: e.target.value })}
-              className="h-9 flex-1 rounded-md border border-border bg-inset px-2 text-body text-text focus:border-accent focus:outline-none disabled:opacity-40"
-            />
-            <span className="text-text-muted">–</span>
-            <input
-              type="time"
-              value={st.end}
-              disabled={!st.enabled}
-              onChange={(e) => set(d.wd, { end: e.target.value })}
-              className="h-9 flex-1 rounded-md border border-border bg-inset px-2 text-body text-text focus:border-accent focus:outline-none disabled:opacity-40"
-            />
+            {st.enabled && (
+              <div className="flex items-center gap-2 pl-[104px]">
+                <label className="flex shrink-0 items-center gap-1.5 text-caption text-text-2">
+                  <Switch defaultChecked={st.hasBreak} onChange={(v) => set(d.wd, { hasBreak: v })} /> Intervalo
+                </label>
+                {st.hasBreak && (
+                  <>
+                    <input type="time" value={st.breakStart} onChange={(e) => set(d.wd, { breakStart: e.target.value })} className={timeCls} />
+                    <span className="text-text-muted">–</span>
+                    <input type="time" value={st.breakEnd} onChange={(e) => set(d.wd, { breakEnd: e.target.value })} className={timeCls} />
+                  </>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

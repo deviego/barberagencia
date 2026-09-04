@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { RescheduleForm } from "@/features/client/components/reschedule-form";
-import { getAppointmentForReschedule, getWorkingHours } from "@/features/client/data";
+import { getAppointmentForReschedule, getWorkingHours, getSlotStep } from "@/features/client/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -9,7 +9,11 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 
 export default async function ReagendarPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [appt, workingHours] = await Promise.all([getAppointmentForReschedule(id), getWorkingHours()]);
+  const [appt, workingHours, slotStep] = await Promise.all([
+    getAppointmentForReschedule(id),
+    getWorkingHours(),
+    getSlotStep(),
+  ]);
   if (!appt) notFound();
 
   const barber = one(appt.barbers as { name: string }[] | { name: string });
@@ -28,6 +32,7 @@ export default async function ReagendarPage({ params }: { params: Promise<{ id: 
         serviceName={serviceName}
         currentStartAt={appt.start_at as string}
         workingHours={workingHours}
+        stepMin={slotStep}
       />
     </div>
   );

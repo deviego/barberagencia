@@ -43,6 +43,15 @@ export async function requestAppointment(input: RequestAppointmentInput) {
   if (!quota.allowed)
     return { ok: false as const, error: "A agenda da barbearia atingiu o limite do mês. Tente novamente mais tarde." };
 
+  // Bloqueio/folga: recusa horário travado pela barbearia (barbeiro ou geral).
+  if (barberId) {
+    const from = new Date(startAt).toISOString();
+    const to = new Date(new Date(startAt).getTime() + 1000).toISOString();
+    const { data: blocks } = await supabase.rpc("blocked_ranges", { p_barber_id: barberId, p_from: from, p_to: to });
+    if (Array.isArray(blocks) && blocks.length > 0)
+      return { ok: false as const, error: "Esse horário está bloqueado na agenda." };
+  }
+
   const firstServiceIdx = items.findIndex((i) => i.kind === "service");
   const primaryServiceRef = firstServiceIdx >= 0 ? items[firstServiceIdx].refId ?? null : null;
   const requestExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -331,10 +340,17 @@ export async function cancelAppointment(id: string) {
 export async function rescheduleAppointment(id: string, startAtISO: string) {
   if (!startAtISO) return { ok: false as const, error: "Horário inválido" };
   const supabase = await createSupabaseServerClient();
-  const { data: appt } = await supabase.from("appointments").select("status").eq("id", id).maybeSingle();
+  const { data: appt } = await supabase.from("appointments").select("status, barber_id").eq("id", id).maybeSingle();
   if (!appt) return { ok: false as const, error: "Agendamento não encontrado" };
   if (appt.status === "CONFIRMED")
     return { ok: false as const, error: "Agendamento confirmado não pode ser reagendado, apenas cancelado." };
+  if (appt.barber_id) {
+    const from = new Date(startAtISO).toISOString();
+    const to = new Date(new Date(startAtISO).getTime() + 1000).toISOString();
+    const { data: blocks } = await supabase.rpc("blocked_ranges", { p_barber_id: appt.barber_id as string, p_from: from, p_to: to });
+    if (Array.isArray(blocks) && blocks.length > 0)
+      return { ok: false as const, error: "Esse horário está bloqueado na agenda." };
+  }
   const requestExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   const { error } = await supabase
     .from("appointments")

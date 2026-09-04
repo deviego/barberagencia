@@ -58,6 +58,14 @@ export async function getWorkingHours() {
   return data ?? [];
 }
 
+/** Espaçamento (min) entre horários da agenda, configurado pela barbearia. Default 30. */
+export async function getSlotStep(): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("tenant_settings").select("slot_step_min").maybeSingle();
+  const v = Number(data?.slot_step_min ?? 30);
+  return Number.isFinite(v) ? Math.min(120, Math.max(5, v)) : 30;
+}
+
 /** Saldo de cortes da assinatura ATIVA do cliente logado (null se não tiver plano). */
 export async function getActivePlanBalance(): Promise<number | null> {
   const supabase = await createSupabaseServerClient();

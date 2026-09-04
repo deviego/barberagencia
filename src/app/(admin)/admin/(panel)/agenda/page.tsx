@@ -4,7 +4,8 @@ import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AgendaBoard } from "@/features/admin/components/agenda-board";
 import { NewAppointmentDrawer } from "@/features/admin/components/new-appointment-drawer";
-import { getAgenda, getBarbers, getClientsWithPlan, getServices, getWorkingHours } from "@/features/admin/data";
+import { ScheduleBlocksPanel } from "@/features/admin/components/schedule-blocks-panel";
+import { getAgenda, getBarbers, getClientsWithPlan, getServices, getWorkingHours, getSlotStep, getScheduleBlocks } from "@/features/admin/data";
 import { cn } from "@/lib/utils";
 
 export default async function AgendaPage({
@@ -31,14 +32,24 @@ export default async function AgendaPage({
     to = addDays(base, 1);
   }
 
-  const [barbers, appointments, clients, services, workingHours] = await Promise.all([
+  const [barbers, appointments, clients, services, workingHours, slotStep, blocks] = await Promise.all([
     getBarbers(),
     getAgenda(from.toISOString(), to.toISOString()),
     getClientsWithPlan(),
     getServices(),
     getWorkingHours(),
+    getSlotStep(),
+    getScheduleBlocks(),
   ]);
   const activeBarbers = barbers.filter((b) => b.active !== false);
+  const one = <T,>(rel: T | T[] | null): T | null => (Array.isArray(rel) ? rel[0] ?? null : rel);
+  const blockViews = blocks.map((b) => ({
+    id: b.id,
+    barberName: one(b.barbers)?.name ?? null,
+    startsAt: b.starts_at,
+    endsAt: b.ends_at,
+    reason: b.reason,
+  }));
   const activeServices = (
     services as { id: string; name: string; price_brl: number; is_child_service?: boolean; active: boolean }[]
   ).filter((s) => s.active !== false);
@@ -85,11 +96,14 @@ export default async function AgendaPage({
             barbers={activeBarbers}
             services={activeServices}
             workingHours={workingHours}
+            stepMin={slotStep}
           />
         </div>
       </div>
 
       <AgendaBoard barbers={activeBarbers} appointments={appointments} view={view} weekStart={weekStart} />
+
+      <ScheduleBlocksPanel barbers={activeBarbers} blocks={blockViews} />
     </div>
   );
 }

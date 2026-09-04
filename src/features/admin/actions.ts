@@ -452,6 +452,14 @@ export async function createAppointmentAdmin(input: {
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
 
+  if (input.barberId) {
+    const from = new Date(input.startAt).toISOString();
+    const to = new Date(new Date(input.startAt).getTime() + 1000).toISOString();
+    const { data: blocks } = await supabase.rpc("blocked_ranges", { p_barber_id: input.barberId, p_from: from, p_to: to });
+    if (Array.isArray(blocks) && blocks.length > 0)
+      return { ok: false as const, error: "Esse horário está bloqueado na agenda." };
+  }
+
   const { data, error } = await supabase
     .from("appointments")
     .insert({
@@ -647,6 +655,40 @@ export async function saveWorkingHours(
     if (error) return { ok: false as const, error: error.message };
   }
   revalidatePath("/admin/barbeiros");
+  return { ok: true as const };
+}
+
+/** Cria um bloqueio/folga na agenda (barbeiro específico ou toda a barbearia). */
+export async function addScheduleBlock(input: {
+  barberId?: string | null;
+  startsAt: string;
+  endsAt: string;
+  reason?: string | null;
+}) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const start = new Date(input.startsAt);
+  const end = new Date(input.endsAt);
+  if (!(start.getTime() < end.getTime())) return { ok: false as const, error: "O fim precisa ser maior que o início." };
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("schedule_blocks").insert({
+    tenant_id: user.tenantId,
+    barber_id: input.barberId || null,
+    starts_at: start.toISOString(),
+    ends_at: end.toISOString(),
+    reason: input.reason?.trim() || null,
+  });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/agenda");
+  return { ok: true as const };
+}
+
+/** Remove um bloqueio/folga da agenda. */
+export async function removeScheduleBlock(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("schedule_blocks").delete().eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/agenda");
   return { ok: true as const };
 }
 

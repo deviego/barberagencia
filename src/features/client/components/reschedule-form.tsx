@@ -6,10 +6,10 @@ import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { buildDaySlots, blocksToWindows, type SlotWindow } from "@/lib/schedule/slots";
 import { rescheduleAppointment } from "@/features/client/actions";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const SLOT_MIN = 45;
 
 interface WorkingHour { barber_id: string; weekday: number; start_min: number; end_min: number }
 
@@ -20,6 +20,7 @@ export function RescheduleForm({
   serviceName,
   currentStartAt,
   workingHours,
+  stepMin = 30,
 }: {
   appointmentId: string;
   barberId: string | null;
@@ -27,6 +28,7 @@ export function RescheduleForm({
   serviceName: string;
   currentStartAt: string;
   workingHours: WorkingHour[];
+  stepMin?: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -34,6 +36,7 @@ export function RescheduleForm({
   const [dayIdx, setDayIdx] = useState(0);
   const [time, setTime] = useState<string | null>(null);
   const [booked, setBooked] = useState<number[]>([]);
+  const [blocked, setBlocked] = useState<SlotWindow[]>([]);
 
   const days = useMemo(() => {
     const base = new Date();
@@ -50,16 +53,11 @@ export function RescheduleForm({
     const wd = day.getDay();
     const now = new Date();
     const isToday = day.toDateString() === now.toDateString();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    const out: string[] = [];
-    for (const w of workingHours.filter((x) => x.barber_id === barberId && x.weekday === wd)) {
-      for (let t = w.start_min; t + SLOT_MIN <= w.end_min; t += SLOT_MIN) {
-        if (isToday && t <= nowMin) continue; // já passou hoje
-        out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
-      }
-    }
-    return out.sort();
-  }, [days, dayIdx, barberId, workingHours]);
+    const windows = workingHours
+      .filter((x) => x.barber_id === barberId && x.weekday === wd)
+      .map((w) => ({ startMin: w.start_min, endMin: w.end_min }));
+    return buildDaySlots({ windows, stepMin, isToday, nowMin: now.getHours() * 60 + now.getMinutes(), blocked });
+  }, [days, dayIdx, barberId, workingHours, stepMin, blocked]);
 
   // Horários já ocupados do barbeiro no dia selecionado (exceto o próprio agendamento).
   useEffect(() => {
@@ -83,6 +81,11 @@ export function RescheduleForm({
           .map((s) => new Date(s).getTime())
           .filter((t) => t !== ownTime);
         setBooked(times);
+      });
+    supabase
+      .rpc("blocked_ranges", { p_barber_id: barberId, p_from: from.toISOString(), p_to: to.toISOString() })
+      .then(({ data }) => {
+        if (alive) setBlocked(blocksToWindows((data as { starts_at: string; ends_at: string }[]) ?? [], day));
       });
     return () => {
       alive = false;

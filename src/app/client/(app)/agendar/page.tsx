@@ -1,7 +1,7 @@
 import { AgendarForm } from "@/features/client/components/agendar-form";
 import type { Child } from "@/features/client/components/child-modal";
 import { PaymentNotice } from "@/features/client/components/payment-notice";
-import { getCatalog, getClientHome, getMyChildren, getProducts, getWorkingHours } from "@/features/client/data";
+import { getCatalog, getClientHome, getMyChildren, getProducts, getWorkingHours, getSlotStep } from "@/features/client/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -14,12 +14,13 @@ export default async function AgendarPage({
   searchParams: Promise<{ service?: string }>;
 }) {
   const { service: preselectId } = await searchParams;
-  const [catalog, home, workingHours, products, children] = await Promise.all([
+  const [catalog, home, workingHours, products, children, slotStep] = await Promise.all([
     getCatalog(),
     getClientHome(),
     getWorkingHours(),
     getProducts(),
     getMyChildren(),
+    getSlotStep(),
   ]);
 
   const sub = home?.sub as
@@ -63,6 +64,7 @@ export default async function AgendarPage({
         plan={plan}
         preselectId={preselectId ?? null}
         children={children as Child[]}
+        stepMin={slotStep}
       />
     </div>
   );

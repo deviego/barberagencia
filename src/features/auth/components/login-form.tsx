@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signInWithPassword } from "../services/auth-service";
+import { resolveLoginEmail } from "@/lib/auth/phone-identity";
 
 /**
  * Formulário de login. Cada tela é ligada à sua ÁREA (cookie próprio):
@@ -34,7 +35,8 @@ export function LoginForm({
     setError(null);
     setLoading(true);
     try {
-      await signInWithPassword(email, password);
+      // Aceita e-mail ou telefone: telefone é mapeado para o e-mail técnico.
+      await signInWithPassword(resolveLoginEmail(email), password);
       router.push(dest);
       router.refresh();
     } catch (err) {

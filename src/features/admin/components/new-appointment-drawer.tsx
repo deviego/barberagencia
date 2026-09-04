@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/input";
 import { Drawer } from "@/components/ui/drawer";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { buildDaySlots, blocksToWindows, type SlotWindow } from "@/lib/schedule/slots";
 import { formatBRL, cn } from "@/lib/utils";
 import { maskPhoneBR } from "@/lib/masks";
 import { createAppointmentAdmin, createClientAdmin } from "@/features/admin/actions";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const SLOT_MIN = 45;
 
 interface ClientWithPlan {
   id: string;
@@ -29,11 +29,13 @@ export function NewAppointmentDrawer({
   barbers,
   services,
   workingHours,
+  stepMin = 30,
 }: {
   clients: ClientWithPlan[];
   barbers: Barber[];
   services: Service[];
   workingHours: WorkingHour[];
+  stepMin?: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -59,6 +61,7 @@ export function NewAppointmentDrawer({
   const [dayIdx, setDayIdx] = useState(0);
   const [time, setTime] = useState<string | null>(null);
   const [booked, setBooked] = useState<number[]>([]);
+  const [blocked, setBlocked] = useState<SlotWindow[]>([]);
 
   const allClients = useMemo(() => {
     const byId = new Map<string, ClientWithPlan>();
@@ -145,14 +148,11 @@ export function NewAppointmentDrawer({
     const day = days[dayIdx]?.date;
     if (!day || !barberId) return [];
     const wd = day.getDay();
-    const out: string[] = [];
-    for (const w of workingHours.filter((x) => x.barber_id === barberId && x.weekday === wd)) {
-      for (let t = w.start_min; t + SLOT_MIN <= w.end_min; t += SLOT_MIN) {
-        out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
-      }
-    }
-    return out.sort();
-  }, [days, dayIdx, barberId, workingHours]);
+    const windows = workingHours
+      .filter((x) => x.barber_id === barberId && x.weekday === wd)
+      .map((w) => ({ startMin: w.start_min, endMin: w.end_min }));
+    return buildDaySlots({ windows, stepMin, blocked });
+  }, [days, dayIdx, barberId, workingHours, stepMin, blocked]);
 
   useEffect(() => {
     const day = days[dayIdx]?.date;
@@ -170,6 +170,11 @@ export function NewAppointmentDrawer({
       .rpc("booked_starts", { p_barber_id: barberId, p_from: from.toISOString(), p_to: to.toISOString() })
       .then(({ data }) => {
         if (alive) setBooked(((data as string[]) ?? []).map((s) => new Date(s).getTime()));
+      });
+    supabase
+      .rpc("blocked_ranges", { p_barber_id: barberId, p_from: from.toISOString(), p_to: to.toISOString() })
+      .then(({ data }) => {
+        if (alive) setBlocked(blocksToWindows((data as { starts_at: string; ends_at: string }[]) ?? [], day));
       });
     return () => {
       alive = false;

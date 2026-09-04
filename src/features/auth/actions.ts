@@ -3,12 +3,57 @@
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { notifyWelcome } from "@/server/notifications/notify";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { AREA_HEADER } from "@/lib/supabase/area";
 import { getRequestOrigin } from "@/lib/http";
+import { phoneDigits, syntheticEmail, isEmail } from "@/lib/auth/phone-identity";
+
+/**
+ * [Cliente] Cria a conta pelo telefone (e-mail opcional). Usa o service-role para
+ * já confirmar a conta (o e-mail técnico não tem caixa de entrada). Se o cliente
+ * informar um e-mail real, ele vira a identidade; senão, o telefone.
+ * Retorna o e-mail de autenticação para o form fazer o signIn na sequência.
+ */
+export async function registerClientAccount(input: {
+  name: string;
+  phone: string;
+  password: string;
+  email?: string;
+  tenantSubdomain?: string;
+}): Promise<{ ok: true; authEmail: string } | { ok: false; error: string }> {
+  const name = input.name?.trim();
+  const digits = phoneDigits(input.phone ?? "");
+  if (!name) return { ok: false, error: "Informe seu nome." };
+  if (digits.length < 10) return { ok: false, error: "Informe um telefone válido com DDD." };
+  if (!input.password || input.password.length < 8) return { ok: false, error: "A senha deve ter ao menos 8 caracteres." };
+
+  const realEmail = input.email && isEmail(input.email) ? input.email.trim().toLowerCase() : null;
+  const authEmail = realEmail ?? syntheticEmail(digits);
+  const admin = createSupabaseAdminClient();
+
+  const { data, error } = await admin.auth.admin.createUser({
+    email: authEmail,
+    password: input.password,
+    email_confirm: true,
+    user_metadata: { full_name: name, phone: input.phone, tenant_subdomain: input.tenantSubdomain },
+  });
+  if (error || !data.user) {
+    const msg = (error?.message ?? "").toLowerCase();
+    if (msg.includes("already") || msg.includes("registered") || msg.includes("exists"))
+      return { ok: false, error: "Este telefone/e-mail já tem conta. Faça login." };
+    return { ok: false, error: error?.message ?? "Falha ao criar conta." };
+  }
+
+  // O trigger handle_new_user preenche clients.email com o e-mail de auth (técnico
+  // quando sem e-mail real) — normaliza para o e-mail real ou nulo.
+  await admin.from("clients").update({ email: realEmail }).eq("user_id", data.user.id);
+
+  return { ok: true, authEmail };
+}
 
 /** Encerra a sessão da ÁREA atual (limpa o cookie dela) e volta ao login da área. */
 export async function logout() {
