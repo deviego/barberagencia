@@ -23,7 +23,8 @@ export default async function ClientHome() {
 
   // Fila (só se a barbearia ativou e o cliente tem senha hoje).
   const tenant = await getCurrentTenant();
-  const queueCfg = tenant.id ? await getQueueConfig(tenant.id) : { enabled: false, pickBarber: false };
+  const queueCfg = tenant.id ? await getQueueConfig(tenant.id) : { enabled: false, pickBarber: false, mode: "TOTEM" };
+  const queueApp = queueCfg.enabled && (queueCfg.mode === "APP" || queueCfg.mode === "BOTH");
   const [filaTicket, filaBoard] = queueCfg.enabled
     ? await Promise.all([getMyTicket(), getQueueBoard(tenant.id)])
     : [null, { serving: [], waiting: [] }];
@@ -129,6 +130,16 @@ export default async function ClientHome() {
           Agendar
         </button>
       </Link>
+
+      {/* Entrar na fila — só quando a barbearia tem a fila no app */}
+      {queueApp && (
+        <Link href="/client/fila">
+          <button className="flex h-14 w-full items-center justify-center gap-2 rounded-lg border-2 border-accent bg-surface font-display text-h4 uppercase text-accent transition-colors hover:bg-accent-wash">
+            <Ticket size={20} />
+            {filaTicket ? `Minha senha · #${filaTicket.ticket}` : "Entrar na fila"}
+          </button>
+        </Link>
+      )}
 
       {/* Atalhos */}
       <div className="grid grid-cols-1">

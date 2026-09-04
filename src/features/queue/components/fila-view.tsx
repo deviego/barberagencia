@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ticket, LogOut, Scissors, User } from "lucide-react";
+import { Ticket, LogOut, Scissors, User, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { joinQueue, leaveQueue } from "../actions";
 import type { MyTicket, QueueBoardItem } from "../data";
@@ -30,26 +30,24 @@ export function FilaView({
   const [pending, startTransition] = useTransition();
   const [service, setService] = useState<string | null>(ticket?.serviceId ?? null);
   const [barber, setBarber] = useState<string | null>(ticket?.barberId ?? null);
-  const joinedOnce = useRef(false);
 
-  // Entra na fila automaticamente na 1ª visita (pega a senha na hora).
-  useEffect(() => {
-    if (!ticket && !joinedOnce.current) {
-      joinedOnce.current = true;
-      startTransition(async () => {
-        await joinQueue(tenantId, service, barber);
-        router.refresh();
-      });
-    }
-  }, [ticket, tenantId, service, barber, router]);
-
-  // Atualiza a "senha em atendimento" a cada 12s.
+  // Atualiza a "senha em atendimento" a cada 12s (acompanhar a fila ao vivo).
   useEffect(() => {
     const t = setInterval(() => router.refresh(), 12000);
     return () => clearInterval(t);
   }, [router]);
 
+  // Entrar na fila só ao clicar (não é mais automático) — pega a senha na hora.
+  function join() {
+    startTransition(async () => {
+      await joinQueue(tenantId, service, barber);
+      router.refresh();
+    });
+  }
+
+  // Enquanto já está na fila, mudar serviço/barbeiro atualiza a mesma senha.
   function saveSelection(nextService: string | null, nextBarber: string | null) {
+    if (!ticket) return;
     startTransition(async () => {
       await joinQueue(tenantId, nextService, nextBarber);
       router.refresh();
@@ -68,18 +66,30 @@ export function FilaView({
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
-      {/* Senha do cliente */}
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface p-6 text-center">
-        <div className="flex items-center gap-1.5 text-caption uppercase text-text-muted">
-          <Ticket size={14} /> Sua senha
+      {/* Senha do cliente — ou convite para entrar na fila */}
+      {ticket ? (
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface p-6 text-center">
+          <div className="flex items-center gap-1.5 text-caption uppercase text-text-muted">
+            <Ticket size={14} /> Sua senha
+          </div>
+          <div className="font-display text-[64px] font-black leading-none text-accent">#{ticket.ticket}</div>
+          <div className="text-caption text-text-2">
+            {ticket.status === "IN_SERVICE" ? "É a sua vez! 💈" : "Aguarde ser chamado"}
+          </div>
         </div>
-        <div className="font-display text-[64px] font-black leading-none text-accent">
-          {ticket ? `#${ticket.ticket}` : "…"}
+      ) : (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-6 text-center">
+          <div className="flex items-center gap-1.5 text-caption uppercase text-text-muted">
+            <Ticket size={14} /> Fila de atendimento
+          </div>
+          <p className="text-body text-text-2">
+            Escolha o serviço (opcional) abaixo e entre na fila. Você recebe sua senha na hora e acompanha por aqui.
+          </p>
+          <Button size="lg" onClick={join} loading={pending} className="w-full">
+            <ListPlus size={18} /> Entrar na fila
+          </Button>
         </div>
-        <div className="text-caption text-text-2">
-          {ticket?.status === "IN_SERVICE" ? "É a sua vez! 💈" : "Aguarde ser chamado"}
-        </div>
-      </div>
+      )}
 
       {/* Em atendimento agora */}
       <div className="flex items-center justify-between rounded-lg border border-border bg-inset px-5 py-4">
