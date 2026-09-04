@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Drawer } from "@/components/ui/drawer";
 import { formatBRL, cn } from "@/lib/utils";
+import { brlInputFromNumber, parseBRLToNumber } from "@/lib/masks";
 import { savePlan, deletePlan } from "@/features/admin/actions";
 import type { PlanManageRow } from "@/features/admin/data";
 
@@ -157,7 +158,13 @@ export function PlanManager({ plans, services }: { plans: PlanManageRow[]; servi
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>Preço (R$/mês)</Label>
-                <input type="number" min={0} step="0.01" value={editing.priceBrl} onChange={(e) => patch({ priceBrl: Number(e.target.value) })} className={field} />
+                <input
+                  inputMode="numeric"
+                  value={brlInputFromNumber(editing.priceBrl)}
+                  onChange={(e) => patch({ priceBrl: parseBRLToNumber(e.target.value) })}
+                  placeholder="R$ 0,00"
+                  className={field}
+                />
               </div>
             </div>
 
