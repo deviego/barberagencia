@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BookOpen, Menu, Search, Shield } from "lucide-react";
+import { Bell, BookOpen, Menu, Search, Shield, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
 import { BarbershopSwitcher } from "@/components/nav/barbershop-switcher";
@@ -147,13 +147,13 @@ export function AdminShell({
       {/* Topbar full-width */}
       <header className="sticky top-0 z-drawer flex items-center justify-between gap-4 border-b border-border bg-surface px-5 py-2.5">
         <div className="flex items-center gap-3">
-          {/* Mobile: abre o menu de tela cheia. */}
+          {/* Mobile: abre/fecha o menu (o botão vira X quando aberto). */}
           <button
-            onClick={() => setMobileNav(true)}
-            aria-label="Abrir menu"
+            onClick={() => setMobileNav((m) => !m)}
+            aria-label={mobileNav ? "Fechar menu" : "Abrir menu"}
             className="flex rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent md:hidden"
           >
-            <Menu size={20} />
+            {mobileNav ? <X size={20} /> : <Menu size={20} />}
           </button>
           {/* Desktop: colapsa/expande a sidebar. */}
           <button
