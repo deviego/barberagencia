@@ -458,7 +458,7 @@ export async function createAppointmentAdmin(input: {
     const to = new Date(new Date(input.startAt).getTime() + 1000).toISOString();
     const { data: blocks } = await supabase.rpc("blocked_ranges", { p_barber_id: input.barberId, p_from: from, p_to: to });
     if (Array.isArray(blocks) && blocks.length > 0)
-      return { ok: false as const, error: "Esse horário está bloqueado na agenda." };
+      return { ok: false as const, error: "Agenda travada neste horário — a barbearia está fechada ou o barbeiro está indisponível. Escolha outro horário." };
   }
 
   const { data, error } = await supabase
