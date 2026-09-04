@@ -120,6 +120,21 @@ export async function createInvite(values: { name?: string; phone?: string; emai
   const supabase = await createSupabaseServerClient();
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+
+  // Telefone não pode repetir — bloqueia e mostra o cliente que já tem o número.
+  {
+    const digits = (values.phone ?? "").replace(/\D/g, "");
+    if (digits.length >= 10) {
+      const { data: withPhone } = await supabase
+        .from("clients")
+        .select("id, name, phone")
+        .eq("tenant_id", user.tenantId)
+        .not("phone", "is", null);
+      const dup = (withPhone ?? []).find((c) => String(c.phone ?? "").replace(/\D/g, "") === digits);
+      if (dup) return { ok: false as const, error: `Já existe um cliente com esse telefone: ${dup.name as string}. Escolha outro número.` };
+    }
+  }
+
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   const { error } = await supabase.from("client_invites").insert({
@@ -276,12 +291,29 @@ export async function createClientAdmin(input: { name: string; phone?: string; e
   const email = input.email?.trim() || null;
   const phone = input.phone?.trim() || null;
 
-  // Dedupe leve: se já existe cliente com o mesmo e-mail/telefone, reaproveita.
-  if (email || phone) {
-    let q = supabase.from("clients").select("id, name").eq("tenant_id", user.tenantId);
-    q = email ? q.eq("email", email) : q.eq("phone", phone as string);
-    const { data: existing } = await q.limit(1).maybeSingle();
+  // E-mail: se já existe cliente com o mesmo e-mail, reaproveita (não duplica).
+  if (email) {
+    const { data: existing } = await supabase
+      .from("clients")
+      .select("id, name")
+      .eq("tenant_id", user.tenantId)
+      .eq("email", email)
+      .limit(1)
+      .maybeSingle();
     if (existing) return { ok: true as const, client: { id: existing.id as string, name: existing.name as string } };
+  }
+  // Telefone: NÃO pode repetir — bloqueia e mostra o cliente que já tem o número.
+  if (phone) {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length >= 10) {
+      const { data: withPhone } = await supabase
+        .from("clients")
+        .select("id, name, phone")
+        .eq("tenant_id", user.tenantId)
+        .not("phone", "is", null);
+      const dup = (withPhone ?? []).find((c) => String(c.phone ?? "").replace(/\D/g, "") === digits);
+      if (dup) return { ok: false as const, error: `Já existe um cliente com esse telefone: ${dup.name as string}. Escolha outro número.` };
+    }
   }
 
   const { data, error } = await supabase
