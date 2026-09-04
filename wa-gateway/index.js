@@ -49,6 +49,21 @@ app.use(express.json({ limit: "5mb" })); // relatórios podem ser grandes; evita
 /** sessions: tenantId -> { sock, status, qr, number, attempts, connectingSince, starting } */
 const sessions = new Map();
 
+// Cache das mensagens (por id) para responder aos "retry receipts" do WhatsApp.
+// Sem getMessage + este cache, o app do PRÓPRIO remetente pode ficar preso em
+// "Aguardando esta mensagem" (não decifra a cópia que o WhatsApp manda aos seus
+// outros aparelhos). Ao receber um retry, o Baileys chama getMessage e reenvia.
+const msgCache = new Map();
+const MSG_CACHE_MAX = 3000;
+function cacheMsg(id, message) {
+  if (!id || !message) return;
+  msgCache.set(id, message);
+  if (msgCache.size > MSG_CACHE_MAX) {
+    const oldest = msgCache.keys().next().value;
+    msgCache.delete(oldest);
+  }
+}
+
 const MAX_ATTEMPTS = 8; // reconexões seguidas antes de desistir (até novo /connect ou watchdog)
 const CONNECTING_TIMEOUT_MS = 60_000; // preso em "connecting" além disso → reinicia
 const WATCHDOG_MS = 3 * 60_000; // varredura periódica de auto-cura
@@ -104,6 +119,8 @@ async function startSession(tenantId, prev, force = false) {
     connectTimeoutMs: 60_000,
     keepAliveIntervalMs: 15_000,
     retryRequestDelayMs: 2000,
+    // Responde aos retries (evita "Aguardando esta mensagem" no app do remetente).
+    getMessage: async (key) => msgCache.get(key?.id) || undefined,
   });
   const s = {
     sock,
@@ -121,6 +138,12 @@ async function startSession(tenantId, prev, force = false) {
   sessions.set(tenantId, s);
 
   sock.ev.on("creds.update", saveCreds);
+  // Guarda toda mensagem (enviada/recebida) para poder reenviar em caso de retry.
+  sock.ev.on("messages.upsert", ({ messages }) => {
+    for (const m of messages ?? []) {
+      if (m?.key?.id && m.message) cacheMsg(m.key.id, m.message);
+    }
+  });
   sock.ev.on("connection.update", async (u) => {
     const { connection, lastDisconnect, qr } = u;
     if (qr) {
@@ -259,7 +282,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "pair-v1";
+const BUILD = "getmsg-v2";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -359,6 +382,7 @@ app.post("/sessions/:tenantId/send", async (req, res) => {
       return res.status(422).json({ error: "not_on_whatsapp" });
     }
     const result = await s.sock.sendMessage(jid, { text: message });
+    if (result?.key?.id && result.message) cacheMsg(result.key.id, result.message);
     res.json({ ok: true, jid, id: result?.key?.id ?? null });
   } catch (e) {
     log.error(e, "send");
@@ -599,7 +623,8 @@ async function sendDocument(tenantId, phone, buffer, fileName, caption) {
   if (s?.status !== "connected" || !s.sock) return { ok: false, error: "sessão remetente não conectada" };
   const { jid, exists } = await resolveJid(s.sock, phone);
   if (exists === false) return { ok: false, error: "número não está no WhatsApp" };
-  await s.sock.sendMessage(jid, { document: buffer, fileName, mimetype: "application/pdf", caption });
+  const result = await s.sock.sendMessage(jid, { document: buffer, fileName, mimetype: "application/pdf", caption });
+  if (result?.key?.id && result.message) cacheMsg(result.key.id, result.message);
   return { ok: true };
 }
 
