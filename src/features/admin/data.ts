@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 
 /** Solicitações de agendamento (REQUESTED) do tenant do admin. */
@@ -59,16 +60,17 @@ export async function getDashboard() {
   };
 }
 
-/** Financeiro do mês (reais). */
-export async function getFinance() {
+/** Financeiro de um período (reais). Sem args = mês corrente. */
+export async function getFinance(fromISO?: string, toISO?: string) {
   const supabase = await createSupabaseServerClient();
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const { data } = await supabase
+  const from = fromISO ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  let query = supabase
     .from("financial_entries")
     .select("type, amount_brl, method, occurred_at")
-    .gte("occurred_at", monthStart.toISOString())
-    .order("occurred_at", { ascending: false });
+    .gte("occurred_at", from);
+  if (toISO) query = query.lt("occurred_at", toISO);
+  const { data } = await query.order("occurred_at", { ascending: false });
   const rows = (data ?? []) as { type: string; amount_brl: number; method: string | null; occurred_at: string }[];
 
   const revenue = rows.filter((r) => r.type === "REVENUE").reduce((s, r) => s + Number(r.amount_brl), 0);
@@ -92,6 +94,54 @@ export async function getFinance() {
   const receipts = rows.filter((r) => r.type === "REVENUE").slice(0, 8);
   return { revenue, expenses, closing: revenue - expenses, withdrawals, byMethod, receipts };
 }
+
+type Row = Record<string, unknown>;
+const relOne = (rel: unknown): Row | null => (Array.isArray(rel) ? ((rel[0] as Row) ?? null) : ((rel as Row) ?? null));
+
+/**
+ * Detalhamento do financeiro num período: recebimentos com cliente + serviços, e
+ * o ranking de serviços mais vendidos (%). Fonte = `sales`/`sale_items` (todo
+ * recebimento passa por createSale). Service-role escopado ao tenant da sessão.
+ */
+export async function getFinanceDetails(fromISO: string, toISO: string) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { receipts: [], services: [] as ServiceStat[] };
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .from("sales")
+    .select("id, total_brl, created_at, clients(name), payments(method), sale_items(name, qty, kind, price_brl)")
+    .eq("tenant_id", user.tenantId)
+    .gte("created_at", fromISO)
+    .lt("created_at", toISO)
+    .order("created_at", { ascending: false });
+  const rows = (data ?? []) as Row[];
+
+  const receipts = rows.slice(0, 40).map((s) => ({
+    datetime: s.created_at as string,
+    clientName: (relOne(s.clients)?.name as string) ?? "Cliente avulso",
+    method: (relOne(s.payments)?.method as string) ?? null,
+    total: Number(s.total_brl ?? 0),
+    items: ((s.sale_items as Row[]) ?? []).map((it) => ({ name: it.name as string, qty: Number(it.qty ?? 1), kind: it.kind as string })),
+  }));
+
+  const acc: Record<string, { name: string; value: number; qty: number }> = {};
+  for (const s of rows) {
+    for (const it of (s.sale_items as Row[]) ?? []) {
+      if (it.kind !== "service") continue;
+      const name = (it.name as string) ?? "Serviço";
+      (acc[name] ??= { name, value: 0, qty: 0 });
+      acc[name].value += Number(it.price_brl ?? 0) * Number(it.qty ?? 1);
+      acc[name].qty += Number(it.qty ?? 1);
+    }
+  }
+  const totalSvc = Object.values(acc).reduce((a, s) => a + s.value, 0);
+  const services: ServiceStat[] = Object.values(acc)
+    .map((s) => ({ ...s, pct: totalSvc > 0 ? Math.round((s.value / totalSvc) * 100) : 0 }))
+    .sort((a, b) => b.value - a.value);
+
+  return { receipts, services };
+}
+export type ServiceStat = { name: string; value: number; qty: number; pct: number };
 
 export async function getCampaigns() {
   const supabase = await createSupabaseServerClient();

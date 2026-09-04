@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getRequestOrigin } from "@/lib/http";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getClientDetail } from "./data";
@@ -690,6 +691,58 @@ export async function removeScheduleBlock(id: string) {
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin/agenda");
   return { ok: true as const };
+}
+
+/** [Barbearia] Solicita o relatório financeiro do MÊS: gera o PDF e envia no
+ *  WhatsApp da própria barbearia (via gateway) e registra a solicitação. */
+export async function requestFinancialReport() {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const base = process.env.WA_SERVICE_URL;
+  const token = process.env.WA_SERVICE_TOKEN;
+  if (!base || !token) return { ok: false as const, error: "WhatsApp da barbearia não configurado. Conecte em Configurações." };
+
+  let ok = false;
+  let phone: string | undefined;
+  let error: string | undefined;
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/report/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-wa-token": token },
+      body: JSON.stringify({ tenant: user.tenantId }), // sem from/to → mês corrente
+      signal: AbortSignal.timeout(60000),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; phone?: string };
+    phone = data.phone;
+    ok = res.ok && data.ok !== false;
+    if (!ok) error = data.error || `Gateway respondeu ${res.status}`;
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Falha de rede";
+  }
+
+  // Registro da solicitação (auditoria — visível ao Master pelos logs).
+  try {
+    const admin = createSupabaseAdminClient();
+    await admin.from("notification_log").insert({
+      tenant_id: user.tenantId,
+      channel: "whatsapp",
+      template: "report_requested",
+      recipient: phone ?? null,
+      status: ok ? "SENT" : "FAILED",
+    });
+  } catch {
+    /* log não bloqueia */
+  }
+
+  if (!ok) {
+    const friendly = /not_connected|needs_reconnect|409/.test(error ?? "")
+      ? "O WhatsApp da barbearia não está conectado. Conecte em Configurações e tente de novo."
+      : /sem telefone|phone/.test(error ?? "")
+        ? "A barbearia não tem telefone cadastrado (Configurações)."
+        : error ?? "Falha ao solicitar o relatório.";
+    return { ok: false as const, error: friendly };
+  }
+  return { ok: true as const, phone };
 }
 
 /** Marca uma retirada de produto como entregue (PICKED_UP). */
