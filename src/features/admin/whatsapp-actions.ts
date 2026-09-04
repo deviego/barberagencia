@@ -4,9 +4,10 @@ import { getSessionUser } from "@/lib/auth/session";
 
 interface WaStatus {
   ok: boolean;
-  status?: "connecting" | "qr" | "connected" | "disconnected";
+  status?: "connecting" | "qr" | "pairing" | "connected" | "disconnected";
   qr?: string | null;
   number?: string | null;
+  pairingCode?: string | null;
   error?: string;
 }
 
@@ -41,6 +42,16 @@ export async function waConnect(): Promise<WaStatus> {
   if (error) return { ok: false, error };
   const data = (await res!.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res!.ok) return { ok: false, error: (data.error as string) ?? `Falha ao conectar (${res!.status}).` };
+  return { ok: true, ...data };
+}
+
+/** "Conectar pelo número" (barbearia com um só celular): gera o código de pareamento. */
+export async function waPair(phone: string): Promise<WaStatus> {
+  if (phone.replace(/\D/g, "").length < 10) return { ok: false, error: "Informe o número com DDD." };
+  const { res, error } = await gateway("/pair", { method: "POST", body: JSON.stringify({ phone }) });
+  if (error) return { ok: false, error };
+  const data = (await res!.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res!.ok) return { ok: false, error: (data.error as string) ?? `Falha ao gerar código (${res!.status}).` };
   return { ok: true, ...data };
 }
 

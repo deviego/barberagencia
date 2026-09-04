@@ -113,6 +113,10 @@ async function startSession(tenantId, prev, force = false) {
     attempts: lock.attempts,
     connectingSince: Date.now(),
     starting: false,
+    // "Conectar pelo número" (mesmo celular): se pairPhone estiver setado, pedimos
+    // um código de pareamento em vez de QR.
+    pairPhone: prev?.pairPhone ?? existing?.pairPhone ?? null,
+    pairingCode: null,
   };
   sessions.set(tenantId, s);
 
@@ -120,13 +124,33 @@ async function startSession(tenantId, prev, force = false) {
   sock.ev.on("connection.update", async (u) => {
     const { connection, lastDisconnect, qr } = u;
     if (qr) {
-      s.status = "qr";
-      s.qr = await QRCode.toDataURL(qr);
-      s.connectingSince = Date.now(); // aguardando o scan
+      // Modo "conectar pelo número" (barbearia com um só celular): pede o código de
+      // pareamento de 8 dígitos em vez do QR — o dono digita no próprio WhatsApp.
+      if (s.pairPhone && !s.pairingCode && !sock.authState?.creds?.registered) {
+        try {
+          const code = await sock.requestPairingCode(s.pairPhone);
+          s.pairingCode = code;
+          s.status = "pairing";
+          s.qr = null;
+          s.connectingSince = Date.now();
+          log.info({ tenant: tenantId }, "código de pareamento gerado");
+        } catch (e) {
+          log.warn({ err: e?.message }, "requestPairingCode falhou — caindo para QR");
+          s.status = "qr";
+          s.qr = await QRCode.toDataURL(qr);
+          s.connectingSince = Date.now();
+        }
+      } else {
+        s.status = "qr";
+        s.qr = await QRCode.toDataURL(qr);
+        s.connectingSince = Date.now(); // aguardando o scan
+      }
     }
     if (connection === "open") {
       s.status = "connected";
       s.qr = null;
+      s.pairingCode = null;
+      s.pairPhone = null;
       s.attempts = 0;
       s.number = sock.user?.id ? sock.user.id.split(":")[0].split("@")[0] : s.number;
       try {
@@ -235,7 +259,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "report-v11";
+const BUILD = "pair-v1";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -243,10 +267,44 @@ app.post("/sessions/:tenantId/connect", async (req, res) => {
     const cur = sessions.get(req.params.tenantId);
     if (cur) cur.attempts = 0; // reset ao pedir conexão manual
     const s = await ensureSession(req.params.tenantId);
-    res.json({ status: s.status, qr: s.qr, number: s.number });
+    res.json({ status: s.status, qr: s.qr, number: s.number, pairingCode: s.pairingCode ?? null });
   } catch (e) {
     log.error(e, "connect");
     res.status(500).json({ error: "connect_failed" });
+  }
+});
+
+/**
+ * "Conectar pelo número" — para barbearias com UM só celular (não dá pra escanear
+ * o QR na mesma tela). Gera o código de pareamento de 8 dígitos que o dono digita
+ * no WhatsApp → Aparelhos conectados → Conectar aparelho → Conectar com número.
+ */
+app.post("/sessions/:tenantId/pair", async (req, res) => {
+  const { phone } = req.body || {};
+  if (!phone) return res.status(400).json({ error: "phone obrigatório" });
+  const number = toWhatsPhone(phone);
+  const tenantId = req.params.tenantId;
+  try {
+    const prev = sessions.get(tenantId);
+    if (prev?.status === "connected") return res.json({ status: "connected", number: prev.number });
+    // Pareamento exige um socket LIMPO e não registrado — descarta creds antigas.
+    if (prev?.sock) { try { prev.sock.end?.(undefined); } catch {} }
+    await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId).catch(() => {});
+    sessions.delete(tenantId);
+    const s = await startSession(tenantId, { pairPhone: number, attempts: 0 }, true);
+    s.pairPhone = number;
+    s.pairingCode = null;
+    // Espera o código (o socket precisa conectar ao WS e ficar pronto).
+    for (let waited = 0; waited < 25_000; waited += 400) {
+      const cur = sessions.get(tenantId);
+      if (cur?.pairingCode) return res.json({ status: "pairing", pairingCode: cur.pairingCode, number });
+      if (cur?.status === "connected") return res.json({ status: "connected", number: cur.number });
+      await sleep(400);
+    }
+    res.json({ status: sessions.get(tenantId)?.status ?? "connecting", pairingCode: null });
+  } catch (e) {
+    log.error(e, "pair");
+    res.status(500).json({ error: "pair_failed" });
   }
 });
 
@@ -261,7 +319,7 @@ app.get("/sessions/:tenantId/status", async (req, res) => {
     }
   }
   if (!s) return res.json({ status: "disconnected" });
-  res.json({ status: s.status, qr: s.qr, number: s.number });
+  res.json({ status: s.status, qr: s.qr, number: s.number, pairingCode: s.pairingCode ?? null });
 });
 
 /**
