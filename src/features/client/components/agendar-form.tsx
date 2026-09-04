@@ -21,6 +21,7 @@ interface PlanInfo {
   name: string;
   saldo: number;
   bookingMode?: string;
+  serviceIds?: string[];
   fixed?: { weekday: number | null; startMin: number | null; barberName: string | null } | null;
 }
 const WEEKDAYS_PT = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -55,6 +56,9 @@ export function AgendarForm({
   const isFixedPlan = plan?.bookingMode === "FIXED";
   const hasPlan = !!plan && plan.saldo > 0 && !isFixedPlan;
   const planNoBalance = !!plan && plan.saldo <= 0 && !isFixedPlan;
+  // Combo: o plano cobre VÁRIOS serviços por visita (não precisa escolher 1).
+  const comboServiceIds = (plan?.serviceIds ?? []).filter((id) => services.some((s) => s.id === id));
+  const isCombo = hasPlan && comboServiceIds.length > 0;
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [barberId, setBarberId] = useState<string | null>(barbers[0]?.id ?? null);
@@ -76,10 +80,11 @@ export function AgendarForm({
   const [childModal, setChildModal] = useState(false);
   const [observations, setObservations] = useState("");
 
-  // Plano cobre 1 corte (o corte do plano) quando há saldo e um corte selecionado.
-  const usePlan = hasPlan && !!planServiceId;
-  // Todos os serviços da comanda (coberto + avulsos), para regras como "corte infantil".
-  const selectedServiceIds = usePlan ? [planServiceId as string, ...avulsoIds] : avulsoIds;
+  // Serviços cobertos pelo plano nesta visita: combo = todos os do combo; senão = 1 escolhido.
+  const coveredServiceIds = isCombo ? comboServiceIds : planServiceId ? [planServiceId] : [];
+  const usePlan = hasPlan && coveredServiceIds.length > 0;
+  // Todos os serviços da comanda (cobertos + avulsos), para regras como "corte infantil".
+  const selectedServiceIds = usePlan ? [...coveredServiceIds, ...avulsoIds] : avulsoIds;
   const needsChild = selectedServiceIds.some((id) => services.find((s) => s.id === id)?.is_child_service);
 
   function setPlanService(id: string) {
@@ -155,22 +160,23 @@ export function AgendarForm({
 
   // Itens da comanda: corte do plano primeiro (coberto), depois avulsos, depois produtos.
   const items = useMemo(() => {
-    const order = usePlan && planServiceId ? [planServiceId, ...avulsoIds] : avulsoIds;
+    const coveredIds = isCombo ? comboServiceIds : planServiceId ? [planServiceId] : [];
+    const covered = new Set(usePlan ? coveredIds : []);
+    const order = usePlan ? [...coveredIds, ...avulsoIds] : avulsoIds;
     const svc = order
       .map((id) => services.find((s) => s.id === id))
       .filter((s): s is Service => !!s)
-      .map((s) => ({ kind: "service" as const, refId: s.id, name: s.name, priceBRL: s.price_brl, qty: 1, durationMin: s.duration_min ?? 0 }));
+      .map((s) => ({ kind: "service" as const, refId: s.id, name: s.name, priceBRL: s.price_brl, qty: 1, durationMin: s.duration_min ?? 0, covered: covered.has(s.id) }));
     const prod = Object.entries(prodQty)
       .filter(([, q]) => q > 0)
       .map(([id, q]) => {
         const p = products.find((x) => x.id === id)!;
-        return { kind: "product" as const, refId: id, name: p.name, priceBRL: p.price_brl, qty: q };
+        return { kind: "product" as const, refId: id, name: p.name, priceBRL: p.price_brl, qty: q, covered: false };
       });
     return [...svc, ...prod];
-  }, [usePlan, planServiceId, avulsoIds, prodQty, services, products]);
+  }, [usePlan, isCombo, comboServiceIds, planServiceId, avulsoIds, prodQty, services, products]);
 
-  const coveredIdx = usePlan ? 0 : -1; // corte do plano é o 1º item
-  const total = items.reduce((s, it, idx) => (idx === coveredIdx ? s : s + it.priceBRL * it.qty), 0);
+  const total = items.reduce((s, it) => (it.covered ? s : s + it.priceBRL * it.qty), 0);
   // Tempo médio estimado do atendimento = soma da duração dos serviços escolhidos.
   const estMin = selectedServiceIds.reduce((s, id) => s + (services.find((x) => x.id === id)?.duration_min ?? 0), 0);
 
@@ -223,7 +229,7 @@ export function AgendarForm({
       )}
       {usePlan && (
         <div className="rounded-lg border border-accent bg-accent-wash px-4 py-3 text-caption text-accent">
-          Seu plano cobre 1 corte (incluído). Você pode adicionar serviços avulsos — pagos no local.
+          {isCombo ? "Seu plano cobre o combo desta visita (incluído)." : "Seu plano cobre 1 corte (incluído)."} Você pode adicionar serviços avulsos — pagos no local.
         </div>
       )}
 
@@ -241,34 +247,69 @@ export function AgendarForm({
 
       {/* Serviços */}
       {hasPlan ? (
-        <>
-          <section className="flex flex-col gap-2">
-            <div className="text-overline uppercase text-text-muted">Corte do plano · incluído</div>
-            <div className="flex flex-wrap gap-2">
-              {services.map((s) => (
-                <Chip key={s.id} active={planServiceId === s.id} onClick={() => setPlanService(s.id)}>
-                  {s.name}
-                  {s.duration_min ? ` · ~${s.duration_min}min` : ""}
-                </Chip>
-              ))}
-            </div>
-            <p className="text-caption text-text-muted">Este corte usa 1 do seu saldo — sem custo no local.</p>
-          </section>
+        isCombo ? (
+          <>
+            <section className="flex flex-col gap-2">
+              <div className="text-overline uppercase text-text-muted">Incluído no seu plano</div>
+              <div className="flex flex-wrap gap-2">
+                {comboServiceIds.map((id) => {
+                  const s = services.find((x) => x.id === id);
+                  if (!s) return null;
+                  return (
+                    <span key={id} className="rounded-pill border-2 border-accent bg-accent-wash px-4 py-2 text-body text-accent">
+                      {s.name}
+                      {s.duration_min ? ` · ~${s.duration_min}min` : ""}
+                    </span>
+                  );
+                })}
+              </div>
+              <p className="text-caption text-text-muted">Sua visita cobre o combo inteiro — usa 1 do seu saldo, sem custo no local.</p>
+            </section>
 
-          <section className="flex flex-col gap-2">
-            <div className="text-overline uppercase text-text-muted">Adicionar avulso (opcional)</div>
-            <div className="flex flex-wrap gap-2">
-              {services
-                .filter((s) => s.id !== planServiceId)
-                .map((s) => (
-                  <Chip key={s.id} active={avulsoIds.includes(s.id)} onClick={() => toggleAvulso(s.id)}>
+            <section className="flex flex-col gap-2">
+              <div className="text-overline uppercase text-text-muted">Adicionar avulso (opcional)</div>
+              <div className="flex flex-wrap gap-2">
+                {services
+                  .filter((s) => !comboServiceIds.includes(s.id))
+                  .map((s) => (
+                    <Chip key={s.id} active={avulsoIds.includes(s.id)} onClick={() => toggleAvulso(s.id)}>
+                      {s.name}
+                      {s.duration_min ? ` · ~${s.duration_min}min` : ""} · {formatBRL(s.price_brl)}
+                    </Chip>
+                  ))}
+              </div>
+            </section>
+          </>
+        ) : (
+          <>
+            <section className="flex flex-col gap-2">
+              <div className="text-overline uppercase text-text-muted">Corte do plano · incluído</div>
+              <div className="flex flex-wrap gap-2">
+                {services.map((s) => (
+                  <Chip key={s.id} active={planServiceId === s.id} onClick={() => setPlanService(s.id)}>
                     {s.name}
-                    {s.duration_min ? ` · ~${s.duration_min}min` : ""} · {formatBRL(s.price_brl)}
+                    {s.duration_min ? ` · ~${s.duration_min}min` : ""}
                   </Chip>
                 ))}
-            </div>
-          </section>
-        </>
+              </div>
+              <p className="text-caption text-text-muted">Este corte usa 1 do seu saldo — sem custo no local.</p>
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <div className="text-overline uppercase text-text-muted">Adicionar avulso (opcional)</div>
+              <div className="flex flex-wrap gap-2">
+                {services
+                  .filter((s) => s.id !== planServiceId)
+                  .map((s) => (
+                    <Chip key={s.id} active={avulsoIds.includes(s.id)} onClick={() => toggleAvulso(s.id)}>
+                      {s.name}
+                      {s.duration_min ? ` · ~${s.duration_min}min` : ""} · {formatBRL(s.price_brl)}
+                    </Chip>
+                  ))}
+              </div>
+            </section>
+          </>
+        )
       ) : (
         <section className="flex flex-col gap-2">
           <div className="text-overline uppercase text-text-muted">Serviços</div>
@@ -461,13 +502,13 @@ export function AgendarForm({
           <p className="text-caption text-text-muted">Selecione um serviço para começar.</p>
         ) : (
           <div className="flex flex-col gap-2">
-            {items.map((it, idx) => (
+            {items.map((it) => (
               <div key={`${it.kind}-${it.refId}`} className="flex items-center justify-between text-body">
                 <span className="text-text-2">
                   {it.qty > 1 ? `${it.qty}x ` : ""}
                   {it.name}
                 </span>
-                {idx === coveredIdx ? (
+                {it.covered ? (
                   <span className="text-caption font-semibold text-accent">Plano · incluído</span>
                 ) : (
                   <span className="tabular text-text">{formatBRL(it.priceBRL * it.qty)}</span>

@@ -56,6 +56,17 @@ export async function requestAppointment(input: RequestAppointmentInput) {
   const primaryServiceRef = firstServiceIdx >= 0 ? items[firstServiceIdx].refId ?? null : null;
   const requestExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
+  // Combo: se o plano tem serviços definidos, a visita cobre TODOS eles (1 uso do
+  // saldo). Sem serviços definidos (plano legado), cobre só o 1º serviço.
+  let coveredSet: Set<string> | null = null;
+  if (usePlan && comboPlanId) {
+    const { data: cps } = await supabase.from("combo_plan_services").select("service_id").eq("combo_plan_id", comboPlanId);
+    const ids = ((cps ?? []) as { service_id: string }[]).map((r) => r.service_id);
+    if (ids.length) coveredSet = new Set(ids);
+  }
+  const isCovered = (i: { kind: string; refId?: string | null }, idx: number) =>
+    usePlan && (coveredSet ? i.kind === "service" && !!i.refId && coveredSet.has(i.refId) : idx === firstServiceIdx);
+
   const { data, error } = await supabase
     .from("appointments")
     .insert({
@@ -86,7 +97,7 @@ export async function requestAppointment(input: RequestAppointmentInput) {
     price_brl: i.priceBRL,
     qty: i.qty,
     duration_min: i.durationMin ?? 0,
-    covered_by_plan: usePlan && idx === firstServiceIdx,
+    covered_by_plan: isCovered(i, idx),
   }));
   const { error: itemsErr } = await supabase.from("appointment_items").insert(rows);
   if (itemsErr) {

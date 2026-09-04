@@ -272,6 +272,46 @@ export async function getSlotStep(): Promise<number> {
   return Number.isFinite(v) ? Math.min(120, Math.max(5, v)) : 30;
 }
 
+/** Planos (combos) com os serviços do combo e os clientes vinculados (para o gerenciador). */
+export async function getPlansManage() {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: plans }, { data: cps }, { data: subs }] = await Promise.all([
+    supabase
+      .from("combo_plans")
+      .select("id, name, cuts, scope, price_brl, booking_mode, forfeit_on_noshow, active")
+      .order("name"),
+    supabase.from("combo_plan_services").select("combo_plan_id, service_id"),
+    supabase.from("client_subscriptions").select("combo_plan_id, saldo_cortes, clients(name, phone)").eq("status", "ACTIVE"),
+  ]);
+  const svcByPlan = new Map<string, string[]>();
+  for (const r of (cps ?? []) as Row[]) {
+    const k = r.combo_plan_id as string;
+    svcByPlan.set(k, [...(svcByPlan.get(k) ?? []), r.service_id as string]);
+  }
+  const subsByPlan = new Map<string, { name: string; phone: string | null; saldo: number }[]>();
+  for (const r of (subs ?? []) as Row[]) {
+    const k = r.combo_plan_id as string;
+    const c = relOne(r.clients);
+    subsByPlan.set(k, [
+      ...(subsByPlan.get(k) ?? []),
+      { name: (c?.name as string) ?? "Cliente", phone: (c?.phone as string) ?? null, saldo: Number(r.saldo_cortes ?? 0) },
+    ]);
+  }
+  return ((plans ?? []) as Row[]).map((p) => ({
+    id: p.id as string,
+    name: p.name as string,
+    cuts: Number(p.cuts ?? 0),
+    scope: (p.scope as string) ?? null,
+    priceBrl: Number(p.price_brl ?? 0),
+    bookingMode: (p.booking_mode as string) ?? "FLEXIBLE",
+    forfeitOnNoshow: !!p.forfeit_on_noshow,
+    active: p.active !== false,
+    serviceIds: svcByPlan.get(p.id as string) ?? [],
+    subscribers: subsByPlan.get(p.id as string) ?? [],
+  }));
+}
+export type PlanManageRow = Awaited<ReturnType<typeof getPlansManage>>[number];
+
 /** Bloqueios/folgas futuros da agenda (barber_id null = barbearia inteira). */
 export async function getScheduleBlocks() {
   const supabase = await createSupabaseServerClient();

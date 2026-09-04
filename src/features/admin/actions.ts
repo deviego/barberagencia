@@ -693,6 +693,57 @@ export async function removeScheduleBlock(id: string) {
   return { ok: true as const };
 }
 
+/** [Admin] Cria/edita um plano (combo) e sincroniza os serviços do combo. */
+export async function savePlan(
+  id: string | null,
+  values: { name: string; cuts: number; scope?: string; priceBrl: number; bookingMode: string; forfeitOnNoshow: boolean; active: boolean },
+  serviceIds: string[]
+) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const name = values.name?.trim();
+  if (!name) return { ok: false as const, error: "Informe o nome do plano." };
+  const supabase = await createSupabaseServerClient();
+  const clean = [...new Set(serviceIds.filter(Boolean))];
+  const payload = {
+    name,
+    cuts: Math.max(0, Math.floor(Number(values.cuts) || 0)),
+    scope: values.scope?.trim() || null,
+    price_brl: Number(values.priceBrl) || 0,
+    booking_mode: values.bookingMode === "FIXED" ? "FIXED" : "FLEXIBLE",
+    forfeit_on_noshow: !!values.forfeitOnNoshow,
+    service_id: clean[0] ?? null, // semente do modo FIXO
+    active: values.active !== false,
+  };
+
+  let planId = id;
+  if (id) {
+    const { error } = await supabase.from("combo_plans").update(payload).eq("id", id);
+    if (error) return { ok: false as const, error: error.message };
+  } else {
+    const { data, error } = await supabase.from("combo_plans").insert({ ...payload, tenant_id: user.tenantId }).select("id").single();
+    if (error) return { ok: false as const, error: error.message };
+    planId = data.id as string;
+  }
+
+  await supabase.from("combo_plan_services").delete().eq("combo_plan_id", planId);
+  if (clean.length) {
+    const { error } = await supabase.from("combo_plan_services").insert(clean.map((s) => ({ combo_plan_id: planId, service_id: s })));
+    if (error) return { ok: false as const, error: error.message };
+  }
+  revalidatePath("/admin/servicos");
+  return { ok: true as const };
+}
+
+/** [Admin] Desativa um plano (soft delete). */
+export async function deletePlan(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("combo_plans").update({ active: false }).eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/servicos");
+  return { ok: true as const };
+}
+
 /** [Barbearia] Solicita o relatório financeiro do MÊS: gera o PDF e envia no
  *  WhatsApp da própria barbearia (via gateway) e registra a solicitação. */
 export async function requestFinancialReport() {
