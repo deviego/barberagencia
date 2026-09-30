@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AvatarUpload } from "@/components/avatar-upload";
-import { addFixedMakeup, adminAddChild, cancelClientSubscription, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
+import { addFixedMakeup, adjustClientCuts, adminAddChild, cancelClientSubscription, changeFixedPlanSlot, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
+import { CutMeter } from "@/components/cut-meter";
+import { FixedSlotFields, timeToMin, type FixedSlot } from "@/features/admin/components/fixed-slot-fields";
 import { formatBRL, getInitials } from "@/lib/utils";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -18,9 +20,17 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 
 interface Detail {
   client: { id: string; name: string; email: string | null; phone: string | null; active: boolean; avatar_url: string | null } | null;
-  sub: { saldo_cortes: number; combo_plans: unknown } | null;
+  sub: {
+    saldo_cortes: number;
+    fixed_weekday?: number | null;
+    fixed_start_min?: number | null;
+    fixed_barber_id?: string | null;
+    combo_plan_id?: string;
+    combo_plans: unknown;
+  } | null;
   history: { id: string; start_at: string; status: string; consumed_from_plan: boolean; services: unknown; combo_plans: unknown }[];
   children: { id: string; name: string; age: number | null; photo_url: string | null }[];
+  barbers: { id: string; name: string }[];
 }
 
 const STATUS: Record<string, string> = {
@@ -43,6 +53,9 @@ export function ClientDetail({ clientId }: { clientId: string }) {
   const [childAge, setChildAge] = useState("");
   const [childPhoto, setChildPhoto] = useState<string | null>(null);
   const [childErr, setChildErr] = useState<string | null>(null);
+  // Alterar dia/horário do plano fixo
+  const [slotOpen, setSlotOpen] = useState(false);
+  const [slot, setSlot] = useState<FixedSlot>({ weekday: 1, time: "09:00", barberId: "" });
 
   function reload() {
     fetchClientDetail(clientId).then((d) => setData(d as Detail));
@@ -99,6 +112,34 @@ export function ClientDetail({ clientId }: { clientId: string }) {
     });
   }
 
+  function adjust(delta: number) {
+    setErr(null);
+    startTransition(async () => {
+      const res = await adjustClientCuts(clientId, delta);
+      if (res.ok) reload();
+      else setErr(res.error);
+    });
+  }
+
+  function openSlot() {
+    const s = (data?.sub ?? {}) as { fixed_weekday?: number | null; fixed_start_min?: number | null; fixed_barber_id?: string | null };
+    const m = s.fixed_start_min;
+    const time = m != null ? `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}` : "09:00";
+    setSlot({ weekday: s.fixed_weekday ?? 1, time, barberId: s.fixed_barber_id ?? "" });
+    setSlotOpen(true);
+  }
+
+  function saveSlot() {
+    setErr(null);
+    startTransition(async () => {
+      const res = await changeFixedPlanSlot(clientId, { weekday: slot.weekday, startMin: timeToMin(slot.time), barberId: slot.barberId });
+      if (res.ok) {
+        setSlotOpen(false);
+        reload();
+      } else setErr(res.error);
+    });
+  }
+
   if (!data) {
     return (
       <div className="flex items-center justify-center py-10 text-text-muted">
@@ -117,6 +158,7 @@ export function ClientDetail({ clientId }: { clientId: string }) {
   );
   const subFixed = data.sub as { fixed_weekday?: number | null; fixed_start_min?: number | null } | null;
   const isFixed = combo?.booking_mode === "FIXED";
+  const saldo = data.sub?.saldo_cortes ?? 0;
   const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const hhmm = (m: number | null | undefined) =>
     m == null ? "" : `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -155,8 +197,16 @@ export function ClientDetail({ clientId }: { clientId: string }) {
         <div className="text-overline uppercase text-text-muted">Plano</div>
         {combo ? (
           <>
-            <div className="mt-1 flex items-center justify-between">
-              <div>
+            <div className="mt-2 flex items-start gap-4">
+              {isFixed ? (
+                <div className="flex flex-col items-center px-2">
+                  <span className="font-display text-h2 leading-none text-accent tabular">{saldo}</span>
+                  <span className="mt-1 text-overline uppercase text-text-muted">reservados</span>
+                </div>
+              ) : (
+                <CutMeter remaining={saldo} total={combo.cuts} size={92} />
+              )}
+              <div className="flex-1">
                 <div className="flex items-center gap-2 text-body font-semibold text-text">
                   {combo.name}
                   {isFixed && <Badge variant="warning">Fixo</Badge>}
@@ -167,19 +217,44 @@ export function ClientDetail({ clientId }: { clientId: string }) {
                     ? ` · ${WD[subFixed.fixed_weekday]} ${hhmm(subFixed.fixed_start_min)}`
                     : ""}
                 </div>
+                {!isFixed && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button size="sm" variant="outline" disabled={pending || saldo <= 0} onClick={() => adjust(-1)}>
+                      − corte
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={pending || saldo >= combo.cuts} onClick={() => adjust(1)}>
+                      + corte
+                    </Button>
+                  </div>
+                )}
               </div>
-              <Badge variant="accent">
-                {isFixed ? `${data.sub?.saldo_cortes ?? 0} reservados` : `${data.sub?.saldo_cortes ?? 0}/${combo.cuts} cortes`}
-              </Badge>
             </div>
+
             {isFixed && (
-              <button
-                onClick={doMakeup}
-                disabled={pending}
-                className="mt-3 mr-4 text-caption font-medium text-accent hover:underline disabled:opacity-50"
-              >
-                + Repor um corte (em caso de falta)
-              </button>
+              <div className="mt-3 flex flex-col gap-2">
+                {slotOpen ? (
+                  <>
+                    <FixedSlotFields barbers={data.barbers} value={slot} onChange={setSlot} />
+                    <div className="flex gap-2">
+                      <Button size="sm" loading={pending} onClick={saveSlot}>
+                        Salvar dia/horário
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setSlotOpen(false)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <button onClick={openSlot} disabled={pending} className="text-caption font-medium text-accent hover:underline disabled:opacity-50">
+                      Alterar dia/horário do plano
+                    </button>
+                    <button onClick={doMakeup} disabled={pending} className="text-caption font-medium text-accent hover:underline disabled:opacity-50">
+                      + Repor um corte (falta)
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             {confirming ? (
               <div className="mt-3 rounded-md border border-danger bg-danger-bg px-3 py-2.5">

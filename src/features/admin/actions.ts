@@ -280,6 +280,55 @@ export async function addFixedMakeup(clientId: string) {
   return { ok: true as const };
 }
 
+/** [Admin] Ajusta o saldo de cortes do plano ativo do cliente (+1 ou -1), limitado a 0..total. */
+export async function adjustClientCuts(clientId: string, delta: number) {
+  if (!clientId || (delta !== 1 && delta !== -1)) return { ok: false as const, error: "Ajuste inválido." };
+  const supabase = await createSupabaseServerClient();
+  const { data: sub } = await supabase
+    .from("client_subscriptions")
+    .select("id, saldo_cortes, combo_plans(cuts)")
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE")
+    .limit(1)
+    .maybeSingle();
+  if (!sub) return { ok: false as const, error: "Cliente sem plano ativo." };
+  const rel = sub.combo_plans as { cuts?: number } | { cuts?: number }[] | null;
+  const total = Number((Array.isArray(rel) ? rel[0]?.cuts : rel?.cuts) ?? 0) || 0;
+  const cur = Number(sub.saldo_cortes ?? 0);
+  const next = Math.max(0, Math.min(total > 0 ? total : cur + 1, cur + delta));
+  if (next !== cur) {
+    const { error } = await supabase.from("client_subscriptions").update({ saldo_cortes: next }).eq("id", sub.id as string);
+    if (error) return { ok: false as const, error: error.message };
+  }
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin");
+  return { ok: true as const, saldo: next };
+}
+
+/** [Admin] Altera o dia/horário/barbeiro do plano FIXO do cliente e reagenda as reservas. */
+export async function changeFixedPlanSlot(
+  clientId: string,
+  input: { weekday: number; startMin: number; barberId: string }
+) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido." };
+  if (!input.barberId) return { ok: false as const, error: "Selecione o barbeiro." };
+  if (input.weekday < 0 || input.weekday > 6 || input.startMin < 0 || input.startMin >= 1440)
+    return { ok: false as const, error: "Dia/horário inválidos." };
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("client_subscriptions")
+    .update({ fixed_weekday: input.weekday, fixed_start_min: input.startMin, fixed_barber_id: input.barberId })
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE");
+  if (error) return { ok: false as const, error: error.message };
+  // Remove as reservas futuras do slot antigo e recria no novo (mesmo serviço do plano).
+  await supabase.rpc("cancel_future_plan_appointments", { p_client_id: clientId });
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: clientId });
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin/agenda");
+  return { ok: true as const };
+}
+
 /** Cria um cliente rápido (admin) para agendar na hora. Retorna id + nome.
  *  Simples = só nome; completo = nome + telefone + e-mail. Sem convite. */
 export async function createClientAdmin(input: { name: string; phone?: string; email?: string }) {

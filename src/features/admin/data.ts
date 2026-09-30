@@ -463,7 +463,7 @@ export async function getClientDetail(id: string) {
     supabase.from("clients").select("id, name, email, phone, active, avatar_url").eq("id", id).maybeSingle(),
     supabase
       .from("client_subscriptions")
-      .select("saldo_cortes, status, fixed_weekday, fixed_start_min, combo_plans(name, cuts, price_brl, booking_mode)")
+      .select("saldo_cortes, status, fixed_weekday, fixed_start_min, fixed_barber_id, combo_plan_id, combo_plans(name, cuts, price_brl, booking_mode)")
       .eq("client_id", id)
       .eq("status", "ACTIVE")
       .limit(1)
@@ -475,12 +475,11 @@ export async function getClientDetail(id: string) {
       .order("start_at", { ascending: false })
       .limit(20),
   ]);
-  const { data: children } = await supabase
-    .from("children")
-    .select("id, name, age, photo_url")
-    .eq("client_id", id)
-    .order("created_at", { ascending: true });
-  return { client, sub, history: history ?? [], children: children ?? [] };
+  const [{ data: children }, { data: barbers }] = await Promise.all([
+    supabase.from("children").select("id, name, age, photo_url").eq("client_id", id).order("created_at", { ascending: true }),
+    supabase.from("barbers").select("id, name").eq("active", true).order("name"),
+  ]);
+  return { client, sub, history: history ?? [], children: children ?? [], barbers: barbers ?? [] };
 }
 
 /** Agenda do dia (todos os status ativos) do tenant. */
