@@ -129,6 +129,11 @@ export function PainelView({
                 >
                   <span className="font-display text-[128px] font-black leading-none text-accent">#{s.ticket}</span>
                   <span className="text-h2 font-bold text-text">{s.firstName}</span>
+                  {s.hasPlan && (
+                    <span className="rounded-pill bg-accent px-3 py-0.5 text-body font-bold uppercase tracking-wide text-text-inverse">
+                      Plano
+                    </span>
+                  )}
                   {s.barber && (
                     <span className="flex items-center gap-1.5 text-h5 text-text-2">
                       <Scissors size={18} /> {s.barber}
@@ -172,6 +177,9 @@ export function PainelView({
                 >
                   <span className="font-display text-h2 font-bold text-text tabular">#{w.ticket}</span>
                   <span className="max-w-[140px] truncate text-body text-text-2">{w.firstName}</span>
+                  {w.hasPlan && (
+                    <span className="rounded-pill bg-accent-wash px-2 py-0.5 text-caption font-bold uppercase text-accent">Plano</span>
+                  )}
                 </div>
               ))}
               {waiting.length > 8 && <span className="text-h5 text-text-muted">+{waiting.length - 8}</span>}

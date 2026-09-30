@@ -11,12 +11,30 @@ export type QueueBoardItem = {
   firstName: string;
   barber: string | null;
   calledAt?: string | null;
+  hasPlan: boolean;
+  planName: string | null;
 };
 
-/** Painel/board da fila de hoje (números + 1º nome + barbeiro). Service-role, escopo do tenant. */
+type PgClient = ReturnType<typeof createSupabaseAdminClient>;
+/** Mapa client_id -> nome do plano (null se sem nome) para assinaturas ATIVAS. */
+async function activePlansByClient(client: PgClient, ids: (string | null | undefined)[]): Promise<Map<string, string | null>> {
+  const uniq = [...new Set(ids.filter(Boolean) as string[])];
+  const m = new Map<string, string | null>();
+  if (!uniq.length) return m;
+  const { data } = await client
+    .from("client_subscriptions")
+    .select("client_id, combo_plans(name)")
+    .eq("status", "ACTIVE")
+    .in("client_id", uniq);
+  for (const r of (data ?? []) as any[]) m.set(r.client_id as string, (r.combo_plans?.name as string) ?? null);
+  return m;
+}
+
+/** Painel/board da fila de hoje (números + 1º nome + barbeiro + selo de plano). Service-role. */
 export async function getQueueBoard(tenantId: string): Promise<{
   serving: QueueBoardItem[];
   waiting: QueueBoardItem[];
+  next: QueueBoardItem | null;
   lastDone: QueueBoardItem | null;
   lastCalled: QueueBoardItem | null;
   doneCount: number;
@@ -31,19 +49,21 @@ export async function getQueueBoard(tenantId: string): Promise<{
     firstName: ((r.clients?.name as string) ?? "").split(" ")[0] || "Cliente",
     barber: (r.barbers?.name as string) ?? null,
     calledAt: (r.called_at as string) ?? null,
+    hasPlan: false,
+    planName: null,
   });
 
   const [{ data }, { data: doneRows, count: doneCount }] = await Promise.all([
     admin
       .from("queue_entries")
-      .select("id, ticket_number, status, called_at, clients(name), barbers(name)")
+      .select("id, ticket_number, status, called_at, client_id, clients(name), barbers(name)")
       .eq("tenant_id", tenantId)
       .eq("day", today)
       .in("status", ["WAITING", "IN_SERVICE"])
       .order("ticket_number", { ascending: true }),
     admin
       .from("queue_entries")
-      .select("id, ticket_number, status, clients(name), barbers(name)", { count: "exact" })
+      .select("id, ticket_number, status, client_id, clients(name), barbers(name)", { count: "exact" })
       .eq("tenant_id", tenantId)
       .eq("day", today)
       .eq("status", "DONE")
@@ -51,16 +71,34 @@ export async function getQueueBoard(tenantId: string): Promise<{
       .limit(1),
   ]);
 
-  const rows = (data ?? []).map(map);
-  const lastDone = (doneRows ?? []).map(map)[0] ?? null;
+  const rawRows = (data ?? []) as any[];
+  const rawDone = (doneRows ?? []) as any[];
+  const rows = rawRows.map(map);
+  const lastDone = rawDone.map(map)[0] ?? null;
+
+  // Selo de plano (assinatura ativa) por cliente.
+  const plans = await activePlansByClient(admin, [...rawRows, ...rawDone].map((r) => r.client_id));
+  const flag = (item: QueueBoardItem | null, clientId: string | undefined) => {
+    if (!item || !clientId || !plans.has(clientId)) return;
+    item.hasPlan = true;
+    item.planName = plans.get(clientId) ?? null;
+  };
+  rows.forEach((item, i) => flag(item, rawRows[i]?.client_id));
+  flag(lastDone, rawDone[0]?.client_id);
+
+  const waiting = rows.filter((r) => r.status === "WAITING");
   // Senha "chamada" mais recente (WAITING com called_at) — dispara o alerta no painel.
   const lastCalled =
-    rows
-      .filter((r) => r.status === "WAITING" && r.calledAt)
+    waiting
+      .filter((r) => r.calledAt)
       .sort((a, b) => new Date(b.calledAt!).getTime() - new Date(a.calledAt!).getTime())[0] ?? null;
+  // Próxima a ser chamada: primeira aguardando ainda não chamada (senão a 1ª da fila).
+  const next = waiting.find((r) => !r.calledAt) ?? waiting[0] ?? null;
+
   return {
     serving: rows.filter((r) => r.status === "IN_SERVICE"),
-    waiting: rows.filter((r) => r.status === "WAITING"),
+    waiting,
+    next,
     lastDone,
     lastCalled,
     doneCount: doneCount ?? 0,
@@ -105,6 +143,8 @@ export type AdminQueueItem = {
   service: string | null;
   barber: string | null;
   joinedAt: string;
+  hasPlan: boolean;
+  planName: string | null;
 };
 
 /** Fila do admin (WAITING + IN_SERVICE de hoje), sob RLS. */
@@ -113,11 +153,13 @@ export async function getAdminQueue(): Promise<AdminQueueItem[]> {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const { data } = await supabase
     .from("queue_entries")
-    .select("id, ticket_number, status, joined_at, clients(name), services(name), barbers(name)")
+    .select("id, ticket_number, status, joined_at, client_id, clients(name), services(name), barbers(name)")
     .eq("day", today)
     .in("status", ["WAITING", "IN_SERVICE"])
     .order("ticket_number", { ascending: true });
-  return (data ?? []).map((r: any) => ({
+  const rows = (data ?? []) as any[];
+  const plans = await activePlansByClient(supabase as unknown as PgClient, rows.map((r) => r.client_id));
+  return rows.map((r) => ({
     id: r.id,
     ticket: r.ticket_number,
     status: r.status,
@@ -125,6 +167,8 @@ export async function getAdminQueue(): Promise<AdminQueueItem[]> {
     service: (r.services?.name as string) ?? null,
     barber: (r.barbers?.name as string) ?? null,
     joinedAt: r.joined_at,
+    hasPlan: plans.has(r.client_id),
+    planName: plans.get(r.client_id) ?? null,
   }));
 }
 

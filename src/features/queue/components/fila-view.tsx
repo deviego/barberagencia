@@ -4,17 +4,50 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Ticket, LogOut, Scissors, User, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatBRL, cn } from "@/lib/utils";
 import { joinQueue, leaveQueue } from "../actions";
 import type { MyTicket, QueueBoardItem } from "../data";
 
 type SvcOpt = { id: string; name: string; priceBrl: number };
 type BarberOpt = { id: string; name: string };
 
-/** Tela da fila do cliente: sua senha + senha em atendimento + seleção de serviço/barbeiro. */
+function PlanPill() {
+  return (
+    <span className="rounded-pill bg-accent-wash px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+      Plano
+    </span>
+  );
+}
+
+/** Linha do quadro da fila: rótulo + senha(s) com nome e selo de plano. */
+function BoardLine({ label, entries, accent }: { label: string; entries: QueueBoardItem[]; accent?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <span className="text-caption uppercase text-text-muted">{label}</span>
+      {entries.length === 0 ? (
+        <span className="text-body text-text-muted">—</span>
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
+          {entries.map((e) => (
+            <span key={e.id} className="flex items-center gap-1.5">
+              <span className={cn("font-display text-h5 font-bold tabular", accent ? "text-accent" : "text-text")}>#{e.ticket}</span>
+              <span className="text-caption text-text-2">{e.firstName}</span>
+              {e.hasPlan && <PlanPill />}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Tela da fila do cliente: sua senha + quadro (último/atendimento/próximo) + seleção. */
 export function FilaView({
   tenantId,
   ticket,
   serving,
+  lastCalled,
+  next,
   services,
   barbers,
   pickBarber,
@@ -22,6 +55,8 @@ export function FilaView({
   tenantId: string;
   ticket: MyTicket | null;
   serving: QueueBoardItem[];
+  lastCalled: QueueBoardItem | null;
+  next: QueueBoardItem | null;
   services: SvcOpt[];
   barbers: BarberOpt[];
   pickBarber: boolean;
@@ -62,8 +97,6 @@ export function FilaView({
     });
   }
 
-  const servingLabel = serving.length ? serving.map((s) => `#${s.ticket}`).join(", ") : "—";
-
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       {/* Senha do cliente — ou convite para entrar na fila */}
@@ -91,10 +124,11 @@ export function FilaView({
         </div>
       )}
 
-      {/* Em atendimento agora */}
-      <div className="flex items-center justify-between rounded-lg border border-border bg-inset px-5 py-4">
-        <span className="text-body text-text-2">Em atendimento agora</span>
-        <span className="font-display text-h4 font-bold text-text tabular">{servingLabel}</span>
+      {/* Quadro da fila: último chamado, em atendimento e próximo */}
+      <div className="flex flex-col divide-y divide-border-subtle rounded-lg border border-border bg-surface">
+        <BoardLine label="Último chamado" entries={lastCalled ? [lastCalled] : []} />
+        <BoardLine label="Em atendimento" entries={serving} />
+        <BoardLine label="Próximo" entries={next ? [next] : []} accent />
       </div>
 
       {/* Seleção de serviço */}
@@ -116,7 +150,7 @@ export function FilaView({
                   service === s.id ? "border-2 border-accent bg-accent-wash text-accent" : "border-border text-text-2 hover:border-accent"
                 }`}
               >
-                {s.name}
+                {s.name} · {formatBRL(s.priceBrl)}
               </button>
             ))}
           </div>

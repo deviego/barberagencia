@@ -41,7 +41,14 @@ export function AdminFila({ items }: { items: AdminQueueItem[] }) {
         <div key={it.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
           <span className="font-display text-h4 font-black text-accent tabular">#{it.ticket}</span>
           <div className="min-w-0">
-            <div className="truncate text-body font-semibold text-text">{it.clientName}</div>
+            <div className="flex items-center gap-2">
+              <span className="truncate text-body font-semibold text-text">{it.clientName}</span>
+              {it.hasPlan && (
+                <span className="shrink-0 rounded-pill bg-accent-wash px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+                  Plano
+                </span>
+              )}
+            </div>
             <div className="truncate text-caption text-text-muted">
               {it.service ?? "Serviço a definir"}
               {it.barber ? ` · ${it.barber}` : ""}

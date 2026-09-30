@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Delete, Printer, Scissors, User, Ticket, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { maskPhoneBR, maskDate } from "@/lib/masks";
@@ -39,7 +39,6 @@ export function TotemKiosk({
   const [ticket, setTicket] = useState<{ n: number; service: string | null; barber: string | null } | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const printedRef = useRef(false);
 
   function reset() {
     setStep("idle");
@@ -51,17 +50,7 @@ export function TotemKiosk({
     setBarberId(null);
     setTicket(null);
     setError(null);
-    printedRef.current = false;
   }
-
-  // Imprime automaticamente ao gerar a senha.
-  useEffect(() => {
-    if (step === "ticket" && ticket && !printedRef.current) {
-      printedRef.current = true;
-      const t = setTimeout(() => window.print(), 400);
-      return () => clearTimeout(t);
-    }
-  }, [step, ticket]);
 
   const digits = phone.replace(/\D/g, "");
 
@@ -275,7 +264,7 @@ export function TotemKiosk({
             {ticket.service && <div className="text-body text-text-2">{ticket.service}</div>}
             <div className="mt-2 flex gap-3">
               <Button variant="outline" onClick={() => window.print()}>
-                <Printer size={16} /> Imprimir de novo
+                <Printer size={16} /> Imprimir senha
               </Button>
               <Button onClick={reset}>
                 <RotateCcw size={16} /> Nova senha
