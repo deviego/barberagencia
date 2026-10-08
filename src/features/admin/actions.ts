@@ -275,8 +275,63 @@ export async function addFixedMakeup(clientId: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("add_fixed_makeup", { p_client_id: clientId });
   if (error) return { ok: false as const, error: error.message };
+  // Sincroniza o contador de "reservados" (saldo_cortes) com a nova reserva.
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: clientId });
   revalidatePath("/admin/clientes");
   revalidatePath("/admin/agenda");
+  return { ok: true as const };
+}
+
+/** Remove um corte do plano fixo (admin) — sempre a ÚLTIMA reserva da fila; as datas
+ *  próximas não mudam.
+ *  - Reserva extra (de um "Repor", acima do total do plano)? só cancela — desfaz a reposição.
+ *  - Senão é DÉBITO (cliente já usou o corte, ex.: cortou antes de assinar): cancela com
+ *    plan_debited=true, e o ensure_fixed_reservations não recria essa data (schema-31). */
+export async function removeFixedCut(clientId: string) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido." };
+  const supabase = await createSupabaseServerClient();
+  const { data: sub } = await supabase
+    .from("client_subscriptions")
+    .select("combo_plan_id, combo_plans(cuts, booking_mode)")
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE")
+    .limit(1)
+    .maybeSingle();
+  const rel = sub?.combo_plans as { cuts?: number; booking_mode?: string } | { cuts?: number; booking_mode?: string }[] | null;
+  const plan = Array.isArray(rel) ? rel[0] : rel;
+  if (!sub || plan?.booking_mode !== "FIXED") return { ok: false as const, error: "Cliente sem plano fixo ativo." };
+  const cuts = Math.max(1, Number(plan.cuts ?? 1));
+
+  const { data: reservations } = await supabase
+    .from("appointments")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("combo_plan_id", sub.combo_plan_id as string)
+    .eq("consumed_from_plan", true)
+    .gt("start_at", new Date().toISOString())
+    .neq("status", "CANCELLED")
+    .order("start_at", { ascending: true });
+  const list = reservations ?? [];
+  if (!list.length) return { ok: false as const, error: "Cliente sem cortes reservados para remover." };
+
+  const extra = list.length > cuts;
+  const target = list[list.length - 1].id as string;
+  const { error } = await supabase
+    .from("appointments")
+    .update({ status: "CANCELLED", plan_debited: !extra })
+    .eq("id", target);
+  if (error) return { ok: false as const, error: error.message };
+
+  // Sincroniza o contador de "reservados" (saldo_cortes).
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: clientId });
+  try {
+    await notifyAppointmentCancelled(target);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin");
   return { ok: true as const };
 }
 

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AvatarUpload } from "@/components/avatar-upload";
-import { addFixedMakeup, adjustClientCuts, adminAddChild, cancelClientSubscription, changeFixedPlanSlot, fetchClientDetail, updateClientAvatar } from "@/features/admin/actions";
+import { addFixedMakeup, adjustClientCuts, adminAddChild, cancelClientSubscription, changeFixedPlanSlot, fetchClientDetail, removeFixedCut, updateClientAvatar } from "@/features/admin/actions";
 import { CutMeter } from "@/components/cut-meter";
 import { FixedSlotFields, timeToMin, type FixedSlot } from "@/features/admin/components/fixed-slot-fields";
 import { formatBRL, getInitials } from "@/lib/utils";
@@ -45,6 +45,7 @@ const STATUS: Record<string, string> = {
 export function ClientDetail({ clientId }: { clientId: string }) {
   const [data, setData] = useState<Detail | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [removingCut, setRemovingCut] = useState(false);
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   // Cadastro de criança (admin)
@@ -109,6 +110,17 @@ export function ClientDetail({ clientId }: { clientId: string }) {
       const res = await addFixedMakeup(clientId);
       if (res.ok) reload();
       else setErr(res.error);
+    });
+  }
+
+  function doRemoveCut() {
+    setErr(null);
+    startTransition(async () => {
+      const res = await removeFixedCut(clientId);
+      if (res.ok) {
+        setRemovingCut(false);
+        reload();
+      } else setErr(res.error);
     });
   }
 
@@ -252,6 +264,30 @@ export function ClientDetail({ clientId }: { clientId: string }) {
                     <button onClick={doMakeup} disabled={pending} className="text-caption font-medium text-accent hover:underline disabled:opacity-50">
                       + Repor um corte (falta)
                     </button>
+                    <button
+                      onClick={() => setRemovingCut(true)}
+                      disabled={pending || saldo <= 0}
+                      className="text-caption font-medium text-danger hover:underline disabled:opacity-50"
+                    >
+                      − Remover um corte
+                    </button>
+                  </div>
+                )}
+                {removingCut && (
+                  <div className="rounded-md border border-danger bg-danger-bg px-3 py-2.5">
+                    <p className="text-caption text-danger-strong">
+                      {saldo > combo.cuts
+                        ? "Remove a última reserva extra (desfaz uma reposição)."
+                        : "Debita um corte já usado: a última reserva da fila é removida e não volta. As próximas datas continuam iguais."}
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <Button size="sm" variant="danger" loading={pending} onClick={doRemoveCut}>
+                        Sim, remover corte
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRemovingCut(false)}>
+                        Voltar
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
