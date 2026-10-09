@@ -417,10 +417,11 @@ export async function notifyInvite(input: {
   tenantName: string;
   tenantId?: string | null;
   link: string;
-}) {
+}): Promise<{ whatsapp: "SENT" | "SKIPPED" | "FAILED" | null }> {
   const supabase = await createSupabaseServerClient();
   const nome = (input.name ?? "").split(" ")[0];
   const brand: Brand = { name: input.tenantName, phone: (await brandFor(input.tenantId)).phone };
+  let whatsapp: "SENT" | "SKIPPED" | "FAILED" | null = null;
 
   if (input.phone) {
     const msg =
@@ -431,12 +432,13 @@ export async function notifyInvite(input: {
       `👉 ${input.link}\n\n` +
       `O link vale por 48 horas.`;
     const w = await sendWhatsApp(input.phone, msg, input.tenantId ?? null);
+    whatsapp = w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED";
     await supabase.from("notification_log").insert({
       tenant_id: input.tenantId ?? null,
       channel: "whatsapp",
       template: "invite",
       recipient: input.phone,
-      status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+      status: whatsapp,
     });
   }
 
@@ -462,6 +464,7 @@ export async function notifyInvite(input: {
       status: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED",
     });
   }
+  return { whatsapp };
 }
 
 /** E-mail (e WhatsApp) de boas-vindas ao novo cliente (após o cadastro). */

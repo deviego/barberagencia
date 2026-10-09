@@ -189,6 +189,60 @@ export async function createInvite(values: { name?: string; phone?: string; emai
   return { ok: true as const, token };
 }
 
+/** Reconvida um cliente que ainda não criou acesso (status INVITED): expira os convites
+ *  pendentes dele, gera um link novo (48h) e reenvia por WhatsApp/e-mail. */
+export async function reinviteClient(clientId: string) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido." };
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id, name, email, phone, status, user_id")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (!client) return { ok: false as const, error: "Cliente não encontrado." };
+  if (client.status !== "INVITED" || client.user_id) return { ok: false as const, error: "Este cliente já tem acesso." };
+  const name = (client.name as string | null) ?? null;
+  const email = (client.email as string | null) ?? null;
+  const phone = (client.phone as string | null) ?? null;
+
+  // Só o último link vale: expira os convites pendentes deste cliente.
+  for (const [col, val] of [["phone", phone], ["email", email]] as const) {
+    if (!val) continue;
+    await supabase
+      .from("client_invites")
+      .update({ status: "EXPIRED" })
+      .eq("tenant_id", user.tenantId)
+      .eq("status", "PENDING")
+      .eq(col, val);
+  }
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase.from("client_invites").insert({
+    tenant_id: user.tenantId,
+    token,
+    name,
+    email,
+    phone,
+    expires_at: expiresAt,
+  });
+  if (error) return { ok: false as const, error: error.message };
+
+  let whatsapp: "SENT" | "SKIPPED" | "FAILED" | null = null;
+  try {
+    const link = `${await getRequestOrigin()}/convite/${token}`;
+    const tenant = await getCurrentTenant();
+    ({ whatsapp } = await notifyInvite({ name, phone, email, tenantName: tenant.name, tenantId: user.tenantId, link }));
+  } catch {
+    whatsapp = phone ? "FAILED" : null;
+  }
+  revalidatePath("/admin/clientes");
+  return { ok: true as const, token, whatsapp };
+}
+
 /** Cria uma campanha de marketing. */
 export async function createCampaign(values: { name: string; segment: string; message: string }) {
   const gate = await checkFeature("marketing.basic");

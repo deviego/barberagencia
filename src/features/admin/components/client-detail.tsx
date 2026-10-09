@@ -3,12 +3,12 @@
 import { useEffect, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Baby, Loader2, Plus } from "lucide-react";
+import { Baby, Check, Copy, Loader2, MessageCircle, Plus, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AvatarUpload } from "@/components/avatar-upload";
-import { addFixedMakeup, adjustClientCuts, adminAddChild, cancelClientSubscription, changeFixedPlanSlot, fetchClientDetail, removeFixedCut, updateClientAvatar } from "@/features/admin/actions";
+import { addFixedMakeup, adjustClientCuts, adminAddChild, cancelClientSubscription, changeFixedPlanSlot, fetchClientDetail, reinviteClient, removeFixedCut, updateClientAvatar } from "@/features/admin/actions";
 import { CutMeter } from "@/components/cut-meter";
 import { FixedSlotFields, timeToMin, type FixedSlot } from "@/features/admin/components/fixed-slot-fields";
 import { formatBRL, getInitials } from "@/lib/utils";
@@ -19,7 +19,7 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
 }
 
 interface Detail {
-  client: { id: string; name: string; email: string | null; phone: string | null; active: boolean; avatar_url: string | null } | null;
+  client: { id: string; name: string; email: string | null; phone: string | null; active: boolean; status?: string | null; avatar_url: string | null } | null;
   sub: {
     saldo_cortes: number;
     fixed_weekday?: number | null;
@@ -46,6 +46,10 @@ export function ClientDetail({ clientId }: { clientId: string }) {
   const [data, setData] = useState<Detail | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [removingCut, setRemovingCut] = useState(false);
+  // Reconvidar (cliente que ainda não criou acesso)
+  const [invite, setInvite] = useState<{ link: string; whatsapp: "SENT" | "SKIPPED" | "FAILED" | null } | null>(null);
+  const [inviteErr, setInviteErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   // Cadastro de criança (admin)
@@ -113,6 +117,16 @@ export function ClientDetail({ clientId }: { clientId: string }) {
     });
   }
 
+  function doReinvite() {
+    setInviteErr(null);
+    setInvite(null);
+    startTransition(async () => {
+      const res = await reinviteClient(clientId);
+      if (res.ok) setInvite({ link: `${window.location.origin}/convite/${res.token}`, whatsapp: res.whatsapp });
+      else setInviteErr(res.error);
+    });
+  }
+
   function doRemoveCut() {
     setErr(null);
     startTransition(async () => {
@@ -171,6 +185,8 @@ export function ClientDetail({ clientId }: { clientId: string }) {
   const subFixed = data.sub as { fixed_weekday?: number | null; fixed_start_min?: number | null } | null;
   const isFixed = combo?.booking_mode === "FIXED";
   const saldo = data.sub?.saldo_cortes ?? 0;
+  const invited = client.status === "INVITED";
+  const waPhone = (client.phone ?? "").replace(/\D/g, "");
   const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const hhmm = (m: number | null | undefined) =>
     m == null ? "" : `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -199,9 +215,68 @@ export function ClientDetail({ clientId }: { clientId: string }) {
       </div>
 
       {/* Status */}
-      <div className="flex items-center justify-between rounded-md border border-border-subtle px-4 py-3">
-        <span className="text-caption text-text-muted">Status</span>
-        {client.active ? <Badge variant="success">Ativo</Badge> : <Badge>Inativo</Badge>}
+      <div className="rounded-md border border-border-subtle px-4 py-3">
+        <div className="flex items-center justify-between">
+          <span className="text-caption text-text-muted">Status</span>
+          {invited ? (
+            <Badge variant="warning">Convidado</Badge>
+          ) : client.active ? (
+            <Badge variant="success">Ativo</Badge>
+          ) : (
+            <Badge>Inativo</Badge>
+          )}
+        </div>
+        {invited && (
+          <div className="mt-3 flex flex-col gap-2">
+            <p className="text-caption text-text-muted">Ainda não criou o acesso. Reconvidar gera um link novo (48h) e invalida o anterior.</p>
+            <Button size="sm" variant="outline" className="self-start" loading={pending} onClick={doReinvite}>
+              <Send size={14} />
+              Reconvidar
+            </Button>
+            {inviteErr && <p className="text-caption text-danger">{inviteErr}</p>}
+            {invite && (
+              <div className="flex flex-col gap-2">
+                {invite.whatsapp === "SENT" ? (
+                  <div className="flex items-center gap-2 rounded-md border border-success bg-success-bg px-3 py-2 text-caption text-success-strong">
+                    <Check size={15} /> Convite reenviado por WhatsApp.
+                  </div>
+                ) : (
+                  <p className="text-caption text-warning">
+                    {client.phone ? "Não foi possível enviar pelo WhatsApp." : "Cliente sem telefone."} Envie o link abaixo.
+                  </p>
+                )}
+                <div className="rounded-md border border-accent bg-accent-wash p-3 text-caption text-text-2 break-all">{invite.link}</div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      navigator.clipboard.writeText(invite.link);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1500);
+                    }}
+                  >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? "Copiado" : "Copiar link"}
+                  </Button>
+                  {waPhone && (
+                    <a
+                      href={`https://wa.me/${waPhone.startsWith("55") ? waPhone : "55" + waPhone}?text=${encodeURIComponent(`Olá! Crie seu acesso: ${invite.link}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-caption font-semibold text-white"
+                      style={{ background: "#25D366" }}
+                    >
+                      <MessageCircle size={14} />
+                      WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Plano */}

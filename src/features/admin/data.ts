@@ -460,7 +460,7 @@ export async function getComandas() {
 export async function getClientDetail(id: string) {
   const supabase = await createSupabaseServerClient();
   const [{ data: client }, { data: sub }, { data: history }] = await Promise.all([
-    supabase.from("clients").select("id, name, email, phone, active, avatar_url").eq("id", id).maybeSingle(),
+    supabase.from("clients").select("id, name, email, phone, active, status, avatar_url").eq("id", id).maybeSingle(),
     supabase
       .from("client_subscriptions")
       .select("saldo_cortes, status, fixed_weekday, fixed_start_min, fixed_barber_id, combo_plan_id, combo_plans(name, cuts, price_brl, booking_mode)")
