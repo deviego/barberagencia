@@ -6,11 +6,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
-import { notifyWelcome } from "@/server/notifications/notify";
+import { notifyPasswordReset, notifyWelcome } from "@/server/notifications/notify";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { AREA_HEADER } from "@/lib/supabase/area";
 import { getRequestOrigin } from "@/lib/http";
-import { phoneDigits, syntheticEmail, isEmail } from "@/lib/auth/phone-identity";
+import { phoneDigits, syntheticEmail, isEmail, isSyntheticEmail } from "@/lib/auth/phone-identity";
 
 /**
  * [Cliente] Cria a conta pelo telefone (e-mail opcional). Usa o service-role para
@@ -131,4 +131,68 @@ export async function exitClientPreview() {
   const user = await getSessionUser();
   const dest = user?.role === "NETWORK_ADMIN" ? "/rede" : "/admin";
   redirect(dest);
+}
+
+/**
+ * [Cliente] Recuperar senha pelo TELEFONE: acha a conta pelo número e manda o link de
+ * recuperação no WhatsApp da barbearia (e-mail real como reserva). Sem conta → notRegistered.
+ */
+export async function requestPasswordResetByPhone(
+  phone: string
+): Promise<
+  | { ok: true; channel: "whatsapp" | "email"; maskedPhone: string }
+  | { ok: false; error: string; notRegistered?: boolean }
+> {
+  const digits = phoneDigits(phone ?? "");
+  if (digits.length < 10) return { ok: false, error: "Informe um telefone válido com DDD." };
+  const admin = createSupabaseAdminClient();
+
+  // Mesma regra do auth_email_for_phone (schema-30): compara só os dígitos do telefone.
+  const { data: rows } = await admin
+    .from("clients")
+    .select("user_id, tenant_id, name, phone, email, created_at")
+    .not("user_id", "is", null)
+    .ilike("phone", `%${digits.slice(-4)}`)
+    .order("created_at", { ascending: true });
+  const matches = (rows ?? []).filter((c) => phoneDigits(String(c.phone ?? "")) === digits);
+  const tenant = await getCurrentTenant();
+  const client = matches.find((c) => c.tenant_id === tenant.id) ?? matches[0];
+  if (!client) return { ok: false, notRegistered: true, error: "Este telefone não possui cadastro." };
+
+  // Anti-abuso: 1 pedido por minuto por telefone.
+  const { count } = await admin
+    .from("notification_log")
+    .select("id", { count: "exact", head: true })
+    .eq("template", "password_reset")
+    .eq("recipient", client.phone as string)
+    .gte("created_at", new Date(Date.now() - 60_000).toISOString());
+  if ((count ?? 0) > 0) return { ok: false, error: "Aguarde um minuto para pedir outro link." };
+
+  const { data: u } = await admin.auth.admin.getUserById(client.user_id as string);
+  const authEmail = u?.user?.email;
+  if (!authEmail) return { ok: false, error: "Não foi possível localizar sua conta. Fale com a barbearia." };
+  const { data: gen, error } = await admin.auth.admin.generateLink({ type: "recovery", email: authEmail });
+  const tokenHash = gen?.properties?.hashed_token;
+  if (error || !tokenHash) return { ok: false, error: "Falha ao gerar o link. Tente novamente." };
+
+  const link = `${await getRequestOrigin()}/client/recuperar-senha/confirmar?token_hash=${encodeURIComponent(tokenHash)}`;
+  const contactEmail = [client.email as string | null, authEmail].find((e) => e && isEmail(e) && !isSyntheticEmail(e)) ?? null;
+  const { channel } = await notifyPasswordReset({
+    name: client.name as string | null,
+    phone: client.phone as string,
+    email: contactEmail,
+    tenantId: (client.tenant_id as string | null) ?? null,
+    link,
+  });
+  if (!channel) return { ok: false, error: "Não conseguimos enviar o link pelo WhatsApp. Fale com a barbearia." };
+  return { ok: true, channel, maskedPhone: `(${digits.slice(0, 2)}) •••••-${digits.slice(-4)}` };
+}
+
+/** [Cliente] Valida o link de recuperação (token de uso único) e abre a sessão da área do cliente. */
+export async function confirmPasswordReset(tokenHash: string): Promise<{ ok: false; error: string } | never> {
+  if (!tokenHash) return { ok: false, error: "Link inválido." };
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.verifyOtp({ type: "recovery", token_hash: tokenHash });
+  if (error) return { ok: false, error: "Este link é inválido ou expirou. Peça um novo." };
+  redirect("/client/redefinir-senha");
 }

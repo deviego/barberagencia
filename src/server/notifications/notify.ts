@@ -630,3 +630,57 @@ export async function notifyAppointmentConfirmed(appointmentId: string) {
     });
   }
 }
+
+/** Link de recuperação de senha: WhatsApp da barbearia; se não sair, e-mail real (se houver).
+ *  Usa service-role no log — quem pede ainda não está logado. */
+export async function notifyPasswordReset(input: {
+  name?: string | null;
+  phone: string;
+  email?: string | null;
+  tenantId: string | null;
+  link: string;
+}): Promise<{ channel: "whatsapp" | "email" | null }> {
+  const admin = createSupabaseAdminClient();
+  const brand = await brandFor(input.tenantId);
+  const nome = (input.name ?? "").split(" ")[0];
+
+  const msg =
+    `✂️ *${brand.name}*\n` +
+    `*RECUPERAR SENHA*\n\n` +
+    `${nome ? `${nome}, ` : ""}recebemos seu pedido para criar uma nova senha. 🔑\n\n` +
+    `👉 ${input.link}\n\n` +
+    `O link vale por 1 hora. Se não foi você, ignore esta mensagem.`;
+  const w = await sendWhatsApp(input.phone, msg, input.tenantId);
+  await admin.from("notification_log").insert({
+    tenant_id: input.tenantId,
+    channel: "whatsapp",
+    template: "password_reset",
+    recipient: input.phone,
+    status: w.ok ? "SENT" : w.skipped ? "SKIPPED" : "FAILED",
+  });
+  if (w.ok) return { channel: "whatsapp" };
+
+  if (input.email) {
+    const html = emailShell(
+      "Recuperar senha 🔑",
+      `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
+         ${nome ? `${nome}, r` : "R"}ecebemos seu pedido para criar uma nova senha na <strong>${brand.name}</strong>.
+       </p>
+       <p style="margin:18px 0;">
+         <a href="${input.link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Criar nova senha</a>
+       </p>
+       <p style="color:#8a8578;font-size:13px;line-height:1.6;">O link vale por 1 hora. Se não foi você, ignore este e-mail.</p>`,
+      brand
+    );
+    const r = await sendEmail({ to: input.email, subject: `Recuperar senha · ${brand.name}`, html, fromName: brand.name });
+    await admin.from("notification_log").insert({
+      tenant_id: input.tenantId,
+      channel: "email",
+      template: "password_reset",
+      recipient: input.email,
+      status: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED",
+    });
+    if (r.ok) return { channel: "email" };
+  }
+  return { channel: null };
+}

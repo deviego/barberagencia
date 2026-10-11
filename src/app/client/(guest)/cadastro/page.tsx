@@ -1,8 +1,9 @@
 import { SignupForm } from "@/features/auth/components/signup-form";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 
-export default async function CadastroPage() {
+export default async function CadastroPage({ searchParams }: { searchParams: Promise<{ phone?: string }> }) {
   const tenant = await getCurrentTenant();
+  const { phone } = await searchParams;
   return (
     <div className="mx-auto flex w-[440px] max-w-full flex-col gap-5">
       <div className="text-center">
@@ -11,7 +12,7 @@ export default async function CadastroPage() {
           Falta pouco para agendar seu próximo corte na {tenant.name}.
         </p>
       </div>
-      <SignupForm tenantName={tenant.name} tenantSubdomain={tenant.subdomain} />
+      <SignupForm tenantName={tenant.name} tenantSubdomain={tenant.subdomain} initialPhone={phone} />
     </div>
   );
 }

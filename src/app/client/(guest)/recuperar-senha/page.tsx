@@ -11,7 +11,7 @@ export default function RecuperarSenhaPage() {
         </div>
         <h1 className="font-display text-h2 uppercase leading-none text-text">Recuperar senha</h1>
         <p className="mt-2 text-body text-text-2">
-          Informe seu e-mail e enviaremos um link para você criar uma nova senha.
+          Informe seu telefone e enviaremos pelo WhatsApp um link para você criar uma nova senha.
         </p>
       </div>
       <ForgotForm />

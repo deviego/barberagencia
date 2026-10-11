@@ -19,6 +19,11 @@ export function syntheticEmail(digits: string): string {
   return `c${digits}@${SYNTHETIC_DOMAIN}`;
 }
 
+/** E-mail técnico (conta só com telefone) — não tem caixa de entrada. */
+export function isSyntheticEmail(email: string): boolean {
+  return email.trim().toLowerCase().endsWith(`@${SYNTHETIC_DOMAIN}`);
+}
+
 export function isEmail(s: string): boolean {
   return /.+@.+\..+/.test(s.trim());
 }

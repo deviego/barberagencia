@@ -13,13 +13,15 @@ import { maskDate, maskPhoneBR } from "@/lib/masks";
 
 export function SignupForm({
   tenantSubdomain,
+  initialPhone,
 }: {
   tenantName?: string;
   tenantSubdomain?: string;
+  initialPhone?: string;
 }) {
   const router = useRouter();
   const [termsOpen, setTermsOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", birth: "", phone: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", birth: "", phone: maskPhoneBR(initialPhone ?? ""), email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
