@@ -5,8 +5,9 @@ const PLANS_UI = [
   {
     name: "Personal",
     monthly: "R$ 69,90",
+    fullPrice: "R$ 129,90",
+    discountBadge: "46% OFF",
     monthlyNote: "nos 3 primeiros meses · depois R$ 129,90/mês",
-    trial: "15 dias grátis · sem adesão",
     desc: "Para continuar a organizar a sua barbearia. Aqui você controla o seu negócio em todas as camadas.",
     highlight: false,
     features: [
@@ -30,7 +31,6 @@ const PLANS_UI = [
     name: "Essencial",
     monthly: "R$ 189,90",
     monthlyNote: "por mês",
-    trial: "15 dias grátis · sem adesão",
     desc: "Excelente para quem precisa eliminar gargalos de forma eficaz. Gerencie o negócio com inteligência e versatilidade.",
     highlight: true,
     badge: "Mais popular",
@@ -54,7 +54,6 @@ const PLANS_UI = [
     name: "Advance",
     monthly: "a partir de R$ 249,90",
     monthlyNote: "por mês",
-    trial: "15 dias grátis · sem adesão",
     desc: "Para quem busca o equilíbrio entre sofisticação no atendimento e controle total da operação. Eleve o padrão enquanto a tecnologia cuida do resto.",
     highlight: false,
     features: [
@@ -91,7 +90,7 @@ const PLAN_TABLE = [
   { label: "Nota fiscal via plataforma", a: "—", b: "—", c: "Sim" },
   { label: "Venda direta via plataforma", a: "—", b: "—", c: "Sim" },
   { label: "Gateway (API) / Webhooks", a: "—", b: "—", c: "Sim" },
-  { label: "Mensalidade", a: "R$ 69,90*", b: "R$ 189,90", c: "a partir de R$ 249,90" },
+  { label: "Mensalidade", a: "R$ 69,90* (46% OFF)", b: "R$ 189,90", c: "a partir de R$ 249,90" },
 ];
 
 export default function PlanosSaasPage() {
@@ -100,8 +99,7 @@ export default function PlanosSaasPage() {
       <div>
         <h1 className="font-display text-h2 uppercase text-text">Planos da plataforma</h1>
         <p className="text-caption text-text-2">
-          Sem adesão · 15 dias de experimentação. A cobrança inicia após 7 dias corridos — o
-          cancelamento é livre nesse período.
+          Sem adesão · cancelamento livre.
         </p>
       </div>
 
@@ -120,18 +118,25 @@ export default function PlanosSaasPage() {
                 {pl.badge}
               </span>
             )}
-            <div className="font-display text-[26px] font-extrabold uppercase leading-none text-text">
-              {pl.name}
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-display text-[26px] font-extrabold uppercase leading-none text-text">
+                {pl.name}
+              </div>
+              {"discountBadge" in pl && pl.discountBadge && (
+                <span className="whitespace-nowrap rounded-md bg-accent px-2.5 py-1 font-display text-[18px] font-black leading-none text-text-inverse">
+                  {pl.discountBadge}
+                </span>
+              )}
             </div>
             <div>
+              {"fullPrice" in pl && pl.fullPrice && (
+                <div className="text-body font-semibold text-text-muted line-through">{pl.fullPrice}</div>
+              )}
               <div className="font-display text-[34px] font-black leading-none text-accent">
                 {pl.monthly}
               </div>
               <div className="mt-1 text-caption text-text-muted">{pl.monthlyNote}</div>
             </div>
-            <span className="w-fit rounded-pill bg-success-bg px-2.5 py-0.5 text-[11px] font-semibold text-success-strong">
-              {pl.trial}
-            </span>
             <p className="text-caption text-text-2">{pl.desc}</p>
             <div className="h-px bg-border-subtle" />
             <div className="flex flex-1 flex-col gap-2.5">
@@ -152,7 +157,7 @@ export default function PlanosSaasPage() {
                 pl.highlight ? "bg-accent text-text-inverse" : "border border-accent text-accent"
               )}
             >
-              Começar teste grátis
+              Começar agora
             </button>
           </div>
         ))}
@@ -184,8 +189,7 @@ export default function PlanosSaasPage() {
       </div>
 
       <p className="text-caption text-text-muted">
-        * Personal: R$ 69,90/mês nos 3 primeiros meses, depois R$ 129,90/mês. Todos os planos têm 15
-        dias de experimentação, sem adesão.
+        * Personal: R$ 69,90/mês nos 3 primeiros meses (46% OFF), depois R$ 129,90/mês. Sem adesão.
       </p>
     </div>
   );

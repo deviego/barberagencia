@@ -23,7 +23,7 @@ import {
 export const metadata: Metadata = {
   title: "Barber Agência — a barbearia inteira em uma plataforma",
   description:
-    "Plataforma white-label de agendamento, assinaturas, financeiro e atendimento para barbearias. Com a sua marca, no seu domínio. 15 dias grátis, sem cartão.",
+    "Plataforma white-label de agendamento, assinaturas, financeiro e atendimento para barbearias. Com a sua marca, no seu domínio. 46% OFF nos 3 primeiros meses, sem adesão.",
 };
 
 const H2 = "font-display font-black uppercase leading-[0.98] text-[40px] sm:text-[52px] lg:text-[56px]";
@@ -44,7 +44,7 @@ export default function LandingPage() {
           <div className="relative mx-auto flex max-w-[1180px] flex-col items-center gap-6 text-center">
             <div className="inline-flex items-center gap-2.5 rounded-pill border border-border bg-surface px-4 py-1.5 text-[13px] text-text-2">
               <span className="h-[7px] w-[7px] rounded-full" style={{ background: "var(--bb-success)" }} />
-              15 dias de experimentação · sem adesão · cancelamento livre
+              <strong className="font-bold text-accent">46% OFF</strong> nos 3 primeiros meses · sem adesão
             </div>
             <h1 className="m-0 max-w-[900px] font-display text-[46px] font-black uppercase leading-[0.92] tracking-[0.01em] sm:text-[68px] lg:text-[86px]">
               A barbearia inteira
@@ -57,12 +57,12 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
-                href={salesWaLink(WA_MESSAGES.trial)}
+                href={salesWaLink(WA_MESSAGES.start)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-md bg-accent px-[30px] py-[15px] text-[15px] font-bold text-text-inverse shadow-lg transition-colors hover:bg-accent-hover"
               >
-                Começar teste grátis
+                Começar agora
               </a>
               <a
                 href="#contato"
@@ -249,8 +249,7 @@ export default function LandingPage() {
               sua barbearia
             </h2>
             <p className="m-0 max-w-[600px] text-[15px] leading-[1.55] text-text-2">
-              Sem adesão · 15 dias de experimentação. A cobrança inicia após 7 dias corridos — o cancelamento é livre
-              nesse período.
+              Sem adesão · cancelamento livre.
             </p>
           </div>
           <div className="grid items-stretch gap-5 pt-3 md:grid-cols-2 lg:grid-cols-3">
@@ -268,14 +267,21 @@ export default function LandingPage() {
                     Mais popular
                   </span>
                 )}
-                <div className="font-display text-[30px] font-extrabold uppercase">{pl.name}</div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-display text-[30px] font-extrabold uppercase">{pl.name}</div>
+                  {pl.discountBadge && (
+                    <span className="whitespace-nowrap rounded-md bg-accent px-3 py-1.5 font-display text-[20px] font-black leading-none text-text-inverse shadow-lg">
+                      {pl.discountBadge}
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-col gap-0.5">
+                  {pl.fullPrice && (
+                    <span className="text-[15px] font-semibold text-text-muted line-through">{pl.fullPrice}</span>
+                  )}
                   <span className="font-display text-[46px] font-black leading-none text-accent">{pl.price}</span>
                   <span className="text-[12px] text-text-muted">{pl.cycle}</span>
                 </div>
-                <span className="self-start rounded-pill bg-success-bg px-3 py-1 text-[11px] font-semibold text-[color:var(--bb-success)]">
-                  15 dias grátis · sem adesão
-                </span>
                 <p className="m-0 text-[13px] leading-[1.55] text-text-2">{pl.desc}</p>
                 <div className="h-px bg-border-subtle" />
                 <div className="flex flex-1 flex-col gap-2.5">
@@ -291,7 +297,7 @@ export default function LandingPage() {
                   ))}
                 </div>
                 <a
-                  href={salesWaLink(WA_MESSAGES.trial)}
+                  href={salesWaLink(WA_MESSAGES.start)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-md py-3.5 text-center text-[14px] font-bold transition-opacity hover:opacity-90"
@@ -301,7 +307,7 @@ export default function LandingPage() {
                     color: pl.highlight ? "var(--bb-text-inverse)" : "var(--bb-accent)",
                   }}
                 >
-                  Começar teste grátis
+                  Começar agora
                 </a>
               </div>
             ))}
@@ -330,8 +336,7 @@ export default function LandingPage() {
             </div>
           </div>
           <span className="text-[12px] text-text-muted">
-            * Personal: R$ 69,90/mês nos 3 primeiros meses, depois R$ 129,90/mês. Todos os planos têm 15 dias de
-            experimentação, sem adesão.
+            * Personal: R$ 69,90/mês nos 3 primeiros meses (46% OFF), depois R$ 129,90/mês. Sem adesão.
           </span>
         </section>
 
@@ -357,16 +362,17 @@ export default function LandingPage() {
                 encher a agenda?
               </h2>
               <p className="m-0 max-w-[460px] text-[16px] leading-[1.55] text-text-2">
-                Comece o teste de 15 dias agora — a gente configura a sua barbearia junto com você.
+                Comece agora — a gente configura a sua barbearia junto com você. Personal com{" "}
+                <strong className="font-bold text-accent">46% OFF</strong> nos 3 primeiros meses.
               </p>
               <div className="mt-1.5 flex flex-wrap justify-center gap-3">
                 <a
-                  href={salesWaLink(WA_MESSAGES.trial)}
+                  href={salesWaLink(WA_MESSAGES.start)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-md bg-accent px-[30px] py-[15px] text-[15px] font-bold text-text-inverse transition-colors hover:bg-accent-hover"
                 >
-                  Começar teste grátis
+                  Começar agora
                 </a>
               </div>
             </div>

@@ -28,12 +28,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (tenant.kind === "DISTRIBUTOR") redirect("/distributor");
 
   const contractView = buildContractView(contract);
-  // Banner só durante o teste ativo e não assinado.
-  const trialActive =
-    !!contract && contract.trial_enabled && contract.status !== "SIGNED" && new Date(contract.trial_ends_at).getTime() > Date.now();
-  // Modal após o teste (ou sem teste), enquanto não assinado.
-  const showModal =
-    !!contractView && contract!.status !== "SIGNED" && new Date(contract!.trial_ends_at).getTime() <= Date.now();
+  // Modal do contrato enquanto não assinado.
+  const showModal = !!contractView && contract!.status !== "SIGNED";
 
   return (
     <>
@@ -46,7 +42,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         userEmail={user.email}
         avatarUrl={user.avatarUrl}
         pendingCount={pendingCount}
-        trialEndsAt={trialActive ? contract!.trial_ends_at : null}
         isMaster={master}
         tenants={master ? allTenants.map((t) => ({ id: t.id, name: t.name })) : undefined}
         acting={!!actingId}

@@ -9,7 +9,7 @@ export function salesWaLink(message: string) {
 }
 
 export const WA_MESSAGES = {
-  trial: "Olá! Quero testar a Barber Agência (15 dias grátis). Pode me ajudar?",
+  start: "Olá! Quero contratar a Barber Agência. Pode me ajudar?",
   specialist: "Olá! Gostaria de falar com um especialista sobre a Barber Agência.",
   demo: (v: { name: string; phone: string; email: string }) =>
     `Olá! Quero uma demonstração da Barber Agência.\n\n` +
@@ -131,6 +131,10 @@ export const STEPS: { num: string; title: string; desc: string; strong: boolean 
 export type Plan = {
   name: string;
   price: string;
+  /** Preço cheio (riscado) quando há desconto inicial. */
+  fullPrice?: string;
+  /** Selo de desconto inicial (ex.: "46% OFF"). */
+  discountBadge?: string;
   cycle: string;
   highlight: boolean;
   desc: string;
@@ -141,6 +145,8 @@ export const PLANS: Plan[] = [
   {
     name: "Personal",
     price: "R$ 69,90",
+    fullPrice: "R$ 129,90",
+    discountBadge: "46% OFF",
     cycle: "nos 3 primeiros meses · depois R$ 129,90/mês",
     highlight: false,
     desc: "Para continuar a organizar a sua barbearia. Aqui você controla o seu negócio em todas as camadas.",
@@ -223,11 +229,11 @@ export const PLAN_TABLE: { label: string; a: string; b: string; c: string }[] = 
   { label: "Nota fiscal via plataforma", a: "—", b: "—", c: "Sim" },
   { label: "Venda direta via plataforma", a: "—", b: "—", c: "Sim" },
   { label: "Gateway (API) / Webhooks", a: "—", b: "—", c: "Sim" },
-  { label: "Mensalidade", a: "R$ 69,90*", b: "R$ 189,90", c: "a partir de R$ 249,90" },
+  { label: "Mensalidade", a: "R$ 69,90* (46% OFF)", b: "R$ 189,90", c: "a partir de R$ 249,90" },
 ];
 
 export const FAQS: { q: string; a: string }[] = [
-  { q: "Preciso de cartão de crédito para testar?", a: "Não. São 15 dias de experimentação sem adesão e sem cartão. A cobrança só inicia após 7 dias corridos e o cancelamento é livre nesse período." },
+  { q: "Como funciona o desconto inicial?", a: "No plano Personal você paga R$ 69,90/mês nos 3 primeiros meses — 46% de desconto. Depois, R$ 129,90/mês. Sem adesão." },
   { q: "A plataforma leva a marca da minha barbearia?", a: "Sim. Logo, cores e domínio são seus — o cliente nunca vê a marca da plataforma. No Advance você usa domínio próprio." },
   { q: "Como funciona o limite de agendamentos?", a: "Cada plano tem um teto mensal (300, 1.500 ou 3.000). Ao se aproximar do limite avisamos no painel e você pode subir de plano na hora, com ajuste proporcional na fatura." },
   { q: "Consigo migrar meus clientes atuais?", a: "Sim. Você importa a base por planilha e a plataforma envia o convite para cada cliente confirmar os dados e criar a própria senha." },

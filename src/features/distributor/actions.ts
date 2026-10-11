@@ -29,7 +29,6 @@ export type CreateDistributorInput = {
   adminEmail: string;
   adminName?: string;
   phone?: string;
-  trialEnabled?: boolean;
   contract?: {
     legalName?: string;
     docType?: string;
@@ -76,19 +75,17 @@ export async function createDistributor(input: CreateDistributorInput) {
   const phone = input.phone?.trim();
   if (phone) await admin.from("tenant_settings").upsert({ tenant_id: tenant.id, phone }, { onConflict: "tenant_id" });
 
-  // Contrato (trial + dados legais)
-  const trialEnabled = input.trialEnabled !== false;
+  // Contrato (dados legais). Sem período de teste: contrato pendente já no 1º acesso.
   const now = new Date();
-  const trialEnds = new Date(now.getTime() + (trialEnabled ? 15 * 24 * 60 * 60 * 1000 : 0));
   const c = input.contract ?? {};
   const clean = (s?: string) => (s && s.trim() ? s.trim() : null);
   await admin.from("tenant_contracts").upsert(
     {
       tenant_id: tenant.id,
       plan: DISTRIBUTOR_PLAN_DEFAULT,
-      trial_enabled: trialEnabled,
+      trial_enabled: false,
       trial_started_at: now.toISOString(),
-      trial_ends_at: trialEnds.toISOString(),
+      trial_ends_at: now.toISOString(),
       status: "PENDING",
       legal_name: clean(c.legalName),
       trade_name: name,

@@ -45,7 +45,6 @@ export default function OnboardingPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminName, setAdminName] = useState("");
   const [phone, setPhone] = useState("");
-  const [trialEnabled, setTrialEnabled] = useState(true);
   const [queueEnabled, setQueueEnabled] = useState(false);
   const [partners, setPartners] = useState<{ id: string; name: string; refCode: string }[]>([]);
   const [partnerId, setPartnerId] = useState("");
@@ -91,7 +90,6 @@ export default function OnboardingPage() {
         adminEmail,
         adminName,
         phone,
-        trialEnabled,
         queueEnabled,
         referredByPartnerId: partnerId || undefined,
         contract: {
@@ -134,7 +132,6 @@ export default function OnboardingPage() {
     setAdminEmail("");
     setAdminName("");
     setPhone("");
-    setTrialEnabled(true);
     setQueueEnabled(false);
     setDocType("CNPJ");
     setDocNumber("");
@@ -276,17 +273,6 @@ export default function OnboardingPage() {
       <div className="flex flex-col gap-1.5">
         <Label>Telefone / WhatsApp da barbearia (opcional)</Label>
         <Input value={phone} onChange={(e) => setPhone(maskPhoneBR(e.target.value))} inputMode="tel" maxLength={15} placeholder="(11) 99999-9999" />
-      </div>
-
-      {/* Período de teste */}
-      <div className="flex items-center justify-between rounded-md border border-border bg-inset px-4 py-3">
-        <div>
-          <div className="text-body font-semibold text-text">Adicionar 15 dias de teste</div>
-          <div className="text-caption text-text-muted">
-            {trialEnabled ? "A barbearia começa no período gratuito." : "Sem teste — contrato pendente já no 1º acesso."}
-          </div>
-        </div>
-        <Switch defaultChecked={trialEnabled} onChange={setTrialEnabled} />
       </div>
 
       {/* Fila (Essencial/Advance) */}

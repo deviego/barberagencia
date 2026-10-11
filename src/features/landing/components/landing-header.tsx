@@ -41,12 +41,12 @@ export function LandingHeader() {
         <div className="flex shrink-0 items-center gap-2.5">
           <ThemeToggle />
           <a
-            href={salesWaLink(WA_MESSAGES.trial)}
+            href={salesWaLink(WA_MESSAGES.start)}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden whitespace-nowrap rounded-md bg-accent px-[18px] py-2 text-[14px] font-bold text-text-inverse transition-colors hover:bg-accent-hover min-[1081px]:inline-flex"
           >
-            Teste 15 dias grátis
+            Começar agora
           </a>
           {/* Hambúrguer (abaixo de 1080px) */}
           <button
@@ -76,12 +76,12 @@ export function LandingHeader() {
             ))}
             <div className="mt-2 flex flex-col gap-2">
               <a
-                href={salesWaLink(WA_MESSAGES.trial)}
+                href={salesWaLink(WA_MESSAGES.start)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-md bg-accent px-3 py-2.5 text-center text-[15px] font-bold text-text-inverse"
               >
-                Teste 15 dias grátis
+                Começar agora
               </a>
             </div>
           </nav>

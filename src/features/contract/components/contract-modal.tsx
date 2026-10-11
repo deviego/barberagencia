@@ -11,7 +11,7 @@ import type { ContractView } from "../view";
 
 const DISMISS_KEY = "bb_contract_modal_dismissed";
 
-/** Modal do contrato após o teste (dismissível). Reaparece a cada nova sessão até assinar. */
+/** Modal do contrato pendente (dismissível). Reaparece a cada nova sessão até assinar. */
 export function ContractModal({ view }: { view: ContractView }) {
   const [visible, setVisible] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -48,7 +48,7 @@ export function ContractModal({ view }: { view: ContractView }) {
       <div className="flex max-h-[90vh] w-[720px] max-w-full flex-col rounded-lg border border-border bg-elevated shadow-lg">
         <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3.5">
           <div>
-            <h3 className="text-h5 font-bold text-text">Seu período de teste terminou</h3>
+            <h3 className="text-h5 font-bold text-text">Assine o contrato da plataforma</h3>
             <p className="text-caption text-text-muted">
               Confirme o contrato de assinatura para continuar usando a plataforma.
             </p>

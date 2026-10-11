@@ -9,7 +9,6 @@ import { LogoutButton } from "@/components/nav/logout-button";
 import { BarbershopSwitcher } from "@/components/nav/barbershop-switcher";
 import { ViewAsClientButton } from "@/components/nav/view-as-client-button";
 import { MobileNav } from "@/components/nav/mobile-nav";
-import { TrialBanner } from "@/components/nav/trial-banner";
 import { Copyright } from "@/components/brand/copyright";
 import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +46,6 @@ export function AdminShell({
   name,
   plan,
   pendingCount = 0,
-  trialEndsAt,
   isMaster = false,
   tenants,
   acting = false,
@@ -61,7 +59,6 @@ export function AdminShell({
   userEmail?: string | null;
   avatarUrl?: string | null;
   pendingCount?: number;
-  trialEndsAt?: string | null;
   isMaster?: boolean;
   tenants?: { id: string; name: string }[];
   acting?: boolean;
@@ -111,7 +108,6 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-screen flex-col">
-      {trialEndsAt && <TrialBanner endsAt={trialEndsAt} />}
       <MobileNav
         open={mobileNav}
         onClose={() => setMobileNav(false)}
