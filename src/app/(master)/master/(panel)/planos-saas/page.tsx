@@ -6,8 +6,8 @@ const PLANS_UI = [
     name: "Personal",
     monthly: "R$ 69,90",
     fullPrice: "R$ 129,90",
-    discountBadge: "46% OFF",
-    monthlyNote: "nos 3 primeiros meses · depois R$ 129,90/mês",
+    discountBadge: "Fim de ano",
+    monthlyNote: "por mês nos 2 primeiros meses · depois R$ 129,90/mês",
     desc: "Para continuar a organizar a sua barbearia. Aqui você controla o seu negócio em todas as camadas.",
     highlight: false,
     features: [
@@ -29,8 +29,10 @@ const PLANS_UI = [
   },
   {
     name: "Essencial",
-    monthly: "R$ 189,90",
-    monthlyNote: "por mês",
+    monthly: "R$ 89,90",
+    fullPrice: "R$ 189,90",
+    discountBadge: "Fim de ano",
+    monthlyNote: "por mês nos 2 primeiros meses · depois R$ 189,90/mês",
     desc: "Excelente para quem precisa eliminar gargalos de forma eficaz. Gerencie o negócio com inteligência e versatilidade.",
     highlight: true,
     badge: "Mais popular",
@@ -90,7 +92,8 @@ const PLAN_TABLE = [
   { label: "Nota fiscal via plataforma", a: "—", b: "—", c: "Sim" },
   { label: "Venda direta via plataforma", a: "—", b: "—", c: "Sim" },
   { label: "Gateway (API) / Webhooks", a: "—", b: "—", c: "Sim" },
-  { label: "Mensalidade", a: "R$ 69,90* (46% OFF)", b: "R$ 189,90", c: "a partir de R$ 249,90" },
+  { label: "Mensalidade", a: "R$ 69,90*", b: "R$ 89,90*", c: "a partir de R$ 249,90" },
+  { label: "Mensalidade a partir do 3º mês", a: "R$ 129,90", b: "R$ 189,90", c: "a partir de R$ 249,90" },
 ];
 
 export default function PlanosSaasPage() {
@@ -189,7 +192,8 @@ export default function PlanosSaasPage() {
       </div>
 
       <p className="text-caption text-text-muted">
-        * Personal: R$ 69,90/mês nos 3 primeiros meses (46% OFF), depois R$ 129,90/mês. Sem adesão.
+        * Promoção de fim de ano: Personal R$ 69,90/mês nos 2 primeiros meses, depois R$ 129,90/mês. Essencial R$ 89,90/mês
+        nos 2 primeiros meses, depois R$ 189,90/mês. Advance sem promoção. Sem custo de adesão, setup ou migração.
       </p>
     </div>
   );

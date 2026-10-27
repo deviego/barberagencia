@@ -12,8 +12,10 @@ import {
   CLIENT_FEATURES,
   FOOTER_COLS,
   METRICS,
+  OFFER_PERKS,
   PLAN_TABLE,
   PLANS,
+  QUEUE_STEPS,
   SECTORS,
   STEPS,
   salesWaLink,
@@ -23,7 +25,7 @@ import {
 export const metadata: Metadata = {
   title: "Barber Agência — a barbearia inteira em uma plataforma",
   description:
-    "Plataforma white-label de agendamento, assinaturas, financeiro e atendimento para barbearias. Com a sua marca, no seu domínio. 46% OFF nos 3 primeiros meses, sem adesão.",
+    "Plataforma white-label para barbearias: agenda online, fila por QR code com painel na TV, mensalidade com saldo de cortes, comanda e financeiro por barbeiro. Sem adesão e sem custo de setup.",
 };
 
 const H2 = "font-display font-black uppercase leading-[0.98] text-[40px] sm:text-[52px] lg:text-[56px]";
@@ -44,7 +46,7 @@ export default function LandingPage() {
           <div className="relative mx-auto flex max-w-[1180px] flex-col items-center gap-6 text-center">
             <div className="inline-flex items-center gap-2.5 rounded-pill border border-border bg-surface px-4 py-1.5 text-[13px] text-text-2">
               <span className="h-[7px] w-[7px] rounded-full" style={{ background: "var(--bb-success)" }} />
-              <strong className="font-bold text-accent">46% OFF</strong> nos 3 primeiros meses · sem adesão
+              <strong className="font-bold text-accent">Promoção de fim de ano</strong> · 2 primeiros meses a partir de R$ 69,90
             </div>
             <h1 className="m-0 max-w-[900px] font-display text-[46px] font-black uppercase leading-[0.92] tracking-[0.01em] sm:text-[68px] lg:text-[86px]">
               A barbearia inteira
@@ -52,8 +54,9 @@ export default function LandingPage() {
               em <span className="text-accent">uma plataforma</span>
             </h1>
             <p className="m-0 max-w-[620px] text-[17px] leading-[1.55] text-text-2 sm:text-[18px]">
-              Agenda, mensalistas, financeiro, produtos e atendimento no mesmo lugar — com a sua marca, no seu domínio.
-              Seu cliente agenda sozinho; você acompanha tudo em tempo real.
+              A Barber Agência é o sistema da barbearia com a sua marca: agenda online, fila por QR code com painel na
+              TV, mensalidade com saldo de cortes, comanda e financeiro por barbeiro. Seu cliente agenda pelo link, sem
+              baixar aplicativo; você acompanha tudo em tempo real.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
@@ -73,7 +76,7 @@ export default function LandingPage() {
               </a>
             </div>
             <div className="flex flex-wrap justify-center gap-x-7 gap-y-2 text-[13px] text-text-muted">
-              {["Sem cartão para testar", "Setup em 1 dia", "Suporte humano em português"].map((t) => (
+              {["Sem custo de migração", "Sem custo de adesão e setup", "Barbearia montada em 1 dia"].map((t) => (
                 <span key={t} className="inline-flex items-center gap-1.5">
                   <Icon name="check" size={15} className="text-[color:var(--bb-success)]" />
                   {t}
@@ -187,9 +190,9 @@ export default function LandingPage() {
                 com a sua marca
               </h2>
               <p className="m-0 max-w-[520px] text-[16px] leading-[1.6] text-text-2">
-                Seu cliente entra no site da <strong className="text-text">sua</strong> barbearia — logo, cores e domínio
-                seus. Escolhe serviço, barbeiro e horário, assina um combo mensal e acompanha o saldo de cortes. Você só
-                confirma.
+                Seu cliente abre o link da <strong className="text-text">sua</strong> barbearia no celular, sem baixar
+                nada, e vê o seu logo e as suas cores. Escolhe barbeiro, serviços e horário, assina um combo mensal e
+                acompanha o saldo de cortes. Você confirma em até 10 minutos.
               </p>
               <div className="mt-1 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 {CLIENT_FEATURES.map((c) => (
@@ -215,6 +218,36 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* FILA DE ATENDIMENTO */}
+        <section id="fila" className="mx-auto mt-28 flex max-w-[1180px] flex-col gap-9 px-6 sm:px-10">
+          <div className="flex max-w-[680px] flex-col gap-3">
+            <span className={OVERLINE}>Fila de atendimento · Essencial e Advance</span>
+            <h2 className={`m-0 ${H2}`}>
+              Fila com senha,
+              <br />
+              sem bagunça no balcão
+            </h2>
+            <p className="m-0 text-[16px] leading-[1.55] text-text-2">
+              Para quem atende por ordem de chegada: o cliente entra na fila sozinho, pega a senha como no banco e
+              acompanha a vez dele, sem ficar perguntando no balcão.
+            </p>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {QUEUE_STEPS.map((q, i) => (
+              <div key={q.title} className="flex flex-col gap-3.5 rounded-lg border border-border bg-surface p-7">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-accent-wash text-accent">
+                    <Icon name={q.icon} size={22} />
+                  </span>
+                  <span className="font-display text-[30px] font-black leading-none text-text-muted">0{i + 1}</span>
+                </div>
+                <div className="text-[18px] font-semibold">{q.title}</div>
+                <p className="m-0 text-[14px] leading-[1.55] text-text-2">{q.desc}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -249,8 +282,22 @@ export default function LandingPage() {
               sua barbearia
             </h2>
             <p className="m-0 max-w-[600px] text-[15px] leading-[1.55] text-text-2">
-              Sem adesão · cancelamento livre.
+              <strong className="font-bold text-accent">Promoção de fim de ano:</strong> Personal e Essencial com preço
+              promocional nos 2 primeiros meses. Sem adesão · cancelamento livre.
             </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {OFFER_PERKS.map((p) => (
+              <div key={p.title} className="flex items-start gap-3.5 rounded-lg border border-accent bg-accent-wash p-5">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-text-inverse">
+                  <Icon name={p.icon} size={20} />
+                </span>
+                <div className="flex flex-col gap-1">
+                  <div className="text-[16px] font-bold text-text">{p.title}</div>
+                  <p className="m-0 text-[13px] leading-[1.5] text-text-2">{p.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
           <div className="grid items-stretch gap-5 pt-3 md:grid-cols-2 lg:grid-cols-3">
             {PLANS.map((pl) => (
@@ -336,7 +383,8 @@ export default function LandingPage() {
             </div>
           </div>
           <span className="text-[12px] text-text-muted">
-            * Personal: R$ 69,90/mês nos 3 primeiros meses (46% OFF), depois R$ 129,90/mês. Sem adesão.
+            * Promoção de fim de ano: Personal R$ 69,90/mês nos 2 primeiros meses, depois R$ 129,90/mês. Essencial R$ 89,90/mês
+            nos 2 primeiros meses, depois R$ 189,90/mês. Advance sem promoção. Sem custo de adesão, setup ou migração.
           </span>
         </section>
 
@@ -362,8 +410,9 @@ export default function LandingPage() {
                 encher a agenda?
               </h2>
               <p className="m-0 max-w-[460px] text-[16px] leading-[1.55] text-text-2">
-                Comece agora — a gente configura a sua barbearia junto com você. Personal com{" "}
-                <strong className="font-bold text-accent">46% OFF</strong> nos 3 primeiros meses.
+                Comece agora — a gente monta a sua barbearia em 1 dia e traz a sua base, sem custo.{" "}
+                <strong className="font-bold text-accent">Promoção de fim de ano:</strong> Personal R$ 69,90 e Essencial
+                R$ 89,90 nos 2 primeiros meses.
               </p>
               <div className="mt-1.5 flex flex-wrap justify-center gap-3">
                 <a
