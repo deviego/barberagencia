@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { LandingHeader } from "@/features/landing/components/landing-header";
+import { LandingJsonLd } from "@/features/seo/landing-json-ld";
+import { LANDING_SEO_METADATA } from "@/features/seo/site";
 import { DeviceShowcase } from "@/features/landing/components/device-showcase";
 import { Faq } from "@/features/landing/components/faq";
 import { Icon } from "@/features/landing/components/icon";
@@ -23,6 +25,7 @@ import {
 } from "@/features/landing/content";
 
 export const metadata: Metadata = {
+  ...LANDING_SEO_METADATA,
   title: "Barber Agência — a barbearia inteira em uma plataforma",
   description:
     "Plataforma white-label para barbearias: agenda online, fila por QR code com painel na TV, mensalidade com saldo de cortes, comanda e financeiro por barbeiro. Sem adesão e sem custo de setup.",
@@ -35,6 +38,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-bg text-text" style={{ fontFamily: "var(--bb-font-ui)" }}>
       <LandingHeader />
+      <LandingJsonLd />
 
       <main>
         {/* HERO */}
@@ -110,7 +114,8 @@ export default function LandingPage() {
               todos no mesmo painel
             </h2>
             <p className="m-0 text-[16px] leading-[1.55] text-text-2">
-              Não é só agenda. É a operação inteira da barbearia — do primeiro contato do cliente ao fechamento do caixa.
+              Não é só agenda: a Barber Agência cuida da operação inteira da barbearia, do pedido de horário do cliente ao
+              fechamento do caixa, com o faturamento separado por barbeiro, por dia e por serviço.
             </p>
           </div>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -440,7 +445,8 @@ export default function LandingPage() {
               <span className="font-display text-[18px] font-extrabold uppercase tracking-[0.04em]">Barber Agência</span>
             </div>
             <p className="m-0 max-w-[280px] text-[13px] leading-[1.55] text-text-muted">
-              Plataforma white-label de agendamento, assinaturas e gestão para barbearias.
+              Plataforma white-label para barbearias: agenda online, fila por QR code, mensalidade com saldo de cortes e
+              financeiro, com a marca da sua barbearia.
             </p>
           </div>
           {FOOTER_COLS.map((col) => (
