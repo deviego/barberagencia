@@ -27,6 +27,10 @@ const SECURITY_HEADERS = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Buscadores e crawlers de IA recebem title/description/canonical/OG no <head> (sem streaming de metadata).
+  // A lista padrão do Next não inclui GPTBot, ClaudeBot, PerplexityBot etc.
+  htmlLimitedBots:
+    /Googlebot|Google-InspectionTool|Google-Extended|Bingbot|BingPreview|Applebot|DuckDuckBot|YandexBot|Baiduspider|GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-User|Claude-SearchBot|anthropic-ai|PerplexityBot|Perplexity-User|CCBot|Amazonbot|Bytespider|meta-externalagent|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|TelegramBot/i,
   images: {
     // Logos/branding e avatares vêm do Supabase Storage (URLs públicas).
     remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
@@ -35,7 +39,16 @@ const nextConfig = {
     // Server Actions are enabled by default in Next 15
   },
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    // Áreas logadas, apps white-label das barbearias e rotas técnicas: nunca indexar.
+    const NOINDEX = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    const PRIVATE = [
+      "/admin/:path*", "/master/:path*", "/distributor/:path*", "/client/:path*", "/rede/:path*",
+      "/b/:path*", "/convite/:path*", "/design-system/:path*", "/api/:path*",
+    ];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      ...PRIVATE.map((source) => ({ source, headers: NOINDEX })),
+    ];
   },
   async rewrites() {
     // URL limpa para a documentação (arquivo estático em /public).
