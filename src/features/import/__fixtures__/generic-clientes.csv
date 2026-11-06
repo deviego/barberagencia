@@ -1,0 +1,8 @@
+Nome,Celular,E-mail,Data de Nascimento,Hotel
+João da Silva,(11) 91234-5678,joao@exemplo.com,15/03/1990,x
+Maria Souza,+55 21 98765-4321,MARIA@Exemplo.com,1985-07-20,
+Pedro Lima,1234,pedro@exemplo,31/02/1992,
+,(11) 90000-0000,semnome@exemplo.com,,
+João Duplicado,11 91234-5678,outro@exemplo.com,,
+Ana Paula,5511987654321,,29/02/2024,
+Carlos Fixo,(31) 3333-4444,carlos@exemplo.com,01/01/2099,

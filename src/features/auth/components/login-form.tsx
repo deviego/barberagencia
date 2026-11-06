@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signInWithIdentifier } from "@/features/auth/actions";
+import { SystemUnavailableModal } from "./system-unavailable-modal";
 
 /**
  * Formulário de login. Cada tela é ligada à sua ÁREA (cookie próprio):
@@ -28,6 +29,7 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +39,8 @@ export function LoginForm({
       // Aceita e-mail OU telefone (o servidor resolve o e-mail de auth pelo telefone).
       const res = await signInWithIdentifier(email, password);
       if (!res.ok) {
-        setError(res.error);
+        if (res.unavailable) setUnavailable(true);
+        else setError(res.error);
         return;
       }
       router.push(dest);
@@ -95,6 +98,8 @@ export function LoginForm({
           </Link>
         </p>
       )}
+
+      {unavailable && <SystemUnavailableModal onClose={() => setUnavailable(false)} />}
     </form>
   );
 }

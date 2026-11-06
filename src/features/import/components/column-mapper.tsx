@@ -1,6 +1,7 @@
 "use client";
 
-import { FIELD_MAP, type Entity } from "../normalize";
+import { FIELD_MAP } from "../core/fields";
+import type { Entity, Mapping } from "../core/types";
 
 const selectCls =
   "h-10 w-full rounded-md border border-border bg-inset px-3 text-body text-text hover:border-accent focus-visible:border-focus focus-visible:outline-none";
@@ -13,9 +14,11 @@ export function ColumnMapper({
 }: {
   entity: Entity;
   headers: string[];
-  mapping: Record<string, string>;
+  mapping: Mapping;
   onChange: (fieldKey: string, header: string) => void;
 }) {
+  const used = new Set(Object.values(mapping).filter(Boolean));
+  const unmapped = headers.filter((h) => !used.has(h));
   return (
     <div className="flex flex-col gap-3">
       <p className="text-caption text-text-muted">
@@ -38,6 +41,11 @@ export function ColumnMapper({
           </label>
         ))}
       </div>
+      {unmapped.length > 0 && (
+        <p className="text-caption text-text-muted">
+          Colunas do arquivo que não serão importadas: {unmapped.join(", ")}
+        </p>
+      )}
     </div>
   );
 }

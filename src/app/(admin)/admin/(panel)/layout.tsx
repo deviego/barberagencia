@@ -9,6 +9,8 @@ import { isMaster, isUnitAdmin } from "@/lib/rbac";
 import { getTenantContract } from "@/features/contract/data";
 import { buildContractView } from "@/features/contract/view";
 import { ContractModal } from "@/features/contract/components/contract-modal";
+import { SystemUnavailableModal } from "@/features/auth/components/system-unavailable-modal";
+import { isTenantSuspended } from "@/lib/tenant/availability";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
@@ -26,6 +28,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Distribuidor logado não usa o painel de barbearia — vai para o painel próprio.
   if (tenant.kind === "DISTRIBUTOR") redirect("/distributor");
+
+  // Barbearia suspensa pelo MASTER: a equipe vê só "Sistema indisponível" (MASTER segue com acesso).
+  if (!master && (await isTenantSuspended(tenant.id))) return <SystemUnavailableModal />;
 
   const contractView = buildContractView(contract);
   // Modal do contrato enquanto não assinado.

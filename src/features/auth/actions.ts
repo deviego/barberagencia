@@ -11,6 +11,7 @@ import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { AREA_HEADER } from "@/lib/supabase/area";
 import { getRequestOrigin } from "@/lib/http";
 import { phoneDigits, syntheticEmail, isEmail } from "@/lib/auth/phone-identity";
+import { isStaffOfSuspendedTenant } from "@/lib/tenant/availability";
 
 /**
  * [Cliente] Cria a conta pelo telefone (e-mail opcional). Usa o service-role para
@@ -72,7 +73,7 @@ export async function logout() {
 export async function signInWithIdentifier(
   identifier: string,
   password: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string; unavailable?: boolean }> {
   const id = (identifier ?? "").trim();
   if (!id || !password) return { ok: false, error: "Informe telefone/e-mail e senha." };
 
@@ -92,8 +93,15 @@ export async function signInWithIdentifier(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { ok: false, error: "Telefone/e-mail ou senha inválidos." };
+
+  // Painel da barbearia suspensa pelo MASTER: encerra a sessão e mostra "Sistema indisponível".
+  const area = (await headers()).get(AREA_HEADER);
+  if (area === "admin" && data.user && (await isStaffOfSuspendedTenant(data.user.id))) {
+    await supabase.auth.signOut();
+    return { ok: false, error: "", unavailable: true };
+  }
   return { ok: true };
 }
 
