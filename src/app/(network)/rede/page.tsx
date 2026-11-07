@@ -1,5 +1,4 @@
 import { Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { hasEntitlement } from "@/lib/entitlements";
 import { RedeView } from "@/features/platform/components/rede-view";
@@ -15,10 +14,9 @@ export default async function RedePage() {
         </div>
         <h1 className="text-h4 font-semibold text-text">Recurso de rede indisponível</h1>
         <p className="text-body text-text-2">
-          A gestão consolidada de múltiplas unidades está disponível no plano{" "}
-          <strong>Advanced</strong>.
+          A gestão de várias unidades num painel só ainda não está disponível. Fale com o suporte se você tem mais
+          de uma unidade.
         </p>
-        <Button>Ver planos</Button>
       </div>
     );
   }
