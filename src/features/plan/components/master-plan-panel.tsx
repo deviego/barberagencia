@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, ArrowUpCircle } from "lucide-react";
+import { Check, ArrowUpCircle, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { setTenantPlan, resolveUpgradeRequest } from "../actions";
@@ -24,33 +24,45 @@ export function MasterPlanPanel({
   const [msg, setMsg] = useState<string | null>(null);
   const pendingReqs = requests.filter((r) => r.status === "PENDING");
 
-  function change(p: SaasPlanKey) {
+  // Condição especial (MANUAL) + troca real de plano: o servidor pede confirmação antes de substituir.
+  const [confirm, setConfirm] = useState<
+    { kind: "plan"; plan: SaasPlanKey; warning: string } | { kind: "request"; id: string; plan: SaasPlanKey; warning: string } | null
+  >(null);
+
+  function change(p: SaasPlanKey, confirmOverwrite = false) {
     setMsg(null);
     startTransition(async () => {
-      const res = await setTenantPlan(tenantId, p);
+      const res = await setTenantPlan(tenantId, p, confirmOverwrite);
       if (res.ok) {
+        setConfirm(null);
         setCurrent(p);
         setMsg(res.termsReplaced ? "Plano atualizado. Condições substituídas pela tabela." : "Plano atualizado.");
+      } else if ("needsConfirmation" in res && res.needsConfirmation) {
+        setConfirm({ kind: "plan", plan: p, warning: res.error });
       } else setMsg(res.error ?? "Falha.");
     });
   }
 
-  function resolve(id: string, approve: boolean) {
+  function resolve(id: string, approve: boolean, confirmOverwrite = false) {
+    setMsg(null);
     startTransition(async () => {
-      const res = await resolveUpgradeRequest(id, approve);
-      if (res.ok && approve) {
+      const res = await resolveUpgradeRequest(id, approve, confirmOverwrite);
+      const req = requests.find((r) => r.id === id);
+      if (res.ok) {
+        setConfirm(null);
         // aprovado: o plano passa a ser o solicitado
-        const req = requests.find((r) => r.id === id);
-        if (req?.requested_plan) setCurrent(normalizeSaasPlan(req.requested_plan));
-      }
-      setMsg(
-        res.ok
-          ? res.termsReplaced
-            ? "Solicitação resolvida. Condições substituídas pela tabela."
-            : "Solicitação resolvida."
-          : res.error ?? "Falha."
-      );
+        if (approve && req?.requested_plan) setCurrent(normalizeSaasPlan(req.requested_plan));
+        setMsg(res.termsReplaced ? "Solicitação resolvida. Condições substituídas pela tabela." : "Solicitação resolvida.");
+      } else if ("needsConfirmation" in res && res.needsConfirmation) {
+        setConfirm({ kind: "request", id, plan: normalizeSaasPlan(req?.requested_plan), warning: res.error });
+      } else setMsg(res.error ?? "Falha.");
     });
+  }
+
+  function confirmOverwrite() {
+    if (!confirm) return;
+    if (confirm.kind === "plan") change(confirm.plan, true);
+    else resolve(confirm.id, true, true);
   }
 
   return (
@@ -74,6 +86,22 @@ export function MasterPlanPanel({
             </button>
           ))}
         </div>
+        {confirm && (
+          <div role="alertdialog" className="flex flex-col gap-3 rounded-md border border-warning-strong/40 bg-warning-bg/40 p-3">
+            <p className="flex items-start gap-1.5 text-caption text-warning-strong">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              {confirm.warning}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={confirmOverwrite} loading={pending}>
+                Trocar mesmo assim
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirm(null)} disabled={pending}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
         {msg && <span className="text-caption text-text-2">{msg}</span>}
       </div>
 

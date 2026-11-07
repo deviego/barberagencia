@@ -8,8 +8,8 @@ import { isMaster } from "@/lib/rbac";
 import { sendEmail } from "@/server/notifications/resend";
 import { BARBERAGENCIA_EMAIL } from "@/lib/contact";
 import { PLAN_ORDER, planLabel, normalizeSaasPlan } from "@/lib/entitlements";
-import { writeDefaultBillingTerms } from "@/features/billing/terms";
-import { shouldReplaceTermsOnPlanChange } from "@/lib/billing/saas-pricing";
+import { loadBillingTerms, writeDefaultBillingTerms } from "@/features/billing/terms";
+import { manualTermsWarning, planChangeDecision } from "@/lib/billing/saas-pricing";
 
 /** O admin solicita upgrade de plano — gera a solicitação e avisa o master. */
 export async function requestUpgrade(input?: { requestedPlan?: string; reason?: string }) {
@@ -51,25 +51,44 @@ export async function requestUpgrade(input?: { requestedPlan?: string; reason?: 
   return { ok: true as const, requested };
 }
 
+/**
+ * Decide o que fazer com as condições vendidas numa troca de plano. Condição especial
+ * (MANUAL) só é substituída com `confirmOverwrite` — a regra vale no servidor, não só na tela.
+ */
+async function planChangeGate(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  tenantId: string,
+  newPlan: string,
+  confirmOverwrite: boolean
+) {
+  const { data: before } = await admin.from("tenants").select("saas_plan").eq("id", tenantId).maybeSingle();
+  const oldPlanRaw = (before?.saas_plan as string) ?? null;
+  const t = await loadBillingTerms(admin, tenantId, oldPlanRaw);
+  const decision = planChangeDecision({ oldPlanRaw, newPlan, termsSource: t.source, confirmed: confirmOverwrite });
+  return { decision, warning: decision === "NEEDS_CONFIRMATION" ? manualTermsWarning(t.terms) : null };
+}
+
 /** MASTER troca o plano de uma barbearia (service-role). */
-export async function setTenantPlan(tenantId: string, plan: string) {
+export async function setTenantPlan(tenantId: string, plan: string, confirmOverwrite = false) {
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
   const p = normalizeSaasPlan(plan);
   const admin = createSupabaseAdminClient();
-  const { data: before } = await admin.from("tenants").select("saas_plan").eq("id", tenantId).maybeSingle();
+  // Janela de promoção segue a 1ª competência paga (nunca reinicia); o preço segue o plano atual.
+  const gate = await planChangeGate(admin, tenantId, p, confirmOverwrite);
+  if (gate.decision === "NEEDS_CONFIRMATION") {
+    return { ok: false as const, needsConfirmation: true as const, error: gate.warning ?? "Confirme a troca de plano." };
+  }
   const { error } = await admin.from("tenants").update({ saas_plan: p }).eq("id", tenantId);
   if (error) return { ok: false as const, error: error.message };
-  // Só uma troca real de plano substitui as condições (pela tabela do novo plano). Mesmo
-  // plano = mantém o que foi negociado (MANUAL). O master ajusta em "Editar condições".
-  const termsReplaced = shouldReplaceTermsOnPlanChange((before?.saas_plan as string) ?? null, p);
+  const termsReplaced = gate.decision === "REPLACE";
   if (termsReplaced) await writeDefaultBillingTerms(admin, tenantId, p, user.id);
   revalidatePath(`/master/barbearias/${tenantId}`);
   return { ok: true as const, termsReplaced };
 }
 
 /** MASTER resolve uma solicitação de upgrade (aprova trocando o plano, ou rejeita). */
-export async function resolveUpgradeRequest(id: string, approve: boolean) {
+export async function resolveUpgradeRequest(id: string, approve: boolean, confirmOverwrite = false) {
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
   const admin = createSupabaseAdminClient();
@@ -85,9 +104,13 @@ export async function resolveUpgradeRequest(id: string, approve: boolean) {
   let termsReplaced = false;
   if (approve) {
     const plan = normalizeSaasPlan(req.requested_plan as string);
-    const { data: before } = await admin.from("tenants").select("saas_plan").eq("id", req.tenant_id as string).maybeSingle();
+    const gate = await planChangeGate(admin, req.tenant_id as string, plan, confirmOverwrite);
+    if (gate.decision === "NEEDS_CONFIRMATION") {
+      // Nada muda: nem o plano nem o status da solicitação.
+      return { ok: false as const, needsConfirmation: true as const, error: gate.warning ?? "Confirme a troca de plano." };
+    }
     await admin.from("tenants").update({ saas_plan: plan }).eq("id", req.tenant_id as string);
-    termsReplaced = shouldReplaceTermsOnPlanChange((before?.saas_plan as string) ?? null, plan);
+    termsReplaced = gate.decision === "REPLACE";
     if (termsReplaced) await writeDefaultBillingTerms(admin, req.tenant_id as string, plan, user.id);
   }
   const { error } = await admin

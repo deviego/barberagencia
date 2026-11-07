@@ -201,3 +201,28 @@ export function checkAmountAgainstSuggestion(s: Suggestion, amountBrl: number): 
 export function shouldReplaceTermsOnPlanChange(oldPlanRaw: string | null, newPlan: string): boolean {
   return (oldPlanRaw ?? "") !== newPlan;
 }
+
+/**
+ * Regra da troca de plano (PM, 07/11): a janela de promoção segue a 1ª competência paga e
+ * nunca reinicia; o PREÇO segue o plano atual (tabela do novo plano). Condição especial
+ * negociada (MANUAL) só é substituída com confirmação explícita do master.
+ */
+export function planChangeDecision(input: {
+  oldPlanRaw: string | null;
+  newPlan: string;
+  termsSource: string | null; // TABLE | BACKFILL | MANUAL | null (sem linha)
+  confirmed: boolean;
+}): "KEEP" | "REPLACE" | "NEEDS_CONFIRMATION" {
+  if (!shouldReplaceTermsOnPlanChange(input.oldPlanRaw, input.newPlan)) return "KEEP";
+  if (input.termsSource === "MANUAL" && !input.confirmed) return "NEEDS_CONFIRMATION";
+  return "REPLACE";
+}
+
+/** Texto da confirmação quando a barbearia tem condição especial e o plano vai mudar. */
+export function manualTermsWarning(terms: BillingTerms): string {
+  const cond =
+    terms.promoPriceBrl != null && terms.promoMonths > 0
+      ? `${formatBrl(terms.promoPriceBrl)} por ${terms.promoMonths} ${terms.promoMonths === 1 ? "mensalidade" : "mensalidades"}, depois ${formatBrl(terms.fullPriceBrl)}`
+      : `${formatBrl(terms.fullPriceBrl)}/mês`;
+  return `Esta barbearia tem condição especial (${cond}). Ao trocar de plano, ela será substituída pela tabela do novo plano.`;
+}

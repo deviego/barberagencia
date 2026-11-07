@@ -7,6 +7,8 @@ import {
   checkAmountAgainstSuggestion,
   shouldReplaceTermsOnPlanChange,
   ymSaoPaulo,
+  planChangeDecision,
+  manualTermsWarning,
 } from "../src/lib/billing/saas-pricing.ts";
 
 const NOW = "2026-11-07T12:00:00Z";
@@ -144,6 +146,41 @@ t("rótulo no fuso de São Paulo: 30/11 22:30 BRT é competência 11/2026", () =
   assert.equal(s.label, "12/2026"); // a 2ª competência; a 1ª foi 11/2026
   assert.equal(suggestPayment(PERSONAL, [], 1, paidAt).label, "11/2026");
   assert.equal(suggestPayment(PERSONAL, [], 1, paidAt).promoUntilLabel, "12/2026");
+});
+
+t("troca de plano na competência 1: a 2ª sai pela promo do NOVO plano, a 3ª cheia (janela não reinicia)", () => {
+  // 1ª competência paga no Personal (69,90); troca real para Essencial → condições = tabela do Essencial.
+  const rows = [pay(1, 1, 69.9)];
+  const s2 = suggestPayment(ESSENCIAL, rows, 1, NOW);
+  assert.equal(s2.competenciaFrom, 2);
+  assert.equal(s2.amountBrl, 89.9);
+  assert.equal(s2.promoUntilLabel, "12/2026");
+  const s3 = suggestPayment(ESSENCIAL, [...rows, pay(2, 2, 89.9)], 1, NOW);
+  assert.equal(s3.competenciaFrom, 3);
+  assert.equal(s3.amountBrl, 189.9);
+  // upgrade no 4º mês não ganha promoção de novo
+  assert.equal(suggestPayment(ESSENCIAL, [pay(1, 3, 339.7)], 1, NOW).amountBrl, 189.9);
+});
+
+t("condição MANUAL + troca real exige confirmação; sem MANUAL ou com confirmação substitui", () => {
+  const d = (o) => planChangeDecision({ oldPlanRaw: "personal", newPlan: "essencial", termsSource: "MANUAL", confirmed: false, ...o });
+  assert.equal(d({}), "NEEDS_CONFIRMATION");
+  assert.equal(d({ confirmed: true }), "REPLACE");
+  assert.equal(d({ termsSource: "TABLE" }), "REPLACE");
+  assert.equal(d({ termsSource: "BACKFILL" }), "REPLACE");
+  assert.equal(d({ termsSource: null }), "REPLACE");
+  assert.equal(d({ newPlan: "personal" }), "KEEP"); // mesmo plano: MANUAL fica, sem perguntar
+});
+
+t("texto da confirmação da condição especial", () => {
+  assert.equal(
+    manualTermsWarning({ promoPriceBrl: 59.9, promoMonths: 3, fullPriceBrl: 119.9 }),
+    "Esta barbearia tem condição especial (R$\u00a059,90 por 3 mensalidades, depois R$\u00a0119,90). Ao trocar de plano, ela será substituída pela tabela do novo plano."
+  );
+  assert.equal(
+    manualTermsWarning({ promoPriceBrl: null, promoMonths: 0, fullPriceBrl: 99.9 }),
+    "Esta barbearia tem condição especial (R$\u00a099,90/mês). Ao trocar de plano, ela será substituída pela tabela do novo plano."
+  );
 });
 
 console.log(`\n${ok} casos OK`);
