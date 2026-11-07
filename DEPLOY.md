@@ -56,7 +56,7 @@ npx prisma migrate dev --name init
 O runtime usa **supabase-js (HTTPS/RLS)**, então não precisa do pooler para funcionar. Basta criar as tabelas:
 1. Supabase → **SQL Editor** → **New query**.
 2. Cole e rode **`supabase/schema.sql`** (tabelas + RLS + trigger de onboarding + RPC).
-3. Cole e rode **`supabase/seed.sql`** (tenant "Barbearia Oliveira 01" + serviços/combos/barbeiros).
+3. **Só em ambiente local/CI:** cole e rode **`supabase/seed.sql`** (tenant fictício "Barbearia Exemplo" + serviços/combos/barbeiros de teste). Nunca em produção.
 4. Rode **em ordem** as demais migrações `supabase/schema-*.sql` — elas adicionam recursos ao longo do tempo:
    - `schema-2..13` / `schema-*.sql` (RPCs de convite/agenda, comanda `appointment_items`, planos de horário fixo, Storage `avatars`, etc.);
    - `schema-14` (contratos), `schema-15` (entitlements + limite de barbeiros), `schema-16` (fila), `schema-17` (foto de produto + bucket `products`), `schema-18` (serviço no plano fixo), `schema-19`/`schema-20` (fila modo Totem + padrão App).
