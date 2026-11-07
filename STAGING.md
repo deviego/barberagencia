@@ -16,17 +16,34 @@ tocar nos dados de produção (clientes reais já usam a plataforma).
 3. Em **Project Settings → Database → Connection string**, pegue a **Direct** (porta 5432).
 
 ## Passo 2 — Replicar o schema no banco de staging
-Na raiz do repo, com a conexão **direta** do staging:
+**Antes:** baixe o certificado do Supabase **do projeto de staging**: Project Settings → Database →
+**SSL Configuration** → *Download certificate* (arquivo `prod-ca-2021.crt`; o nome é esse mesmo em todo projeto).
+
+Na raiz do repo, **só por variáveis de ambiente** (nunca passe a URL como argumento: aparece no `ps` e no
+histórico do shell). Para a senha não ir para o histórico, digite-a com `read -s`:
 
 ```bash
-STAGING_DATABASE_URL="postgresql://postgres.<REF>:<SENHA>@<HOST>:5432/postgres" \
-  node scripts/bootstrap-staging.mjs
+export STAGING_PROJECT_REF="<REF do projeto de staging>"      # 20 letras/números, aparece na URL do painel
+export SUPABASE_CA_CERT="$HOME/Downloads/prod-ca-2021.crt"
+read -s -p "Senha do Postgres de staging: " PGPASS_STAGING; echo
+export STAGING_DATABASE_URL="postgresql://postgres.${STAGING_PROJECT_REF}:${PGPASS_STAGING}@aws-N-<região>.pooler.supabase.com:5432/postgres"
+#   ou a conexão direta: postgresql://postgres:${PGPASS_STAGING}@db.${STAGING_PROJECT_REF}.supabase.co:5432/postgres
+node scripts/bootstrap-staging.mjs
+unset PGPASS_STAGING STAGING_DATABASE_URL
 ```
-O script:
+> Se a senha tiver caracteres especiais (`@ : / ? #`), use a versão já codificada que o painel mostra na connection string.
+
+O script (lógica em `scripts/lib/schema-apply.mjs`, o mesmo módulo do CI):
 - aplica os `supabase/schema*.sql` na ordem de **`supabase/ci-order.txt`** (ordem em que foram criados),
   em **uma passada**, cada arquivo numa transação, e **para no primeiro erro**;
-- confere que o `ci-order.txt` lista exatamente os `schema*.sql` do repositório (arquivo novo fora da lista → recusa);
-- recusa rodar se a URL parecer a de produção e **nunca** aplica seeds.
+- confere que o `ci-order.txt` lista exatamente os `schema*.sql` do repositório (arquivo fora da lista,
+  inexistente, repetido ou `seed*` → recusa). **Nunca** aplica seeds;
+- **só aceita o projeto de staging** (allowlist): host `db.<REF>.supabase.co` com usuário `postgres`, ou o pooler
+  `aws-N-<região>.pooler.supabase.com` com usuário `postgres.<REF>`. A ref de produção é recusada em qualquer
+  lugar, e `?host=` / `?hostaddr=` na URL também;
+- usa SSL **com verificação** do certificado (`SUPABASE_CA_CERT`); recusa `sslmode=disable/allow/prefer/no-verify`;
+- **aborta antes de aplicar qualquer coisa se o schema `public` já tiver alguma tabela** (protege produção e
+  qualquer banco em uso, independentemente da URL).
 
 O banco de staging precisa estar **vazio** (projeto recém-criado). Se parar no meio, apague e recrie o projeto
 (ou resete o banco) antes de rodar de novo.
