@@ -2,6 +2,11 @@ name: CI
 on:
   pull_request:
     branches: [main, staging]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
