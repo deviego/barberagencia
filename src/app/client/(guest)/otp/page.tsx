@@ -12,8 +12,7 @@ export default function OtpPage() {
           Validação de acesso
         </h1>
         <p className="mt-2 text-body text-text-2">
-          Enviamos um código de 6 dígitos por e-mail, SMS e WhatsApp para{" "}
-          <strong className="text-text">+55 (11) 9****-4321</strong>.
+          Digite o código de 6 dígitos para continuar.
         </p>
       </div>
       <OtpForm />
