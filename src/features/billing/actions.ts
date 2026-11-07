@@ -7,7 +7,7 @@ import { isMaster } from "@/lib/rbac";
 import { isUuid } from "@/lib/auth/acting";
 import { z } from "zod";
 import { isDistributorPlan, normalizeSaasPlan } from "@/lib/entitlements";
-import { suggestPayment } from "@/lib/billing/saas-pricing";
+import { checkAmountAgainstSuggestion, suggestPayment } from "@/lib/billing/saas-pricing";
 import { loadBillingTerms, loadPaymentRecords } from "./terms";
 
 /** Estende uma data em N meses (mantém o dia; base = maior entre data atual e agora). */
@@ -58,6 +58,8 @@ export async function registerSaasPayment(input: RegisterSaasPaymentInput) {
     ]);
     if (tr.tableExists && pr.competenciaColumns) {
       const s = suggestPayment(tr.terms, pr.records, input.partial ? 1 : months, now.toISOString());
+      const amountError = checkAmountAgainstSuggestion(s, amount);
+      if (amountError) return { ok: false as const, error: amountError };
       if (s.kind === "REMAINING") {
         // Completa a competência aberta: mesma competência, a vigência já andou na 1ª parte.
         competencia = { from: s.competencia, to: s.competencia, expected: s.amountBrl, partial: true, label: s.label, breakdown: null };
