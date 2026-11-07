@@ -1,13 +1,18 @@
 // Bootstrap de um banco Supabase NOVO (staging) com o schema de produção.
-// Aplica todos os supabase/schema*.sql — idempotentes — em 2 passadas, para
-// resolver dependências de ordem entre os arquivos. NÃO aplica seeds.
+// Aplica os supabase/schema*.sql na ordem de supabase/ci-order.txt (ordem cronológica em que
+// foram criados), em UMA passada, cada arquivo numa transação, e PARA no primeiro erro.
+// NUNCA aplica seeds.
+//
+// Por que não mais "2 passadas em ordem alfabética": esse jeito aplicava sem erro, mas gerava um
+// banco diferente da produção (auth_tenant_id sem o "Atuar como" do MASTER e `authenticated` sem
+// EXECUTE em blocked_ranges/place_order/set_order_status). Ver docs/spikes/2026-11-ci-supabase-efemero.md.
 //
 // Uso:
 //   STAGING_DATABASE_URL="postgresql://postgres.<ref>:<senha>@<host>:5432/postgres" \
 //   node scripts/bootstrap-staging.mjs
 // ou:  node scripts/bootstrap-staging.mjs "postgresql://...."
 //
-// Dica: use a conexão DIRETA (porta 5432), não a pooled (6543).
+// Dica: use a conexão DIRETA (porta 5432), não a pooled (6543). O banco precisa estar VAZIO.
 import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
@@ -23,53 +28,46 @@ if (/aws-0-ca-central-1|tusfxbnnrypjtzqcvpov/.test(url)) {
 }
 
 const dir = path.resolve("supabase");
-const files = fs
-  .readdirSync(dir)
-  .filter((f) => f.startsWith("schema") && f.endsWith(".sql"));
+const manifestPath = path.join(dir, "ci-order.txt");
+const order = fs.readFileSync(manifestPath, "utf8").split(/\s+/).filter(Boolean);
 
-// Ordem: schema.sql → nomeados (tenant/unit/wa/...) → numéricos crescentes.
-const rank = (f) => {
-  if (f === "schema.sql") return -1;
-  const m = f.match(/^schema-(\d+)/);
-  if (m) return 100 + Number(m[1]);
-  return 10; // nomeados foundacionais (schema-tenant.sql, schema-unit.sql, etc.)
-};
-files.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
-
-const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
-await client.connect();
-
-async function applyOnce(list) {
-  const failed = [];
-  for (const f of list) {
-    const sql = fs.readFileSync(path.join(dir, f), "utf8");
-    try {
-      await client.query(sql);
-      console.log(`  ✓ ${f}`);
-    } catch (e) {
-      console.log(`  … ${f} adiado (${e.message.split("\n")[0]})`);
-      failed.push(f);
-    }
-  }
-  return failed;
+// O manifesto precisa bater exatamente com os arquivos schema*.sql: nada faltando, nada a mais.
+const onDisk = fs.readdirSync(dir).filter((f) => f.startsWith("schema") && f.endsWith(".sql"));
+const notListed = onDisk.filter((f) => !order.includes(f));
+const notFound = order.filter((f) => !onDisk.includes(f));
+const notSchema = order.filter((f) => !/^schema[\w-]*\.sql$/.test(f)); // nunca seed*.sql
+const dupes = order.filter((f, i) => order.indexOf(f) !== i);
+if (notListed.length || notFound.length || notSchema.length || dupes.length) {
+  if (notListed.length) console.error(`✗ Fora do ci-order.txt: ${notListed.join(", ")} (adicione na posição certa)`);
+  if (notFound.length) console.error(`✗ No ci-order.txt mas não existe: ${notFound.join(", ")}`);
+  if (notSchema.length) console.error(`✗ Só schema*.sql pode entrar (seeds nunca): ${notSchema.join(", ")}`);
+  if (dupes.length) console.error(`✗ Repetidos no ci-order.txt: ${dupes.join(", ")}`);
+  process.exit(1);
 }
 
+const host = new URL(url).hostname;
+const local = ["127.0.0.1", "localhost", "::1"].includes(host);
+const client = new pg.Client({ connectionString: url, ssl: local ? false : { rejectUnauthorized: false } });
+await client.connect();
+
 try {
-  console.log(`Passada 1/2 — ${files.length} arquivos:`);
-  const failed1 = await applyOnce(files);
-  if (failed1.length) {
-    console.log(`\nPassada 2/2 — reaplicando ${failed1.length} adiados:`);
-    const failed2 = await applyOnce(failed1);
-    if (failed2.length) {
-      console.error(`\n✗ Falharam mesmo na 2ª passada: ${failed2.join(", ")}`);
-      console.error("Rode de novo ou aplique esses manualmente com dbadmin apontando ao staging.");
+  console.log(`Aplicando ${order.length} arquivos na ordem de supabase/ci-order.txt (1 passada):`);
+  for (const [i, f] of order.entries()) {
+    const sql = fs.readFileSync(path.join(dir, f), "utf8");
+    try {
+      await client.query("begin");
+      await client.query(sql);
+      await client.query("commit");
+      console.log(`  ✓ ${String(i + 1).padStart(2)} ${f}`);
+    } catch (e) {
+      await client.query("rollback").catch(() => {});
+      console.error(`\n✗ PAROU em ${f} (${i + 1}/${order.length}): ${e.message.split("\n")[0]}`);
+      console.error("Nada depois dele foi aplicado. O banco precisa estar vazio; corrija e recrie o staging.");
       process.exitCode = 1;
-    } else {
-      console.log("\n✓ Tudo aplicado (2ª passada resolveu as dependências).");
+      break;
     }
-  } else {
-    console.log("\n✓ Tudo aplicado na 1ª passada.");
   }
+  if (!process.exitCode) console.log(`\n✓ ${order.length} arquivos aplicados.`);
 } finally {
   await client.end();
 }

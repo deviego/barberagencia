@@ -22,10 +22,30 @@ Na raiz do repo, com a conexão **direta** do staging:
 STAGING_DATABASE_URL="postgresql://postgres.<REF>:<SENHA>@<HOST>:5432/postgres" \
   node scripts/bootstrap-staging.mjs
 ```
-O script aplica todos os `supabase/schema*.sql` (idempotentes) em 2 passadas e
-recusa rodar se a URL parecer a de produção. **Não** aplica seeds.
+O script:
+- aplica os `supabase/schema*.sql` na ordem de **`supabase/ci-order.txt`** (ordem em que foram criados),
+  em **uma passada**, cada arquivo numa transação, e **para no primeiro erro**;
+- confere que o `ci-order.txt` lista exatamente os `schema*.sql` do repositório (arquivo novo fora da lista → recusa);
+- recusa rodar se a URL parecer a de produção e **nunca** aplica seeds.
 
-> Alternativa (mirror exato via dump): `pg_dump --schema-only --no-owner --no-privileges --schema=public "<PROD_DIRECT_URL>" > schema.sql` e depois `psql "<STAGING_DIRECT_URL>" -f schema.sql`. Use isto se quiser o schema idêntico byte a byte; senão o script acima basta.
+O banco de staging precisa estar **vazio** (projeto recém-criado). Se parar no meio, apague e recrie o projeto
+(ou resete o banco) antes de rodar de novo.
+
+Confira o resultado (somente leitura) no SQL Editor do **staging**. O esperado é tudo `true`:
+```sql
+select pg_get_functiondef('public.auth_tenant_id'::regproc) like '%x-act-tenant%' as act_as,
+       has_function_privilege('authenticated', 'public.blocked_ranges(uuid,timestamptz,timestamptz)', 'EXECUTE') as blocked_ranges,
+       has_function_privilege('authenticated', 'public.place_order(uuid,jsonb,text)', 'EXECUTE') as place_order,
+       has_function_privilege('authenticated', 'public.set_order_status(uuid,text)', 'EXECUTE') as set_order_status,
+       (select bool_and(relrowsecurity) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relkind = 'r') as rls_em_todas;
+```
+
+> Por que não mais "2 passadas": o jeito antigo aplicava sem erro, mas gerava um banco diferente da produção
+> (`auth_tenant_id` sem o "Atuar como" do MASTER e `authenticated` sem EXECUTE nessas 3 funções). Detalhes em
+> `docs/spikes/2026-11-ci-supabase-efemero.md` (branch `spike/ci-supabase-efemero`).
+>
+> Alternativa (mirror exato via dump): `pg_dump --schema-only --no-owner --no-privileges --schema=public "<PROD_DIRECT_URL>" > schema.sql` e depois `psql "<STAGING_DIRECT_URL>" -f schema.sql`. É o caminho da ADR 0002 (baseline) e o mais fiel; o dump é feito pelo Diego.
 
 Depois, opcional: crie 1–2 barbearias de teste pelo painel Master do preview.
 
