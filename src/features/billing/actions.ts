@@ -7,7 +7,7 @@ import { isMaster } from "@/lib/rbac";
 import { isUuid } from "@/lib/auth/acting";
 import { z } from "zod";
 import { isDistributorPlan, normalizeSaasPlan } from "@/lib/entitlements";
-import { checkAmountAgainstSuggestion, suggestPayment } from "@/lib/billing/saas-pricing";
+import { checkAmountAgainstSuggestion, suggestPayment, ymSaoPaulo } from "@/lib/billing/saas-pricing";
 import { loadBillingTerms, loadPaymentRecords } from "./terms";
 
 /** Estende uma data em N meses (mantém o dia; base = maior entre data atual e agora). */
@@ -75,7 +75,8 @@ export async function registerSaasPayment(input: RegisterSaasPaymentInput) {
   }
 
   const paidUntil = extendMonths > 0 ? addMonths(base, extendMonths) : current ?? base;
-  const reference = competencia?.label ?? `${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+  const spNow = ymSaoPaulo(now.toISOString());
+  const reference = competencia?.label ?? `${String(spNow.month).padStart(2, "0")}/${spNow.year}`;
   const userNote = input.note?.trim() || null;
   const note = competencia?.breakdown ? (userNote ? `${competencia.breakdown} · ${userNote}` : competencia.breakdown) : userNote;
   const row: Record<string, unknown> = {
