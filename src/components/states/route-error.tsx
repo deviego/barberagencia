@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { startTransition, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,18 @@ export function RouteError({
   homeLabel = "Voltar ao início",
   fullScreen = false,
 }: RouteErrorProps) {
+  const router = useRouter();
   useEffect(() => {
     console.error("[route-error]", { digest: error.digest ?? null });
   }, [error.digest]);
+
+  // reset() sozinho só re-renderiza o boundary no cliente; erro de Server Component
+  // precisa buscar o payload RSC de novo (router.refresh) para sair da tela de erro.
+  const retry = () =>
+    startTransition(() => {
+      router.refresh();
+      reset();
+    });
 
   return (
     <div
@@ -48,7 +58,7 @@ export function RouteError({
           Não conseguimos carregar esta tela. Tente de novo em alguns segundos.
         </p>
         <div className="mt-6 flex flex-col gap-3">
-          <Button size="lg" onClick={reset} className="w-full">
+          <Button size="lg" onClick={retry} className="w-full">
             <RotateCcw size={16} aria-hidden />
             Tentar de novo
           </Button>

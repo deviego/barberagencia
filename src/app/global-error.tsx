@@ -7,7 +7,7 @@ import "@/styles/globals.css";
  * Erro na raiz (inclusive no layout raiz). Substitui o <html> inteiro, então
  * não depende de Providers nem do tenant. Nunca mostra error.message ao usuário.
  */
-export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ error }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("[global-error]", { digest: error.digest ?? null });
   }, [error.digest]);
@@ -27,7 +27,8 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             <div className="mt-6 flex flex-col gap-3">
               <button
                 type="button"
-                onClick={reset}
+                // O router pode não estar disponível aqui: recarrega a página inteira.
+                onClick={() => window.location.reload()}
                 className="h-12 w-full rounded-md bg-accent px-6 font-semibold text-text-inverse"
               >
                 Tentar de novo
