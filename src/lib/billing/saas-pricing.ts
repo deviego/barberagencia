@@ -79,9 +79,13 @@ function monthsBetween(fromIso: string, toIso: string): number {
   return Math.max(1, Math.round((b - a) / (30.4375 * 24 * 3600 * 1000)));
 }
 
-function ym(iso: string): { year: number; month: number } {
-  const d = new Date(iso);
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+const SP_MONTH = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric", month: "numeric" });
+
+/** Mês/ano no fuso de São Paulo (um pagamento às 22:30 de 30/11 é competência 11, não 12). */
+export function ymSaoPaulo(iso: string): { year: number; month: number } {
+  const parts = SP_MONTH.formatToParts(new Date(iso));
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  return { year: get("year"), month: get("month") };
 }
 
 export function competenciaLabel(anchor: { year: number; month: number }, competencia: number): string {
@@ -131,7 +135,7 @@ export function buildLedger(terms: BillingTerms, payments: PaymentRecord[], nowI
     }
   }
 
-  const anchor = rows.length > 0 ? ym(rows[0].paidAt) : ym(nowIso);
+  const anchor = rows.length > 0 ? ymSaoPaulo(rows[0].paidAt) : ymSaoPaulo(nowIso);
   return { lastCompetencia: last, open, anchor };
 }
 
@@ -180,4 +184,20 @@ export function suggestPayment(terms: BillingTerms, payments: PaymentRecord[], m
     promoUntilLabel: inPromo ? competenciaLabel(ledger.anchor, terms.promoMonths) : null,
     breakdown,
   };
+}
+
+/**
+ * Valida o valor digitado contra a sugestão. Com uma competência aberta (paga em partes),
+ * o registro só completa aquela competência: valor acima do restante seria engolido.
+ */
+export function checkAmountAgainstSuggestion(s: Suggestion, amountBrl: number): string | null {
+  if (s.kind === "REMAINING" && cents(amountBrl) > cents(s.amountBrl) + 1) {
+    return `Registre o restante e a próxima mensalidade separados (falta ${formatBrl(s.amountBrl)} da competência ${s.label}).`;
+  }
+  return null;
+}
+
+/** Troca de plano só substitui as condições gravadas quando o plano muda de verdade. */
+export function shouldReplaceTermsOnPlanChange(oldPlanRaw: string | null, newPlan: string): boolean {
+  return (oldPlanRaw ?? "") !== newPlan;
 }

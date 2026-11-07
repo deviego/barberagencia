@@ -1,7 +1,13 @@
 // Teste da função de preço por competência (Epic 01 · S1). Sem runner: `npm run test:saas-pricing`.
 // Node 22.18+ importa .ts direto (type stripping). Dados fictícios.
 import assert from "node:assert/strict";
-import { suggestPayment, buildLedger } from "../src/lib/billing/saas-pricing.ts";
+import {
+  suggestPayment,
+  buildLedger,
+  checkAmountAgainstSuggestion,
+  shouldReplaceTermsOnPlanChange,
+  ymSaoPaulo,
+} from "../src/lib/billing/saas-pricing.ts";
 
 const NOW = "2026-11-07T12:00:00Z";
 const PERSONAL = { promoPriceBrl: 69.9, promoMonths: 2, fullPriceBrl: 129.9 };
@@ -107,6 +113,37 @@ t("pagamentos legados (sem competência) contam pelos meses que o paid_until and
   const s = suggestPayment(PERSONAL, legacy, 1, NOW);
   assert.equal(s.amountBrl, 129.9);
   assert.equal(s.label, "12/2026");
+});
+
+t("competência aberta: valor acima do restante é recusado (restante + próxima num PIX só)", () => {
+  const rows = [pay(1, 1, 34.95, { partial: true, expected: 69.9 })];
+  const s = suggestPayment(PERSONAL, rows, 1, NOW);
+  assert.equal(s.kind, "REMAINING");
+  const err = checkAmountAgainstSuggestion(s, 104.85);
+  assert.match(err, /^Registre o restante e a próxima mensalidade separados/);
+  assert.equal(checkAmountAgainstSuggestion(s, 34.95), null); // exato
+  assert.equal(checkAmountAgainstSuggestion(s, 34.96), null); // tolerância de 1 centavo
+  assert.notEqual(checkAmountAgainstSuggestion(s, 34.97), null);
+  assert.equal(checkAmountAgainstSuggestion(s, 20), null); // menos que o restante: ainda parcial
+  // modo NEW não limita (vários meses / valor combinado)
+  assert.equal(checkAmountAgainstSuggestion(suggestPayment(PERSONAL, [], 1, NOW), 500), null);
+});
+
+t("troca para o mesmo plano mantém condições MANUAL; troca real substitui", () => {
+  assert.equal(shouldReplaceTermsOnPlanChange("personal", "personal"), false);
+  assert.equal(shouldReplaceTermsOnPlanChange("personal", "essencial"), true);
+  assert.equal(shouldReplaceTermsOnPlanChange("essencial", "personal"), true);
+  assert.equal(shouldReplaceTermsOnPlanChange(null, "advance"), true); // plano desconhecido → grava a tabela
+});
+
+t("rótulo no fuso de São Paulo: 30/11 22:30 BRT é competência 11/2026", () => {
+  const paidAt = "2026-12-01T01:30:00Z"; // = 30/11/2026 22:30 em São Paulo (UTC-3)
+  assert.deepEqual(ymSaoPaulo(paidAt), { year: 2026, month: 11 });
+  const rows = [{ ...pay(1, 1, 69.9), paidAt }];
+  const s = suggestPayment(PERSONAL, rows, 1, NOW);
+  assert.equal(s.label, "12/2026"); // a 2ª competência; a 1ª foi 11/2026
+  assert.equal(suggestPayment(PERSONAL, [], 1, paidAt).label, "11/2026");
+  assert.equal(suggestPayment(PERSONAL, [], 1, paidAt).promoUntilLabel, "12/2026");
 });
 
 console.log(`\n${ok} casos OK`);
