@@ -9,6 +9,7 @@ import { sendEmail } from "@/server/notifications/resend";
 import { BARBERAGENCIA_EMAIL } from "@/lib/contact";
 import { PLAN_ORDER, planLabel, normalizeSaasPlan } from "@/lib/entitlements";
 import { writeDefaultBillingTerms } from "@/features/billing/terms";
+import { shouldReplaceTermsOnPlanChange } from "@/lib/billing/saas-pricing";
 
 /** O admin solicita upgrade de plano — gera a solicitação e avisa o master. */
 export async function requestUpgrade(input?: { requestedPlan?: string; reason?: string }) {
@@ -56,12 +57,15 @@ export async function setTenantPlan(tenantId: string, plan: string) {
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
   const p = normalizeSaasPlan(plan);
   const admin = createSupabaseAdminClient();
+  const { data: before } = await admin.from("tenants").select("saas_plan").eq("id", tenantId).maybeSingle();
   const { error } = await admin.from("tenants").update({ saas_plan: p }).eq("id", tenantId);
   if (error) return { ok: false as const, error: error.message };
-  // Troca de plano: condições do novo plano pela tabela padrão; o master ajusta em "Editar condições".
-  await writeDefaultBillingTerms(admin, tenantId, p, user.id);
+  // Só uma troca real de plano substitui as condições (pela tabela do novo plano). Mesmo
+  // plano = mantém o que foi negociado (MANUAL). O master ajusta em "Editar condições".
+  const termsReplaced = shouldReplaceTermsOnPlanChange((before?.saas_plan as string) ?? null, p);
+  if (termsReplaced) await writeDefaultBillingTerms(admin, tenantId, p, user.id);
   revalidatePath(`/master/barbearias/${tenantId}`);
-  return { ok: true as const };
+  return { ok: true as const, termsReplaced };
 }
 
 /** MASTER resolve uma solicitação de upgrade (aprova trocando o plano, ou rejeita). */
@@ -78,10 +82,13 @@ export async function resolveUpgradeRequest(id: string, approve: boolean) {
   if (!req) return { ok: false as const, error: "Solicitação não encontrada." };
   if (req.status !== "PENDING") return { ok: false as const, error: "Solicitação já resolvida." };
 
+  let termsReplaced = false;
   if (approve) {
     const plan = normalizeSaasPlan(req.requested_plan as string);
+    const { data: before } = await admin.from("tenants").select("saas_plan").eq("id", req.tenant_id as string).maybeSingle();
     await admin.from("tenants").update({ saas_plan: plan }).eq("id", req.tenant_id as string);
-    await writeDefaultBillingTerms(admin, req.tenant_id as string, plan, user.id);
+    termsReplaced = shouldReplaceTermsOnPlanChange((before?.saas_plan as string) ?? null, plan);
+    if (termsReplaced) await writeDefaultBillingTerms(admin, req.tenant_id as string, plan, user.id);
   }
   const { error } = await admin
     .from("plan_upgrade_requests")
@@ -90,6 +97,6 @@ export async function resolveUpgradeRequest(id: string, approve: boolean) {
   if (error) return { ok: false as const, error: error.message };
 
   revalidatePath("/master/barbearias");
-  return { ok: true as const };
+  return { ok: true as const, termsReplaced };
 }
 

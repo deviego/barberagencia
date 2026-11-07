@@ -30,7 +30,7 @@ export function MasterPlanPanel({
       const res = await setTenantPlan(tenantId, p);
       if (res.ok) {
         setCurrent(p);
-        setMsg("Plano atualizado.");
+        setMsg(res.termsReplaced ? "Plano atualizado. Condições substituídas pela tabela." : "Plano atualizado.");
       } else setMsg(res.error ?? "Falha.");
     });
   }
@@ -43,7 +43,13 @@ export function MasterPlanPanel({
         const req = requests.find((r) => r.id === id);
         if (req?.requested_plan) setCurrent(normalizeSaasPlan(req.requested_plan));
       }
-      setMsg(res.ok ? "Solicitação resolvida." : res.error ?? "Falha.");
+      setMsg(
+        res.ok
+          ? res.termsReplaced
+            ? "Solicitação resolvida. Condições substituídas pela tabela."
+            : "Solicitação resolvida."
+          : res.error ?? "Falha."
+      );
     });
   }
 
