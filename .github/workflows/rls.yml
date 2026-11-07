@@ -1,0 +1,54 @@
+# Isolamento entre barbearias (Epic 02 · S2/S3): Supabase EFÊMERO no runner, schema aplicado do
+# zero na ordem de supabase/ci-order.txt e teste de RLS/RPCs com 2 barbearias fictícias.
+# Só docker local do runner. Nenhum segredo: as chaves vêm do `supabase status` local (demo).
+# Check obrigatório separado do `check` (ci.yml): precisa de docker, leva ~2–4 min e falha por
+# motivo diferente (vazamento de dados entre tenants).
+name: RLS
+
+on:
+  pull_request:
+    branches: [main, staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rls-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências (sem scripts de install)
+        run: npm ci --ignore-scripts
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Subir Supabase local (db, auth, rest, kong, storage) — seed desligado no config.toml
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,realtime,postgres-meta
+
+      - name: Aplicar schema do zero (só supabase/ci-order.txt, 1 passada; falha se faltar arquivo no manifesto)
+        env:
+          SCHEMA_ORDER_FILE: supabase/ci-order.txt
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          test -f "$SCHEMA_ORDER_FILE"
+          node scripts/ci/apply-schema.mjs
+
+      - name: Exportar URL e chaves do Supabase LOCAL
+        run: supabase status -o env | sed 's/="/=/; s/"$//' >> "$GITHUB_ENV"
+
+      - name: Teste de isolamento (RLS + RPCs, 2 barbearias fictícias)
+        run: node --test scripts/ci/rls-isolation.test.mjs

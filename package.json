@@ -11,7 +11,8 @@
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "test:rls": "node --test scripts/ci/rls-isolation.test.mjs"
   },
   "engines": {
     "node": ">=20"
