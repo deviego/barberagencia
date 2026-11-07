@@ -9,6 +9,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
 import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
 import { REF_COOKIE } from "@/lib/partners/ref";
+import { writeDefaultBillingTerms } from "@/features/billing/terms";
 
 /** MASTER: dispara o envio do relatório mensal AGORA (WhatsApp), via gateway. */
 export async function sendReportNow(ym?: string) {
@@ -138,6 +139,9 @@ export async function createTenant(input: {
   }
   const tenant = ins.data;
   if (ins.error || !tenant) return { ok: false as const, error: ins.error?.message ?? "Falha ao criar a barbearia." };
+
+  // Condições vendidas (Epic 01 · S0): copia a tabela padrão do plano para a barbearia.
+  await writeDefaultBillingTerms(admin, tenant.id as string, input.plan, user.id);
 
   await admin.from("branding").insert({
     tenant_id: tenant.id,

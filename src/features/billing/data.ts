@@ -3,6 +3,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
 import { PLANS, normalizeSaasPlan, planLabel, isDistributorPlan, distributorPlanInfo } from "@/lib/entitlements";
+import type { BillingTerms, PaymentRecord } from "@/lib/billing/saas-pricing";
+import { loadBillingTerms, loadPaymentRecords } from "./terms";
 
 export type SaasPaymentRow = {
   amountBrl: number;
@@ -26,6 +28,15 @@ export type SaasBilling = {
   overdue: boolean;
   payments: SaasPaymentRow[];
   configured: boolean; // migração schema-23 aplicada?
+  /** Condições vendidas (S0). null = distribuidor (preço fixo, fora do Epic 01). */
+  terms: BillingTerms | null;
+  termsStored: boolean; // false = não há linha gravada (usa a tabela padrão do plano)
+  termsSource: string | null; // TABLE | BACKFILL | MANUAL
+  /** Todas as linhas de pagamento, no formato do cálculo por competência (S1). */
+  ledger: PaymentRecord[];
+  competenciaConfigured: boolean; // schema-34 aplicado (tabela de condições + colunas de competência)?
+  planUnknown: boolean; // tenants.saas_plan nulo/desconhecido → "Confira o valor combinado"
+  nowIso: string; // "agora" do servidor, para o cálculo no cliente bater com o SSR
 };
 
 const num = (v: unknown) => Number(v ?? 0);
@@ -79,6 +90,22 @@ export async function getSaasBilling(tenantId: string): Promise<SaasBilling | nu
       }))
     : [];
 
+  // Condições vendidas + linhas para o cálculo por competência (só barbearias).
+  let terms: BillingTerms | null = null;
+  let termsStored = false;
+  let termsSource: string | null = null;
+  let ledger: PaymentRecord[] = [];
+  let competenciaConfigured = false;
+  if (!isDist) {
+    const [tr, pr] = await Promise.all([loadBillingTerms(admin, tenantId, rawPlan), loadPaymentRecords(admin, tenantId)]);
+    terms = tr.terms;
+    termsStored = tr.stored;
+    termsSource = tr.source;
+    ledger = pr.records;
+    competenciaConfigured = tr.tableExists && pr.competenciaColumns;
+  }
+  const planUnknown = !isDist && !(rawPlan === "personal" || rawPlan === "essencial" || rawPlan === "advance");
+
   const now = Date.now();
   const trialActive = !!trialEndsAt && new Date(trialEndsAt).getTime() > now;
   const paidActive = !!paidUntil && new Date(paidUntil).getTime() >= now;
@@ -103,5 +130,12 @@ export async function getSaasBilling(tenantId: string): Promise<SaasBilling | nu
     overdue,
     payments,
     configured: paidUntilKnown && tableExists,
+    terms,
+    termsStored,
+    termsSource,
+    ledger,
+    competenciaConfigured,
+    planUnknown,
+    nowIso: new Date(now).toISOString(),
   };
 }

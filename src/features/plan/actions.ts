@@ -8,6 +8,7 @@ import { isMaster } from "@/lib/rbac";
 import { sendEmail } from "@/server/notifications/resend";
 import { BARBERAGENCIA_EMAIL } from "@/lib/contact";
 import { PLAN_ORDER, planLabel, normalizeSaasPlan } from "@/lib/entitlements";
+import { writeDefaultBillingTerms } from "@/features/billing/terms";
 
 /** O admin solicita upgrade de plano — gera a solicitação e avisa o master. */
 export async function requestUpgrade(input?: { requestedPlan?: string; reason?: string }) {
@@ -57,6 +58,8 @@ export async function setTenantPlan(tenantId: string, plan: string) {
   const admin = createSupabaseAdminClient();
   const { error } = await admin.from("tenants").update({ saas_plan: p }).eq("id", tenantId);
   if (error) return { ok: false as const, error: error.message };
+  // Troca de plano: condições do novo plano pela tabela padrão; o master ajusta em "Editar condições".
+  await writeDefaultBillingTerms(admin, tenantId, p, user.id);
   revalidatePath(`/master/barbearias/${tenantId}`);
   return { ok: true as const };
 }
@@ -78,6 +81,7 @@ export async function resolveUpgradeRequest(id: string, approve: boolean) {
   if (approve) {
     const plan = normalizeSaasPlan(req.requested_plan as string);
     await admin.from("tenants").update({ saas_plan: plan }).eq("id", req.tenant_id as string);
+    await writeDefaultBillingTerms(admin, req.tenant_id as string, plan, user.id);
   }
   const { error } = await admin
     .from("plan_upgrade_requests")
