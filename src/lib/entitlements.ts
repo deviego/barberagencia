@@ -30,7 +30,7 @@ export type NumericLimitKey =
 
 interface PlanConfig {
   label: string;
-  priceBRL: number; // mensalidade
+  priceBRL: number; // mensalidade cheia (sem promoção; promo é registrada manualmente pelo master no pagamento)
   features: Record<FeatureKey, boolean>;
   limits: Record<NumericLimitKey, number>; // -1 = ilimitado
 }
@@ -40,7 +40,7 @@ const UNLIMITED = -1;
 export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   personal: {
     label: "Personal",
-    priceBRL: 69.9,
+    priceBRL: 129.9,
     features: {
       "site.subdomain": false,
       "site.customDomain": false,
