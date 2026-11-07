@@ -43,7 +43,7 @@ const nextConfig = {
     const NOINDEX = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
     const PRIVATE = [
       "/admin/:path*", "/master/:path*", "/distributor/:path*", "/client/:path*", "/rede/:path*",
-      "/b/:path*", "/convite/:path*", "/design-system/:path*", "/api/:path*",
+      "/b/:path*", "/convite/:path*", "/design-system/:path*", "/api/:path*", "/preview/:path*",
     ];
     return [
       { source: "/:path*", headers: SECURITY_HEADERS },

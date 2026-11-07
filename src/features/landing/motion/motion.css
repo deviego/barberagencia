@@ -1,0 +1,190 @@
+/*
+ * Direções de movimento da landing (Fase 1, preview).
+ * Regras: só transform/opacity nas transições de entrada; nada esconde conteúdo sem a
+ * classe .m-pending (posta só pelo JS, abaixo da dobra); tudo atrás de
+ * prefers-reduced-motion: no-preference. O hero (#produto) nunca começa invisível.
+ */
+[data-motion] {
+  --m-ease: cubic-bezier(0.16, 1, 0.3, 1); /* "expo out": chega rápido, assenta devagar */
+  --m-dur: 700ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ---------- Base comum: revelar ao rolar ---------- */
+  [data-motion] .m-reveal {
+    transition:
+      opacity var(--m-dur) var(--m-ease) var(--m-delay, 0ms),
+      transform var(--m-dur) var(--m-ease) var(--m-delay, 0ms);
+  }
+  [data-motion] .m-pending {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+
+  /* Cards: leve elevação no hover, depois de revelados */
+  [data-motion] main > section:not(#produto) .grid > div.m-done,
+  [data-motion] main > section:not(#produto) .grid > div:not(.m-reveal):not(.m-pending) {
+    transition: transform 450ms var(--m-ease), border-color 200ms ease-out;
+  }
+  [data-motion] main > section:not(#produto) .grid > div.rounded-lg:not(.m-pending):hover {
+    transform: translate3d(0, -4px, 0);
+  }
+  [data-motion] main a[href]:active {
+    transform: scale(0.98);
+  }
+
+  /* =====================================================================
+   * A · NAVALHA — preciso e quieto. Revela, e um "fio de navalha" dourado
+   * corta sob cada sobretítulo. O brilho do hero respira, devagar.
+   * ===================================================================== */
+  [data-motion="navalha"] #produto > .pointer-events-none {
+    animation: m-breathe 9s var(--m-ease) 1.2s infinite alternate;
+  }
+  [data-motion="navalha"] main > section > div > span.uppercase.text-accent {
+    position: relative;
+    padding-bottom: 6px;
+  }
+  [data-motion="navalha"] main > section > div > span.uppercase.text-accent::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 48px;
+    height: 1px;
+    background: var(--bb-accent);
+    transform-origin: left;
+    transform: scaleX(1);
+  }
+  [data-motion="navalha"] .m-pending span.uppercase.text-accent::after {
+    transform: scaleX(0);
+  }
+  [data-motion="navalha"] .m-in span.uppercase.text-accent::after {
+    transition: transform 900ms var(--m-ease) 250ms;
+  }
+
+  /* =====================================================================
+   * B · LETREIRO — ritmo de barbearia. Números entram como placa de senha,
+   * os 4 passos acendem em sequência e o poste listrado gira ao chegar.
+   * ===================================================================== */
+  [data-motion="letreiro"] .m-pending {
+    transform: translate3d(0, 28px, 0);
+  }
+  /* Métricas: o valor sobe de dentro da célula (placa) */
+  [data-motion="letreiro"] main > section:nth-of-type(2) .grid > div > span:first-child {
+    display: inline-block;
+  }
+  [data-motion="letreiro"] main > section:nth-of-type(2) .grid > div {
+    overflow: hidden;
+  }
+  [data-motion="letreiro"] main > section:nth-of-type(2) .m-pending > span:first-child {
+    transform: translate3d(0, 110%, 0);
+  }
+  [data-motion="letreiro"] main > section:nth-of-type(2) .m-in > span:first-child {
+    transition: transform 800ms var(--m-ease) calc(var(--m-delay, 0ms) + 120ms);
+  }
+  /* Fila: o número da etapa vira como placa de senha */
+  [data-motion="letreiro"] #fila .grid > div span.font-display {
+    display: inline-block;
+    transform-origin: 50% 0;
+  }
+  [data-motion="letreiro"] #fila .grid > .m-pending span.font-display {
+    transform: perspective(300px) rotateX(-90deg);
+  }
+  [data-motion="letreiro"] #fila .grid > .m-in span.font-display {
+    transition: transform 700ms var(--m-ease) calc(var(--m-delay, 0ms) + 200ms);
+  }
+  /* Implantação: a linha de cada passo acende em sequência */
+  [data-motion="letreiro"] main > section:nth-of-type(7) .grid > div {
+    position: relative;
+  }
+  [data-motion="letreiro"] main > section:nth-of-type(7) .grid > div::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -2px;
+    height: 2px;
+    background: var(--bb-accent);
+    transform-origin: left;
+    transform: scaleX(0);
+  }
+  [data-motion="letreiro"] main > section:nth-of-type(7) .grid > .m-in::before,
+  [data-motion="letreiro"] main > section:nth-of-type(7) .grid > .m-done::before {
+    transform: scaleX(1);
+    transition: transform 900ms var(--m-ease) calc(var(--m-delay, 0ms) * 3 + 200ms);
+  }
+  /* CTA: o poste listrado do topo gira 2 voltas quando a seção chega */
+  [data-motion="letreiro"] #contato .m-in > div:first-child,
+  [data-motion="letreiro"] #contato .m-done > div:first-child {
+    background-size: 42.43px 42.43px !important;
+    animation: m-pole 1.2s linear 2;
+  }
+
+  /* =====================================================================
+   * C · CINEMA — profundidade. O mockup do hero recua ao rolar, o celular
+   * do app flutua em parallax, o "antes" apaga quando o "depois" chega e um
+   * holofote dourado segue o cursor nos planos (só desktop).
+   * ===================================================================== */
+  [data-motion="cinema"] .m-pending {
+    transform: translate3d(0, 32px, 0) scale(0.97);
+  }
+  [data-motion="cinema"] main > section > div.m-pending:not(.grid) h2 {
+    opacity: 0.001;
+    transform: translate3d(0, 12px, 0);
+  }
+  [data-motion="cinema"] main > section > div.m-in:not(.grid) h2 {
+    transition: opacity 900ms var(--m-ease) 120ms, transform 900ms var(--m-ease) 120ms;
+  }
+  /* Antes/depois: o "Sem a plataforma" perde força quando o "Com" chega */
+  [data-motion="cinema"] main > section:nth-of-type(4) .grid:has(> div:nth-child(2):is(.m-in, .m-done)) > div:first-child {
+    opacity: 0.55;
+    transition: opacity 900ms var(--m-ease) 500ms;
+  }
+  /* Holofote nos planos (variáveis vindas do pointermove) */
+  [data-motion="cinema"] #planos .grid.items-stretch > div::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(280px circle at var(--mx, 50%) var(--my, 0%), var(--bb-accent-wash), transparent 70%);
+    transition: opacity 300ms ease-out;
+  }
+  [data-motion="cinema"] #planos .grid.items-stretch > div:hover::after {
+    opacity: 1;
+  }
+
+  /* Rolagem ligada à animação (CSS puro; navegador sem suporte = estático) */
+  @supports (animation-timeline: view()) {
+    /* Mockup do hero: começa intacto (LCP) e só recua quando sai da tela */
+    [data-motion="cinema"] #produto > div:last-child {
+      animation: m-recede linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 100%;
+    }
+    /* Celular do app do cliente: parallax suave */
+    [data-motion="cinema"] #cliente .grid > div:last-child > div {
+      animation: m-float linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+
+@keyframes m-breathe {
+  from { opacity: 1; }
+  to { opacity: 0.55; }
+}
+@keyframes m-pole {
+  from { background-position: 0 0; }
+  to { background-position: 42.43px 0; }
+}
+@keyframes m-recede {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.92) translate3d(0, -4%, 0); opacity: 0.35; }
+}
+@keyframes m-float {
+  from { transform: translate3d(0, 28px, 0); }
+  to { transform: translate3d(0, -28px, 0); }
+}
