@@ -1,0 +1,55 @@
+# SPIKE (docs/spikes/2026-11-ci-supabase-efemero.md): Supabase efêmero no runner + schema + teste de RLS.
+# Só docker local do runner, dados fictícios. Nenhum segredo: as chaves vêm do `supabase status` local.
+name: rls-spike
+
+on:
+  push:
+    branches: [spike/ci-supabase-efemero]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências (sem scripts de install)
+        run: npm ci --ignore-scripts
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Subir Supabase local (só db, auth, rest, kong, storage)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,realtime,postgres-meta
+
+      - name: Aplicar schema do zero (ordem cronológica, 1 passada)
+        env:
+          SCHEMA_ORDER_FILE: supabase/ci-order.txt
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: node scripts/ci/apply-schema.mjs
+
+      - name: Aplicar schema do jeito do bootstrap-staging (2 passadas) — só para comparar
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: |
+          supabase db reset --local
+          node scripts/ci/apply-schema.mjs
+          supabase db reset --local
+          SCHEMA_ORDER_FILE=supabase/ci-order.txt node scripts/ci/apply-schema.mjs
+
+      - name: Teste de isolamento RLS (2 tenants fictícios, JWT authenticated)
+        run: |
+          supabase status -o env | sed 's/="/=/; s/"$//' >> "$GITHUB_ENV"
+          echo "ok"
+
+      - run: node --test scripts/ci/rls-isolation.test.mjs
