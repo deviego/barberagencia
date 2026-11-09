@@ -48,6 +48,8 @@ export default async function ClientFilaPage() {
         tenantId={tenant.id}
         ticket={ticket}
         serving={board.serving}
+        lastCalled={board.lastCalled}
+        next={board.next}
         services={services}
         barbers={barbers}
         pickBarber={config.pickBarber}

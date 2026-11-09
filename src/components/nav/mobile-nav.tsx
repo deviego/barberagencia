@@ -49,7 +49,7 @@ export function MobileNav({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-drawer transition-opacity duration-200 md:hidden",
+        "fixed inset-x-0 bottom-0 top-14 z-drawer transition-opacity duration-200 md:hidden",
         open ? "opacity-100" : "pointer-events-none opacity-0"
       )}
       aria-hidden={!open}

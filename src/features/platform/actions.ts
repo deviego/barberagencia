@@ -9,6 +9,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
 import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
 import { REF_COOKIE } from "@/lib/partners/ref";
+import { writeDefaultBillingTerms } from "@/features/billing/terms";
 
 /** MASTER: dispara o envio do relatório mensal AGORA (WhatsApp), via gateway. */
 export async function sendReportNow(ym?: string) {
@@ -88,7 +89,6 @@ export async function createTenant(input: {
   adminEmail: string;
   adminName?: string;
   phone?: string;
-  trialEnabled?: boolean;
   queueEnabled?: boolean;
   referredByPartnerId?: string;
   contract?: {
@@ -140,6 +140,9 @@ export async function createTenant(input: {
   const tenant = ins.data;
   if (ins.error || !tenant) return { ok: false as const, error: ins.error?.message ?? "Falha ao criar a barbearia." };
 
+  // Condições vendidas (Epic 01 · S0): copia a tabela padrão do plano para a barbearia.
+  await writeDefaultBillingTerms(admin, tenant.id as string, input.plan, user.id);
+
   await admin.from("branding").insert({
     tenant_id: tenant.id,
     logo_text: name.slice(0, 2).toUpperCase(),
@@ -151,19 +154,17 @@ export async function createTenant(input: {
     await admin.from("tenant_settings").upsert({ tenant_id: tenant.id, phone }, { onConflict: "tenant_id" });
   }
 
-  // contrato de assinatura (com dados legais + flag de teste)
-  const trialEnabled = input.trialEnabled !== false; // default: com teste
+  // contrato de assinatura (com dados legais). Sem período de teste: contrato pendente já no 1º acesso.
   const now = new Date();
-  const trialEnds = new Date(now.getTime() + (trialEnabled ? 15 * 24 * 60 * 60 * 1000 : 0));
   const c = input.contract ?? {};
   const clean = (s?: string) => (s && s.trim() ? s.trim() : null);
   await admin.from("tenant_contracts").upsert(
     {
       tenant_id: tenant.id,
       plan: input.plan,
-      trial_enabled: trialEnabled,
+      trial_enabled: false,
       trial_started_at: now.toISOString(),
-      trial_ends_at: trialEnds.toISOString(),
+      trial_ends_at: now.toISOString(),
       status: "PENDING",
       legal_name: clean(c.legalName),
       trade_name: clean(c.tradeName) ?? name,

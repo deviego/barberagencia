@@ -30,7 +30,10 @@ export type NumericLimitKey =
 
 interface PlanConfig {
   label: string;
-  priceBRL: number; // mensalidade
+  priceBRL: number; // mensalidade cheia (preço depois da promoção)
+  /** Tabela padrão para fechamentos NOVOS. O cálculo usa as condições gravadas na barbearia (tenant_billing_terms). */
+  promoPriceBRL: number | null; // null = sem promoção
+  promoMonths: number; // competências com o preço promocional, a partir da 1ª paga
   features: Record<FeatureKey, boolean>;
   limits: Record<NumericLimitKey, number>; // -1 = ilimitado
 }
@@ -40,7 +43,9 @@ const UNLIMITED = -1;
 export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   personal: {
     label: "Personal",
-    priceBRL: 69.9,
+    priceBRL: 129.9,
+    promoPriceBRL: 69.9,
+    promoMonths: 2,
     features: {
       "site.subdomain": false,
       "site.customDomain": false,
@@ -68,6 +73,8 @@ export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   essencial: {
     label: "Essencial",
     priceBRL: 189.9,
+    promoPriceBRL: 89.9,
+    promoMonths: 2,
     features: {
       "site.subdomain": true,
       "site.customDomain": false,
@@ -95,6 +102,8 @@ export const PLANS: Record<SaasPlanKey, PlanConfig> = {
   advance: {
     label: "Advance",
     priceBRL: 249.9,
+    promoPriceBRL: null,
+    promoMonths: 0,
     features: {
       "site.subdomain": true,
       "site.customDomain": true,
@@ -151,6 +160,12 @@ export const PLAN_ORDER: SaasPlanKey[] = ["personal", "essencial", "advance"];
 
 export function planLabel(plan: SaasPlanKey): string {
   return PLANS[plan].label;
+}
+
+/** Condições padrão de cobrança de um plano SaaS (copiadas para a barbearia no fechamento). */
+export function defaultBillingTerms(plan: SaasPlanKey): { promoPriceBrl: number | null; promoMonths: number; fullPriceBrl: number } {
+  const p = PLANS[plan];
+  return { promoPriceBrl: p.promoPriceBRL, promoMonths: p.promoPriceBRL == null ? 0 : p.promoMonths, fullPriceBrl: p.priceBRL };
 }
 
 export function normalizeSaasPlan(p: string | null | undefined): SaasPlanKey {

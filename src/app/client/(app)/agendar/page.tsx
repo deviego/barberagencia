@@ -1,7 +1,7 @@
 import { AgendarForm } from "@/features/client/components/agendar-form";
 import type { Child } from "@/features/client/components/child-modal";
 import { PaymentNotice } from "@/features/client/components/payment-notice";
-import { getCatalog, getClientHome, getMyChildren, getProducts, getWorkingHours, getSlotStep } from "@/features/client/data";
+import { getCatalog, getClientHome, getComboServiceIds, getMyChildren, getProducts, getWorkingHours, getSlotStep } from "@/features/client/data";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
   if (!rel) return null;
@@ -39,6 +39,7 @@ export default async function AgendarPage({
   const fixedBarberName =
     sub?.fixed_barber_id ? catalog.barbers.find((b) => b.id === sub.fixed_barber_id)?.name ?? null : null;
 
+  const comboServiceIds = sub?.combo_plan_id ? await getComboServiceIds(sub.combo_plan_id) : [];
   const plan =
     sub && combo
       ? {
@@ -46,6 +47,7 @@ export default async function AgendarPage({
           name: combo.name,
           saldo: sub.saldo_cortes,
           bookingMode,
+          serviceIds: comboServiceIds,
           fixed:
             bookingMode === "FIXED"
               ? { weekday: sub.fixed_weekday, startMin: sub.fixed_start_min, barberName: fixedBarberName }
