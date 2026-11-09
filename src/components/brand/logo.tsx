@@ -1,9 +1,14 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { isPublicStorageUrl } from "@/lib/storage/public-url";
 
 /**
- * Logo do tenant. Se `src` (logoUrl) existir, mostra a imagem; senão, o
- * placeholder tipográfico com as iniciais.
+ * Logo do tenant. Só usa next/image quando `src` é uma URL pública do nosso Storage
+ * (o único host liberado em images.remotePatterns). Qualquer outra URL, ou falha ao
+ * carregar, cai no placeholder com as iniciais — nunca derruba a página.
  */
 export function LogoMark({
   text,
@@ -16,13 +21,22 @@ export function LogoMark({
   size?: number;
   className?: string;
 }) {
-  if (src) {
+  const [failed, setFailed] = useState(false);
+
+  if (!failed && isPublicStorageUrl(src)) {
     return (
       <span
         className={cn("relative block shrink-0 overflow-hidden rounded-md", className)}
         style={{ height: size, width: size }}
       >
-        <Image src={src} alt={text} fill sizes={`${size}px`} className="object-contain" />
+        <Image
+          src={src}
+          alt={text}
+          fill
+          sizes={`${size}px`}
+          className="object-contain"
+          onError={() => setFailed(true)}
+        />
       </span>
     );
   }
