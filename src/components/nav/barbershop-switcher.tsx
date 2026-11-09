@@ -50,12 +50,12 @@ export function BarbershopSwitcher({
         onClick={() => setOpen((o) => !o)}
         disabled={pending}
         className={cn(
-          "hidden items-center gap-1.5 rounded-md border px-3 py-1.5 text-caption transition-colors sm:flex",
+          "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-caption transition-colors sm:px-3",
           acting ? "border-accent bg-accent-wash text-accent" : "border-border text-text hover:border-accent"
         )}
       >
-        <Building2 size={15} className="text-accent" />
-        <span className="max-w-[160px] truncate">{shortName}</span>
+        <Building2 size={15} className="shrink-0 text-accent" />
+        <span className="hidden max-w-[160px] truncate sm:inline">{shortName}</span>
         {acting && <span className="rounded-pill bg-accent px-1.5 text-[10px] font-bold uppercase text-text-inverse">atuando</span>}
         <ChevronDown size={14} className="text-text-muted" />
       </button>

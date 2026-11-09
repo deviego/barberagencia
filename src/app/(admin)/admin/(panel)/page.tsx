@@ -82,8 +82,9 @@ export default async function AdminDashboard() {
         </Link>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Faturamento (mês)" value={formatBRL(d.revenueMonth)} accent />
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <KpiCard label="Faturamento (dia)" value={formatBRL(d.revenueToday)} accent />
+        <KpiCard label="Faturamento (mês)" value={formatBRL(d.revenueMonth)} />
         <KpiCard label="Agendamentos hoje" value={String(d.apptsToday)} />
         <KpiCard label="Assinantes ativos" value={String(d.subscribers)} />
         <KpiCard label="Solicitações pendentes" value={String(d.pending)} />

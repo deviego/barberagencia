@@ -64,6 +64,39 @@ export async function logout() {
   redirect(area === "admin" ? "/admin/login" : area === "master" ? "/master/login" : "/client/login");
 }
 
+/**
+ * Login por E-MAIL ou TELEFONE. Se vier telefone, resolve o e-mail de auth real
+ * vinculado (funciona p/ conta com e-mail real e p/ conta telefone-only), senão
+ * usa o e-mail técnico. Faz o signIn no servidor (seta o cookie da área).
+ */
+export async function signInWithIdentifier(
+  identifier: string,
+  password: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = (identifier ?? "").trim();
+  if (!id || !password) return { ok: false, error: "Informe telefone/e-mail e senha." };
+
+  let email = id.toLowerCase();
+  if (!isEmail(id)) {
+    const digits = phoneDigits(id);
+    if (digits.length < 10) return { ok: false, error: "Informe um e-mail ou telefone válido (com DDD)." };
+    let resolved: string | null = null;
+    try {
+      const admin = createSupabaseAdminClient();
+      const { data } = await admin.rpc("auth_email_for_phone", { p_digits: digits });
+      resolved = (data as string | null) ?? null;
+    } catch {
+      /* usa o e-mail técnico abaixo */
+    }
+    email = (resolved ?? syntheticEmail(digits)).toLowerCase();
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return { ok: false, error: "Telefone/e-mail ou senha inválidos." };
+  return { ok: true };
+}
+
 /** Envia o e-mail de boas-vindas ao usuário logado (chamado logo após o cadastro). */
 export async function sendWelcomeEmail() {
   const supabase = await createSupabaseServerClient();

@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BookOpen, Menu, Search, Shield } from "lucide-react";
+import { Bell, BookOpen, Menu, Search, Shield, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LogoutButton } from "@/components/nav/logout-button";
 import { BarbershopSwitcher } from "@/components/nav/barbershop-switcher";
 import { ViewAsClientButton } from "@/components/nav/view-as-client-button";
 import { MobileNav } from "@/components/nav/mobile-nav";
-import { TrialBanner } from "@/components/nav/trial-banner";
 import { Copyright } from "@/components/brand/copyright";
 import { LogoMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,7 @@ import { ADMIN_NAV } from "@/features/admin/nav";
 import { hasEntitlement } from "@/lib/entitlements";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { SaasPlanKey } from "@/lib/tenant/types";
-import { cn, getInitials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 /** Bip curto (Web Audio) — só toca após 1ª interação do usuário na página. */
 function playBeep() {
@@ -46,11 +45,7 @@ export function AdminShell({
   logoUrl,
   name,
   plan,
-  userName,
-  userEmail,
-  avatarUrl,
   pendingCount = 0,
-  trialEndsAt,
   isMaster = false,
   tenants,
   acting = false,
@@ -64,7 +59,6 @@ export function AdminShell({
   userEmail?: string | null;
   avatarUrl?: string | null;
   pendingCount?: number;
-  trialEndsAt?: string | null;
   isMaster?: boolean;
   tenants?: { id: string; name: string }[];
   acting?: boolean;
@@ -78,7 +72,6 @@ export function AdminShell({
   const prevCount = useRef(pendingCount);
 
   const items = ADMIN_NAV.filter((i) => !i.feature || hasEntitlement(plan, i.feature));
-  const initials = getInitials(userName, userEmail);
   const mobileItems = items.map((i) => ({
     href: i.href,
     label: i.label,
@@ -115,7 +108,6 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-screen flex-col">
-      {trialEndsAt && <TrialBanner endsAt={trialEndsAt} />}
       <MobileNav
         open={mobileNav}
         onClose={() => setMobileNav(false)}
@@ -151,13 +143,13 @@ export function AdminShell({
       {/* Topbar full-width */}
       <header className="sticky top-0 z-drawer flex items-center justify-between gap-4 border-b border-border bg-surface px-5 py-2.5">
         <div className="flex items-center gap-3">
-          {/* Mobile: abre o menu de tela cheia. */}
+          {/* Mobile: abre/fecha o menu (o botão vira X quando aberto). */}
           <button
-            onClick={() => setMobileNav(true)}
-            aria-label="Abrir menu"
+            onClick={() => setMobileNav((m) => !m)}
+            aria-label={mobileNav ? "Fechar menu" : "Abrir menu"}
             className="flex rounded-md p-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent md:hidden"
           >
-            <Menu size={20} />
+            {mobileNav ? <X size={20} /> : <Menu size={20} />}
           </button>
           {/* Desktop: colapsa/expande a sidebar. */}
           <button
@@ -198,18 +190,6 @@ export function AdminShell({
             )}
           </Link>
           <ThemeToggle />
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt={initials} className="h-8 w-8 rounded-full object-cover" />
-          ) : (
-            <span
-              className="flex h-8 w-8 items-center justify-center rounded-full text-caption font-bold text-white"
-              style={{ background: "var(--bb-pole-blue)" }}
-            >
-              {initials}
-            </span>
-          )}
-          <LogoutButton />
         </div>
       </header>
 
