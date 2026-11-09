@@ -56,6 +56,17 @@ export async function requestAppointment(input: RequestAppointmentInput) {
   const primaryServiceRef = firstServiceIdx >= 0 ? items[firstServiceIdx].refId ?? null : null;
   const requestExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
+  // Combo: se o plano tem serviços definidos, a visita cobre TODOS eles (1 uso do
+  // saldo). Sem serviços definidos (plano legado), cobre só o 1º serviço.
+  let coveredSet: Set<string> | null = null;
+  if (usePlan && comboPlanId) {
+    const { data: cps } = await supabase.from("combo_plan_services").select("service_id").eq("combo_plan_id", comboPlanId);
+    const ids = ((cps ?? []) as { service_id: string }[]).map((r) => r.service_id);
+    if (ids.length) coveredSet = new Set(ids);
+  }
+  const isCovered = (i: { kind: string; refId?: string | null }, idx: number) =>
+    usePlan && (coveredSet ? i.kind === "service" && !!i.refId && coveredSet.has(i.refId) : idx === firstServiceIdx);
+
   const { data, error } = await supabase
     .from("appointments")
     .insert({
@@ -86,7 +97,7 @@ export async function requestAppointment(input: RequestAppointmentInput) {
     price_brl: i.priceBRL,
     qty: i.qty,
     duration_min: i.durationMin ?? 0,
-    covered_by_plan: usePlan && idx === firstServiceIdx,
+    covered_by_plan: isCovered(i, idx),
   }));
   const { error: itemsErr } = await supabase.from("appointment_items").insert(rows);
   if (itemsErr) {
@@ -219,8 +230,10 @@ export async function addComandaItemClient(
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appt || appt.client_id !== client.id) return { ok: false as const, error: "Pedido não encontrado" };
-  if (appt.service_started_at || !EDITAVEL.includes(appt.status as string))
-    return { ok: false as const, error: "Este pedido não pode mais ser alterado." };
+  // Pode adicionar até o pedido ser finalizado — inclusive DURANTE o atendimento
+  // (service_started_at setado, status ainda ativo). Só bloqueia se já finalizou/cancelou.
+  if (!EDITAVEL.includes(appt.status as string))
+    return { ok: false as const, error: "Este pedido já foi finalizado e não pode ser alterado." };
 
   const { error } = await supabase.from("appointment_items").insert({
     appointment_id: appointmentId,

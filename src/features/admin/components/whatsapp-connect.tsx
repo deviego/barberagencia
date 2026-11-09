@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, MessageCircle, RefreshCw } from "lucide-react";
+import { Loader2, MessageCircle, RefreshCw, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { maskPhoneBR } from "@/lib/masks";
-import { waConnect, waLogout, waSend, waStatus } from "@/features/admin/whatsapp-actions";
+import { waConnect, waLogout, waPair, waSend, waStatus } from "@/features/admin/whatsapp-actions";
 
-type State = "connecting" | "qr" | "connected" | "disconnected" | "loading";
+type State = "connecting" | "qr" | "pairing" | "connected" | "disconnected" | "loading";
 
 export function WhatsAppConnect() {
   const [state, setState] = useState<State>("loading");
@@ -17,6 +17,8 @@ export function WhatsAppConnect() {
   const [error, setError] = useState<string | null>(null);
   const [testPhone, setTestPhone] = useState("");
   const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [pairPhone, setPairPhone] = useState("");
   const [pending, startTransition] = useTransition();
   const polling = useRef(false);
 
@@ -31,15 +33,16 @@ export function WhatsAppConnect() {
     setState((s.status as State) ?? "disconnected");
     setQr(s.qr ?? null);
     setNumber(s.number ?? null);
+    setPairingCode(s.pairingCode ?? null);
   }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  // Polling enquanto conectando/aguardando QR.
+  // Polling enquanto conectando/aguardando QR ou pareamento.
   useEffect(() => {
-    if (state !== "qr" && state !== "connecting") {
+    if (state !== "qr" && state !== "connecting" && state !== "pairing") {
       polling.current = false;
       return;
     }
@@ -70,6 +73,18 @@ export function WhatsAppConnect() {
     });
   }
 
+  // "Conectar pelo número" — gera o código de pareamento (mesmo celular, sem QR).
+  function pair() {
+    setError(null);
+    startTransition(async () => {
+      const s = await waPair(pairPhone);
+      if (!s.ok) return setError(s.error ?? "Erro");
+      setState((s.status as State) ?? "connecting");
+      setPairingCode(s.pairingCode ?? null);
+      setNumber(s.number ?? null);
+    });
+  }
+
   // Encerra qualquer sessão presa (limpa creds no gateway) e pede um QR novo.
   function reset() {
     setError(null);
@@ -90,6 +105,26 @@ export function WhatsAppConnect() {
       setTestMsg(r.ok ? "Mensagem de teste enviada!" : r.error ?? "Falha ao enviar.");
     });
   }
+
+  const pairBox = (
+    <div className="w-full rounded-md border border-border-subtle bg-inset p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-caption font-semibold text-text-2">
+        <Smartphone size={14} /> Só tem um celular? Conecte pelo número
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={pairPhone}
+          onChange={(e) => setPairPhone(maskPhoneBR(e.target.value))}
+          placeholder="(11) 91234-5678"
+          inputMode="tel"
+          maxLength={15}
+        />
+        <Button variant="secondary" loading={pending} onClick={pair}>
+          Gerar código
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
@@ -153,6 +188,21 @@ export function WhatsAppConnect() {
               Recomeçar do zero
             </button>
           </div>
+          {pairBox}
+        </div>
+      ) : state === "pairing" && pairingCode ? (
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-center text-caption text-text-2">
+            No WhatsApp <strong>deste celular</strong>: Configurações → <strong>Aparelhos conectados</strong> →{" "}
+            <strong>Conectar aparelho</strong> → <strong>Conectar com número de telefone</strong>. Digite o código:
+          </p>
+          <div className="rounded-lg border border-border bg-inset px-6 py-4 font-display text-h2 font-black tracking-[0.25em] text-accent">
+            {pairingCode.slice(0, 4)}-{pairingCode.slice(4)}
+          </div>
+          <p className="text-caption text-text-muted">O código expira rápido. Se não funcionar, gere de novo.</p>
+          <button onClick={reset} disabled={pending} className="flex items-center gap-1 text-caption text-text-muted hover:text-danger hover:underline">
+            <RefreshCw size={13} /> Recomeçar
+          </button>
         </div>
       ) : state === "connecting" || state === "loading" ? (
         <div className="flex flex-col items-start gap-2">
@@ -166,11 +216,12 @@ export function WhatsAppConnect() {
           )}
         </div>
       ) : (
-        <div className="flex flex-col items-start gap-2">
-          <Button loading={pending} onClick={connect}>
-            Conectar WhatsApp
+        <div className="flex flex-col items-stretch gap-3">
+          <Button className="self-start" loading={pending} onClick={connect}>
+            Conectar por QR code
           </Button>
-          <button onClick={reset} disabled={pending} className="text-caption text-text-muted hover:text-accent hover:underline">
+          {pairBox}
+          <button onClick={reset} disabled={pending} className="self-start text-caption text-text-muted hover:text-accent hover:underline">
             Problemas para conectar? Recomeçar do zero
           </button>
         </div>

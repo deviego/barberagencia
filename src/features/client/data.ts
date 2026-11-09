@@ -58,6 +58,13 @@ export async function getWorkingHours() {
   return data ?? [];
 }
 
+/** Serviços cobertos por um plano combo (para a cobertura no agendamento). */
+export async function getComboServiceIds(comboPlanId: string): Promise<string[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("combo_plan_services").select("service_id").eq("combo_plan_id", comboPlanId);
+  return ((data ?? []) as { service_id: string }[]).map((r) => r.service_id);
+}
+
 /** Espaçamento (min) entre horários da agenda, configurado pela barbearia. Default 30. */
 export async function getSlotStep(): Promise<number> {
   const supabase = await createSupabaseServerClient();

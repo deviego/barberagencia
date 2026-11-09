@@ -1,0 +1,43 @@
+# Barber Agência
+
+> A Barber Agência é uma plataforma white-label (SaaS) para barbearias no Brasil: agenda online, fila por QR code com totem e painel de chamada na TV, mensalidade com saldo de cortes, comanda ao vivo e financeiro por barbeiro. O cliente da barbearia usa um app com o nome, o logo e as cores da barbearia, pelo navegador, sem baixar nada. Atualizado em 27/10/2026.
+
+Para quem é: barbearias de 1 unidade, de 1 a 8 profissionais, em que o dono corta e administra. Site oficial: https://www.barberagencia.com. Contato comercial e suporte (humano, em português): WhatsApp +55 47 98866-0506 (https://wa.me/5547988660506), e-mail barberagencia@gmail.com.
+
+## Páginas
+
+- [Página inicial](https://www.barberagencia.com/): o que a plataforma faz, app do cliente, planos e perguntas frequentes
+- [Documentação](https://www.barberagencia.com/documentacao): manual funcional do app do cliente e do painel do dono
+- [Termos de uso](https://www.barberagencia.com/termos): regras de agendamento e cancelamento para o cliente final
+- [Privacidade](https://www.barberagencia.com/privacidade): política de privacidade (LGPD)
+
+## O que a plataforma faz
+
+- Fila por ordem de chegada (planos Essencial e Advance): o cliente escaneia o QR code na parede ou pega a senha no totem do balcão, acompanha pelo celular quem está em atendimento e o próximo, e a TV mostra as próximas senhas com som a cada chamada.
+- Agenda: o cliente escolhe barbeiro, serviços, data e horário pelo link; o pedido chega como solicitação e a barbearia tem 10 minutos para confirmar. Agenda por barbeiro, dia e semana, com bloqueios e folgas.
+- Mensalidade / clube do corte: planos com cortes por mês e vários serviços; o cliente assina pelo app e vê o saldo de cortes. Modo livre ou fixo (mesmo dia, horário e barbeiro toda semana).
+- Comanda ao vivo e venda de balcão; o fechamento registra PIX, cartão ou dinheiro no financeiro.
+- Financeiro: receitas, despesas, saque do caixa, estornos, faturamento por barbeiro, por dia e por serviço, comissão por profissional. Relatório mensal em PDF enviado ao WhatsApp do dono todo dia 21.
+- Avisos automáticos pelo WhatsApp da própria barbearia: solicitação recebida, agendamento confirmado, atendimento iniciado e finalizado (com total), cancelamentos, convite de acesso. Exige o WhatsApp da barbearia conectado.
+- Produtos com foto, preço, custo e estoque; reserva para retirar no balcão.
+- White-label: logo, cores e nome da barbearia; o cliente final não vê a marca Barber Agência.
+- Importação da base de clientes por planilha (CSV/Excel), com guia para Trinks, Booksy, AppBarber e BestBarbers/Belasis, feita pela equipe.
+
+## Planos e preços (mensal, em reais)
+
+- Personal: até 3 profissionais, 20 clientes mensalistas, 300 agendamentos por mês. R$ 129,90/mês. Promoção de fim de ano: R$ 69,90/mês nos 2 primeiros meses. Sem fila.
+- Essencial: até 5 profissionais, 90 clientes mensalistas, 1.500 agendamentos por mês, com fila por QR code, totem e painel na TV, vitrine de produtos e endereço próprio. R$ 189,90/mês. Promoção de fim de ano: R$ 89,90/mês nos 2 primeiros meses.
+- Advance: até 8 profissionais, clientes mensalistas ilimitados, 3.000 agendamentos por mês, fila e domínio próprio. A partir de R$ 249,90/mês.
+- Em todos: sem taxa de adesão, sem custo de setup, sem multa de cancelamento, migração da base sem custo. Barbearia montada pela equipe em 1 dia. Pagamento mensal por PIX.
+
+## O que a plataforma não faz (hoje)
+
+- Não envia lembrete automático antes do horário nem SMS.
+- Não tem pagamento online, cobrança recorrente no cartão ou gateway: o cliente paga na barbearia.
+- Não emite nota fiscal, não tem API/webhooks, bot de IA, disparo de campanhas nem gestão de rede/franquia com várias unidades.
+- Não tem teste grátis.
+
+## Clientes
+
+- Barbearia Max Estilo: cliente e embaixadora da Barber Agência.
+- Barbearia Oliveira 01: usa a plataforma em produção.

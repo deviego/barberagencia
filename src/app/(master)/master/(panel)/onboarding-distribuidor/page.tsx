@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, Check, Copy, MessageCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { createDistributor } from "@/features/distributor/actions";
 import { maskPhoneBR, maskCPF, maskCNPJ, maskCEP, maskUF } from "@/lib/masks";
 
@@ -16,7 +15,6 @@ export default function OnboardingDistribuidorPage() {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [trialEnabled, setTrialEnabled] = useState(true);
   const [docType, setDocType] = useState<"CNPJ" | "CPF">("CNPJ");
   const [docNumber, setDocNumber] = useState("");
   const [legalName, setLegalName] = useState("");
@@ -39,7 +37,6 @@ export default function OnboardingDistribuidorPage() {
         adminName,
         adminEmail,
         phone,
-        trialEnabled,
         contract: {
           legalName,
           docType,
@@ -117,14 +114,6 @@ export default function OnboardingDistribuidorPage() {
       <div className="flex flex-col gap-1.5">
         <Label>Telefone / WhatsApp (opcional)</Label>
         <Input value={phone} onChange={(e) => setPhone(maskPhoneBR(e.target.value))} inputMode="tel" maxLength={15} placeholder="(11) 99999-9999" />
-      </div>
-
-      <div className="flex items-center justify-between rounded-md border border-border bg-inset px-4 py-3">
-        <div>
-          <div className="text-body font-semibold text-text">Adicionar 15 dias de teste</div>
-          <div className="text-caption text-text-muted">{trialEnabled ? "Começa no período gratuito." : "Sem teste — contrato pendente já no 1º acesso."}</div>
-        </div>
-        <Switch defaultChecked={trialEnabled} onChange={setTrialEnabled} />
       </div>
 
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
