@@ -49,6 +49,21 @@ app.use(express.json({ limit: "5mb" })); // relatórios podem ser grandes; evita
 /** sessions: tenantId -> { sock, status, qr, number, attempts, connectingSince, starting } */
 const sessions = new Map();
 
+// Cache das mensagens (por id) para responder aos "retry receipts" do WhatsApp.
+// Sem getMessage + este cache, o app do PRÓPRIO remetente pode ficar preso em
+// "Aguardando esta mensagem" (não decifra a cópia que o WhatsApp manda aos seus
+// outros aparelhos). Ao receber um retry, o Baileys chama getMessage e reenvia.
+const msgCache = new Map();
+const MSG_CACHE_MAX = 3000;
+function cacheMsg(id, message) {
+  if (!id || !message) return;
+  msgCache.set(id, message);
+  if (msgCache.size > MSG_CACHE_MAX) {
+    const oldest = msgCache.keys().next().value;
+    msgCache.delete(oldest);
+  }
+}
+
 const MAX_ATTEMPTS = 8; // reconexões seguidas antes de desistir (até novo /connect ou watchdog)
 const CONNECTING_TIMEOUT_MS = 60_000; // preso em "connecting" além disso → reinicia
 const WATCHDOG_MS = 3 * 60_000; // varredura periódica de auto-cura
@@ -104,6 +119,8 @@ async function startSession(tenantId, prev, force = false) {
     connectTimeoutMs: 60_000,
     keepAliveIntervalMs: 15_000,
     retryRequestDelayMs: 2000,
+    // Responde aos retries (evita "Aguardando esta mensagem" no app do remetente).
+    getMessage: async (key) => msgCache.get(key?.id) || undefined,
   });
   const s = {
     sock,
@@ -113,20 +130,50 @@ async function startSession(tenantId, prev, force = false) {
     attempts: lock.attempts,
     connectingSince: Date.now(),
     starting: false,
+    // "Conectar pelo número" (mesmo celular): se pairPhone estiver setado, pedimos
+    // um código de pareamento em vez de QR.
+    pairPhone: prev?.pairPhone ?? existing?.pairPhone ?? null,
+    pairingCode: null,
   };
   sessions.set(tenantId, s);
 
   sock.ev.on("creds.update", saveCreds);
+  // Guarda toda mensagem (enviada/recebida) para poder reenviar em caso de retry.
+  sock.ev.on("messages.upsert", ({ messages }) => {
+    for (const m of messages ?? []) {
+      if (m?.key?.id && m.message) cacheMsg(m.key.id, m.message);
+    }
+  });
   sock.ev.on("connection.update", async (u) => {
     const { connection, lastDisconnect, qr } = u;
     if (qr) {
-      s.status = "qr";
-      s.qr = await QRCode.toDataURL(qr);
-      s.connectingSince = Date.now(); // aguardando o scan
+      // Modo "conectar pelo número" (barbearia com um só celular): pede o código de
+      // pareamento de 8 dígitos em vez do QR — o dono digita no próprio WhatsApp.
+      if (s.pairPhone && !s.pairingCode && !sock.authState?.creds?.registered) {
+        try {
+          const code = await sock.requestPairingCode(s.pairPhone);
+          s.pairingCode = code;
+          s.status = "pairing";
+          s.qr = null;
+          s.connectingSince = Date.now();
+          log.info({ tenant: tenantId }, "código de pareamento gerado");
+        } catch (e) {
+          log.warn({ err: e?.message }, "requestPairingCode falhou — caindo para QR");
+          s.status = "qr";
+          s.qr = await QRCode.toDataURL(qr);
+          s.connectingSince = Date.now();
+        }
+      } else {
+        s.status = "qr";
+        s.qr = await QRCode.toDataURL(qr);
+        s.connectingSince = Date.now(); // aguardando o scan
+      }
     }
     if (connection === "open") {
       s.status = "connected";
       s.qr = null;
+      s.pairingCode = null;
+      s.pairPhone = null;
       s.attempts = 0;
       s.number = sock.user?.id ? sock.user.id.split(":")[0].split("@")[0] : s.number;
       try {
@@ -235,7 +282,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "report-v11";
+const BUILD = "getmsg-v2";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -243,10 +290,44 @@ app.post("/sessions/:tenantId/connect", async (req, res) => {
     const cur = sessions.get(req.params.tenantId);
     if (cur) cur.attempts = 0; // reset ao pedir conexão manual
     const s = await ensureSession(req.params.tenantId);
-    res.json({ status: s.status, qr: s.qr, number: s.number });
+    res.json({ status: s.status, qr: s.qr, number: s.number, pairingCode: s.pairingCode ?? null });
   } catch (e) {
     log.error(e, "connect");
     res.status(500).json({ error: "connect_failed" });
+  }
+});
+
+/**
+ * "Conectar pelo número" — para barbearias com UM só celular (não dá pra escanear
+ * o QR na mesma tela). Gera o código de pareamento de 8 dígitos que o dono digita
+ * no WhatsApp → Aparelhos conectados → Conectar aparelho → Conectar com número.
+ */
+app.post("/sessions/:tenantId/pair", async (req, res) => {
+  const { phone } = req.body || {};
+  if (!phone) return res.status(400).json({ error: "phone obrigatório" });
+  const number = toWhatsPhone(phone);
+  const tenantId = req.params.tenantId;
+  try {
+    const prev = sessions.get(tenantId);
+    if (prev?.status === "connected") return res.json({ status: "connected", number: prev.number });
+    // Pareamento exige um socket LIMPO e não registrado — descarta creds antigas.
+    if (prev?.sock) { try { prev.sock.end?.(undefined); } catch {} }
+    await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId).catch(() => {});
+    sessions.delete(tenantId);
+    const s = await startSession(tenantId, { pairPhone: number, attempts: 0 }, true);
+    s.pairPhone = number;
+    s.pairingCode = null;
+    // Espera o código (o socket precisa conectar ao WS e ficar pronto).
+    for (let waited = 0; waited < 25_000; waited += 400) {
+      const cur = sessions.get(tenantId);
+      if (cur?.pairingCode) return res.json({ status: "pairing", pairingCode: cur.pairingCode, number });
+      if (cur?.status === "connected") return res.json({ status: "connected", number: cur.number });
+      await sleep(400);
+    }
+    res.json({ status: sessions.get(tenantId)?.status ?? "connecting", pairingCode: null });
+  } catch (e) {
+    log.error(e, "pair");
+    res.status(500).json({ error: "pair_failed" });
   }
 });
 
@@ -261,7 +342,7 @@ app.get("/sessions/:tenantId/status", async (req, res) => {
     }
   }
   if (!s) return res.json({ status: "disconnected" });
-  res.json({ status: s.status, qr: s.qr, number: s.number });
+  res.json({ status: s.status, qr: s.qr, number: s.number, pairingCode: s.pairingCode ?? null });
 });
 
 /**
@@ -301,6 +382,7 @@ app.post("/sessions/:tenantId/send", async (req, res) => {
       return res.status(422).json({ error: "not_on_whatsapp" });
     }
     const result = await s.sock.sendMessage(jid, { text: message });
+    if (result?.key?.id && result.message) cacheMsg(result.key.id, result.message);
     res.json({ ok: true, jid, id: result?.key?.id ?? null });
   } catch (e) {
     log.error(e, "send");
@@ -541,7 +623,8 @@ async function sendDocument(tenantId, phone, buffer, fileName, caption) {
   if (s?.status !== "connected" || !s.sock) return { ok: false, error: "sessão remetente não conectada" };
   const { jid, exists } = await resolveJid(s.sock, phone);
   if (exists === false) return { ok: false, error: "número não está no WhatsApp" };
-  await s.sock.sendMessage(jid, { document: buffer, fileName, mimetype: "application/pdf", caption });
+  const result = await s.sock.sendMessage(jid, { document: buffer, fileName, mimetype: "application/pdf", caption });
+  if (result?.key?.id && result.message) cacheMsg(result.key.id, result.message);
   return { ok: true };
 }
 

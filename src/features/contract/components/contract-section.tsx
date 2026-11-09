@@ -12,15 +12,6 @@ import { signContract, updateOwnContractData } from "../actions";
 import { ACCEPT_TEXT } from "../parties";
 import type { ContractView, ContractDataValue } from "../view";
 
-function trialLabel(v: ContractView) {
-  if (v.signature.status === "SIGNED") return "Contrato assinado";
-  const ends = new Date(v.trialEndsAt);
-  const ended = ends.getTime() <= Date.now();
-  const d = ends.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  if (!v.trialEnabled) return "Sem período de teste — contrato pendente de assinatura";
-  return ended ? `Período de teste encerrado em ${d}` : `Período de teste até ${d}`;
-}
-
 /** Campos obrigatórios que faltam (mesma regra de contractDataComplete). */
 function missingFields(f: ContractView["fields"]): string[] {
   const miss: string[] = [];
@@ -73,8 +64,6 @@ export function ContractSection({ view, initial }: { view: ContractView; initial
           <ContractPrintButton onBeforePrint={() => setOpen(true)} />
         </div>
       </div>
-
-      <p className="text-caption text-text-2">{trialLabel(view)}</p>
 
       {/* CTA de preenchimento / finalização */}
       {!signed && (

@@ -34,10 +34,10 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin/clientes", label: "Clientes", icon: Users },
   { href: "/admin/servicos", label: "Serviços", icon: Scissors },
   { href: "/admin/produtos", label: "Produtos", icon: Package },
-  { href: "/admin/fornecedores", label: "Fornecedores", icon: Truck },
   { href: "/admin/barbeiros", label: "Barbeiros", icon: User },
   { href: "/admin/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/admin/marketing-place", label: "Marketing Place", icon: Store },
+  { href: "/admin/fornecedores", label: "Fornecedores", icon: Truck },
   { href: "/admin/suporte", label: "Suporte", icon: LifeBuoy },
   { href: "/admin/config", label: "Configurações", icon: Settings },
 ];
