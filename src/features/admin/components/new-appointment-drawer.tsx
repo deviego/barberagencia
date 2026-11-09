@@ -441,8 +441,17 @@ export function NewAppointmentDrawer({
           {/* Horário */}
           <div className="flex flex-col gap-2">
             <Label className="mb-0">Horário</Label>
+            {blocked.length > 0 && (
+              <p className="rounded-md border border-warning-strong/30 bg-warning-bg px-3 py-2 text-caption text-warning-strong">
+                ⛔ Agenda travada em parte deste dia — os horários bloqueados não aparecem.
+              </p>
+            )}
             {slots.length === 0 ? (
-              <p className="text-caption text-text-muted">Sem horários para este barbeiro neste dia.</p>
+              <p className="text-caption text-text-muted">
+                {workingHours.some((x) => x.barber_id === barberId && x.weekday === days[dayIdx]?.date.getDay())
+                  ? "Barbearia fechada neste dia (agenda travada)."
+                  : "Sem horários para este barbeiro neste dia."}
+              </p>
             ) : (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {slots.map((t) => {

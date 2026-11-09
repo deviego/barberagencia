@@ -89,7 +89,7 @@ export function ClientPedidosList({
 
       {orders.map((o) => {
         const inService = !!o.service_started_at && o.status !== "DONE";
-        const editable = !o.service_started_at && EDITAVEL.includes(o.status);
+        const editable = EDITAVEL.includes(o.status);
         return (
           <button
             key={o.id}
@@ -129,7 +129,7 @@ export function ClientPedidosList({
           (() => {
             const items = itemsOf(selected);
             const inService = !!selected.service_started_at && selected.status !== "DONE";
-            const editable = !selected.service_started_at && EDITAVEL.includes(selected.status);
+            const editable = EDITAVEL.includes(selected.status);
             const estimate = items.reduce((s, i) => s + (i.kind === "service" ? i.duration_min * i.qty : 0), 0);
             const barber = one(selected.barbers as { name: string }[] | { name: string });
             return (
