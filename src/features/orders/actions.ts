@@ -6,7 +6,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/auth/acting";
 import { formatBRL } from "@/lib/utils";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
-import { requireActiveDistributor } from "@/features/distributor/guard";
+import { getSupplierAvailability, requireActiveDistributor } from "@/features/distributor/guard";
 import { requireBarbershopAdmin, requireOrderParticipantAdmin } from "./guards";
 
 const STATUS_MSG: Record<string, string> = {
@@ -48,6 +48,8 @@ export async function placeOrder(distributorId: string, items: { productId: stri
   const g = await requireBarbershopAdmin();
   if (!g.ok) return { ok: false as const, error: g.error };
   if (!isUuid(distributorId)) return { ok: false as const, error: "Distribuidor inválido." };
+  if ((await getSupplierAvailability(distributorId)) !== "OPEN")
+    return { ok: false as const, error: "Este fornecedor não está recebendo pedidos agora." };
   const clean = items.filter((i) => isUuid(i.productId) && i.qty > 0).map((i) => ({ product_id: i.productId, qty: Math.floor(i.qty) }));
   if (!clean.length) return { ok: false as const, error: "Carrinho vazio." };
 
