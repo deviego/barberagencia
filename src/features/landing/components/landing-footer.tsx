@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FOOTER_COLS } from "@/features/landing/content";
 
 /** Rodapé da landing. `anchorBase="/"` fora da home, para "#planos" virar "/#planos". */
-export function LandingFooter({ anchorBase = "" }: { anchorBase?: string }) {
+export function LandingFooter({ anchorBase = "", privacyHref }: { anchorBase?: string; privacyHref?: string }) {
   return (
     <footer className="mt-24 border-t border-border bg-surface">
       <div className="mx-auto grid max-w-[1180px] gap-10 px-6 py-12 sm:grid-cols-2 sm:px-10 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
@@ -31,7 +31,7 @@ export function LandingFooter({ anchorBase = "" }: { anchorBase?: string }) {
                   {l.label}
                 </a>
               ) : (
-                <Link key={l.label} href={l.href} className="text-[13px] text-text-2 transition-colors hover:text-accent">
+                <Link key={l.label} href={privacyHref && l.href === "/privacidade" ? privacyHref : l.href} className="text-[13px] text-text-2 transition-colors hover:text-accent">
                   {l.label}
                 </Link>
               )

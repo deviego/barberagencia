@@ -7,6 +7,7 @@ import { Icon } from "@/features/landing/components/icon";
 import { salesWaLink, WA_MESSAGES } from "@/features/landing/content";
 import { DIST_FAQS, DIST_FEATURES, DIST_STEPS } from "@/features/landing/distributor-content";
 import { DISTRIBUTOR_SEO_METADATA } from "@/features/seo/site";
+import { LEAD_PRIVACY_HREF } from "@/features/leads/consent";
 
 export const metadata: Metadata = DISTRIBUTOR_SEO_METADATA;
 
@@ -153,7 +154,7 @@ export default function DistribuidorasPage() {
         </section>
       </main>
 
-      <LandingFooter anchorBase="/" />
+      <LandingFooter anchorBase="/" privacyHref={LEAD_PRIVACY_HREF} />
     </div>
   );
 }

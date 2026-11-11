@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Loader2, MessageCircle } from "lucide-react";
 import { salesWaLink, WA_MESSAGES } from "@/features/landing/content";
 import { submitDistributorLead } from "@/features/leads/actions";
-import { LEAD_CONSENT_TEXT } from "@/features/leads/consent";
+import { LEAD_CONSENT_TEXT, LEAD_PRIVACY_HREF } from "@/features/leads/consent";
 import {
   DistributorLeadSchema,
   LEAD_GENERIC_ERROR,
@@ -291,10 +291,11 @@ export function DistributorLeadForm() {
             onChange={(e) => set("consent", e.target.checked)}
           />
           <span>
-            {LEAD_CONSENT_TEXT}{" "}
-            <Link href="/privacidade" target="_blank" className="font-semibold text-accent underline underline-offset-2">
-              Política de privacidade
+            {LEAD_CONSENT_TEXT} Ver a{" "}
+            <Link href={LEAD_PRIVACY_HREF} target="_blank" className="font-semibold text-accent underline underline-offset-2">
+              política de privacidade
             </Link>
+            .
           </span>
         </label>
         {err("consent")}
