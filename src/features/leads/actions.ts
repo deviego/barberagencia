@@ -12,10 +12,10 @@ import { anonymizeLeadRow, countRecentLeads, hashLeadIp, insertLead, updateLeadS
 
 const GENERIC: LeadResult = { ok: false, error: LEAD_GENERIC_ERROR };
 
+/** IP do visitante definido pela plataforma de hospedagem (Vercel), não o informado pelo cliente. */
 async function clientIp(): Promise<string> {
   const h = await headers();
-  const fwd = h.get("x-forwarded-for");
-  return (fwd ? fwd.split(",")[0].trim() : h.get("x-real-ip")) || "unknown";
+  return h.get("x-real-ip")?.trim() || "unknown";
 }
 
 /**
