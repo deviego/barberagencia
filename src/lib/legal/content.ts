@@ -3,6 +3,8 @@
  * Sem dados de nenhuma barbearia específica; o contato é feito pelos canais da própria barbearia.
  */
 
+import { BARBERAGENCIA_EMAIL, BARBERAGENCIA_WHATSAPP_DISPLAY } from "@/lib/contact";
+
 export const LEGAL_CONTACT = {
   updatedAt: "20 de julho de 2026",
 };
@@ -119,6 +121,14 @@ export const PRIVACY: LegalDocument = {
       title: "7. Canal de atendimento",
       paragraphs: [
         "Para exercer seus direitos ou tirar dúvidas sobre a sua privacidade, fale com a administração da barbearia pelos canais oficiais (o WhatsApp de atendimento aparece na página de Suporte no app).",
+      ],
+    },
+    {
+      title: "8. Formulário para distribuidoras (site da Barber Agência)",
+      paragraphs: [
+        "Na página \"Para distribuidoras\" do site da Barber Agência, coletamos nome, nome da empresa, cidade, UF, WhatsApp, número de barbearias atendidas e como você recebe pedidos hoje, além da data, da hora e da versão do aceite. Usamos esses dados só para falar com você sobre o sistema, pelo WhatsApp informado, com base no seu consentimento (Art. 7º, I da LGPD). Esses dados não são vendidos nem enviados para ferramentas de anúncio.",
+        "Se você não virar cliente, guardamos os dados por até 12 meses; depois disso, eles são anonimizados.",
+        `Para pedir acesso, correção ou exclusão desses dados, ou revogar o aceite, fale com a Barber Agência pelo WhatsApp ${BARBERAGENCIA_WHATSAPP_DISPLAY} ou pelo e-mail ${BARBERAGENCIA_EMAIL}.`,
       ],
     },
   ],
