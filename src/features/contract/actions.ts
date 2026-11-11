@@ -22,6 +22,10 @@ async function clientIp(): Promise<string | null> {
 export async function signContract() {
   const user = await getSessionUser();
   if (!user) return { ok: false as const, error: "Sessão inválida." };
+  // Distribuidor com conta não ativa não assina (mesma regra de updateOwnContractData).
+  const access = await getDistributorAccess();
+  if (!access.ok && access.reason === "SUSPENDED")
+    return { ok: false as const, error: "Sua conta está suspensa. Fale com a Barber Agência pelo WhatsApp." };
 
   const supabase = await createSupabaseServerClient();
   const { data: c } = await supabase.from("tenant_contracts").select(COLS).maybeSingle();

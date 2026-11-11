@@ -18,6 +18,12 @@ const DENIED_MESSAGE: Record<Exclude<DistributorAccess, { ok: true }>["reason"],
   SUSPENDED: "Sua conta está suspensa. Fale com a Barber Agência pelo WhatsApp.",
 };
 
+/** Só o status ACTIVE libera; valor desconhecido, novo ou ausente bloqueia. */
+const ALLOWED_STATUSES: ReadonlySet<string> = new Set(["ACTIVE"]);
+function isActiveStatus(status: unknown): boolean {
+  return typeof status === "string" && ALLOWED_STATUSES.has(status);
+}
+
 /**
  * Acesso ao painel do distribuidor, sempre resolvido no servidor:
  * admin (UNIT_ADMIN ou acima) + tenant da sessão do tipo DISTRIBUTOR
@@ -32,10 +38,10 @@ export const getDistributorAccess = cache(async (): Promise<DistributorAccess> =
   const tenant = await getCurrentTenant();
   if (tenant.id !== user.tenantId || tenant.kind !== "DISTRIBUTOR") return { ok: false, reason: "NOT_DISTRIBUTOR" };
 
-  // Suspensão primeiro: conta suspensa não vê nem o contrato.
+  // Status da conta primeiro: só conta ativa passa (qualquer outro status, ou nenhum, cai na tela de suspensão).
   const supabase = await createSupabaseServerClient();
-  const { data: t } = await supabase.from("tenants").select("status").eq("id", tenant.id).maybeSingle();
-  if ((t?.status as string | undefined) === "SUSPENDED") return { ok: false, reason: "SUSPENDED" };
+  const { data: t, error } = await supabase.from("tenants").select("status").eq("id", tenant.id).maybeSingle();
+  if (error || !isActiveStatus(t?.status)) return { ok: false, reason: "SUSPENDED" };
 
   const contract = await getTenantContract();
   if (contract?.status !== "SIGNED") return { ok: false, reason: "CONTRACT_PENDING" };
@@ -52,17 +58,15 @@ export async function requireActiveDistributor(): Promise<{ ok: true; tenantId: 
 
 /**
  * [Barbearia] O distribuidor está recebendo pedidos? CLOSED se não existir, não for
- * distribuidor ou estiver suspenso. Só devolve OPEN/CLOSED (nenhum outro dado do tenant).
+ * distribuidor, não estiver com a conta ativa ou a consulta falhar. Só devolve OPEN/CLOSED (nenhum outro dado do tenant).
  * Service role: a barbearia não lê `tenants` de outro tenant sob RLS.
  */
 export async function getSupplierAvailability(distributorId: string): Promise<"OPEN" | "CLOSED"> {
   const user = await getSessionUser();
   if (!user?.tenantId) return "CLOSED";
   const admin = createSupabaseAdminClient();
-  let res = await admin.from("tenants").select("status, kind").eq("id", distributorId).maybeSingle();
-  if (res.error) res = await admin.from("tenants").select("status").eq("id", distributorId).maybeSingle();
-  const t = res.data as { status?: string; kind?: string } | null;
-  if (!t || t.status === "SUSPENDED") return "CLOSED";
-  if (t.kind !== undefined && t.kind !== "DISTRIBUTOR") return "CLOSED";
-  return "OPEN";
+  const { data, error } = await admin.from("tenants").select("status, kind").eq("id", distributorId).maybeSingle();
+  if (error || !data) return "CLOSED";
+  const t = data as { status?: string | null; kind?: string | null };
+  return t.kind === "DISTRIBUTOR" && isActiveStatus(t.status) ? "OPEN" : "CLOSED";
 }
