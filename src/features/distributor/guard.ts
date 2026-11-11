@@ -9,13 +9,14 @@ import { isUnitAdmin } from "@/lib/rbac";
 
 export type DistributorAccess =
   | { ok: true; tenantId: string }
-  | { ok: false; reason: "UNAUTHENTICATED" | "NOT_DISTRIBUTOR" | "CONTRACT_PENDING" | "SUSPENDED" };
+  | { ok: false; reason: "UNAUTHENTICATED" | "NOT_DISTRIBUTOR" | "CONTRACT_PENDING" | "SUSPENDED" | "INACTIVE" };
 
 const DENIED_MESSAGE: Record<Exclude<DistributorAccess, { ok: true }>["reason"], string> = {
   UNAUTHENTICATED: "Sessão expirada. Entre de novo.",
   NOT_DISTRIBUTOR: "Acesso negado.",
   CONTRACT_PENDING: "Assine o contrato para continuar.",
   SUSPENDED: "Sua conta está suspensa. Fale com a Barber Agência pelo WhatsApp.",
+  INACTIVE: "Sua conta ainda não está ativa. Fale com a gente pelo WhatsApp.",
 };
 
 /** Só o status ACTIVE libera; valor desconhecido, novo ou ausente bloqueia. */
@@ -27,7 +28,9 @@ function isActiveStatus(status: unknown): boolean {
 /**
  * Acesso ao painel do distribuidor, sempre resolvido no servidor:
  * admin (UNIT_ADMIN ou acima) + tenant da sessão do tipo DISTRIBUTOR
- * + contrato assinado + conta não suspensa.
+ * + conta ativa + contrato assinado.
+ * Ordem das telas (decisão do PO na #71): suspensa → contrato pendente (quem está entrando consegue assinar)
+ * → qualquer outro status diferente de ACTIVE ("ainda não está ativa").
  * Layout e páginas chamam isto; actions usam requireActiveDistributor().
  */
 export const getDistributorAccess = cache(async (): Promise<DistributorAccess> => {
@@ -38,13 +41,16 @@ export const getDistributorAccess = cache(async (): Promise<DistributorAccess> =
   const tenant = await getCurrentTenant();
   if (tenant.id !== user.tenantId || tenant.kind !== "DISTRIBUTOR") return { ok: false, reason: "NOT_DISTRIBUTOR" };
 
-  // Status da conta primeiro: só conta ativa passa (qualquer outro status, ou nenhum, cai na tela de suspensão).
+  // Falha fechado: só ACTIVE libera. Erro na leitura bloqueia como "ainda não está ativa".
   const supabase = await createSupabaseServerClient();
   const { data: t, error } = await supabase.from("tenants").select("status").eq("id", tenant.id).maybeSingle();
-  if (error || !isActiveStatus(t?.status)) return { ok: false, reason: "SUSPENDED" };
+  if (error) return { ok: false, reason: "INACTIVE" };
+  if (t?.status === "SUSPENDED") return { ok: false, reason: "SUSPENDED" };
 
   const contract = await getTenantContract();
   if (contract?.status !== "SIGNED") return { ok: false, reason: "CONTRACT_PENDING" };
+
+  if (!isActiveStatus(t?.status)) return { ok: false, reason: "INACTIVE" };
 
   return { ok: true, tenantId: tenant.id };
 });
