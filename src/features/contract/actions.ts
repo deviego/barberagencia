@@ -9,6 +9,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { isMaster, isUnitAdmin } from "@/lib/rbac";
 import { ACCEPT_TEXT, CONTRACT_VERSION } from "./parties";
 import { contractPlainText } from "./template";
+import { getDistributorAccess } from "@/features/distributor/guard";
 import { CONTRACT_COLS as COLS, contractToFields, contractDataComplete, type TenantContract } from "./view";
 
 async function clientIp(): Promise<string | null> {
@@ -112,6 +113,10 @@ export async function updateOwnContractData(input: OwnContractDataInput) {
   const user = await getSessionUser();
   if (!user?.role || !isUnitAdmin(user.role) || !user.tenantId)
     return { ok: false as const, error: "Acesso negado." };
+  // Distribuidor suspenso não altera dados (pendente continua podendo preencher e assinar).
+  const access = await getDistributorAccess();
+  if (!access.ok && access.reason === "SUSPENDED")
+    return { ok: false as const, error: "Sua conta está suspensa. Fale com a Barber Agência pelo WhatsApp." };
 
   const admin = createSupabaseAdminClient();
   // Não permite editar dados após assinar (integridade do documento).
