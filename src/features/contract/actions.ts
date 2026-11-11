@@ -52,6 +52,7 @@ export async function signContract() {
 
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin", "layout");
+  revalidatePath("/distributor", "layout");
   revalidatePath("/admin/config");
   return { ok: true as const };
 }
@@ -144,6 +145,7 @@ export async function updateOwnContractData(input: OwnContractDataInput) {
 
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin", "layout");
+  revalidatePath("/distributor", "layout");
   revalidatePath("/admin/config");
   return { ok: true as const };
 }

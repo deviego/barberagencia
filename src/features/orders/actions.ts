@@ -6,6 +6,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isUuid } from "@/lib/auth/acting";
 import { formatBRL } from "@/lib/utils";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { requireActiveDistributor } from "@/features/distributor/guard";
 
 const STATUS_MSG: Record<string, string> = {
   CONFIRMED: "foi ACEITO ✅",
@@ -71,6 +73,10 @@ export async function setOrderStatus(orderId: string, status: string) {
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sessão inválida." };
   if (!isUuid(orderId)) return { ok: false as const, error: "Pedido inválido." };
+  if ((await getCurrentTenant()).kind === "DISTRIBUTOR") {
+    const access = await requireActiveDistributor();
+    if (!access.ok) return { ok: false as const, error: access.error };
+  }
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("set_order_status", { p_order_id: orderId, p_status: status });
