@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getSessionUser } from "@/lib/auth/session";
 import { isUuid } from "@/lib/auth/acting";
 import { formatBRL } from "@/lib/utils";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { requireActiveDistributor } from "@/features/distributor/guard";
+import { requireBarbershopAdmin, requireOrderParticipantAdmin } from "./guards";
 
 const STATUS_MSG: Record<string, string> = {
   CONFIRMED: "foi ACEITO ✅",
@@ -45,8 +45,8 @@ async function tenantName(admin: ReturnType<typeof createSupabaseAdminClient>, t
 
 /** [Barbearia] Cria um pedido a um distribuidor (RPC transacional). */
 export async function placeOrder(distributorId: string, items: { productId: string; qty: number }[], note?: string) {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sessão inválida." };
+  const g = await requireBarbershopAdmin();
+  if (!g.ok) return { ok: false as const, error: g.error };
   if (!isUuid(distributorId)) return { ok: false as const, error: "Distribuidor inválido." };
   const clean = items.filter((i) => isUuid(i.productId) && i.qty > 0).map((i) => ({ product_id: i.productId, qty: Math.floor(i.qty) }));
   if (!clean.length) return { ok: false as const, error: "Carrinho vazio." };
@@ -58,7 +58,7 @@ export async function placeOrder(distributorId: string, items: { productId: stri
   // Alerta o distribuidor (best-effort).
   try {
     const admin = createSupabaseAdminClient();
-    const [phone, buyer] = await Promise.all([tenantPhone(admin, distributorId), tenantName(admin, user.tenantId)]);
+    const [phone, buyer] = await Promise.all([tenantPhone(admin, distributorId), tenantName(admin, g.tenantId)]);
     await notify(distributorId, phone, `📥 Novo pedido de *${buyer}* na Barber Agência. Acesse o painel para aceitar.`);
   } catch {
     /* ignore */
@@ -70,8 +70,8 @@ export async function placeOrder(distributorId: string, items: { productId: stri
 
 /** [Distribuidor/Barbearia] Muda o status do pedido (RPC valida papel + estoque). */
 export async function setOrderStatus(orderId: string, status: string) {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sessão inválida." };
+  const g = await requireOrderParticipantAdmin();
+  if (!g.ok) return { ok: false as const, error: g.error };
   if (!isUuid(orderId)) return { ok: false as const, error: "Pedido inválido." };
   if ((await getCurrentTenant()).kind === "DISTRIBUTOR") {
     const access = await requireActiveDistributor();
