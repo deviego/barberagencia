@@ -119,7 +119,7 @@ test("rate limit: 6º envio do mesmo IP em 10 min é recusado; limite global por
 });
 
 test("texto do aceite diz a finalidade e tem versão", () => {
-  assert.match(LEAD_CONSENT_TEXT, /falar com você sobre o sistema/);
+  assert.match(LEAD_CONSENT_TEXT, /falar comigo sobre o sistema/);
   assert.ok(LEAD_CONSENT_VERSION.length > 0 && LEAD_CONSENT_VERSION.length <= 40);
 });
 

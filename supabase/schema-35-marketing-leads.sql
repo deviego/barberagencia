@@ -49,7 +49,7 @@ alter table public.marketing_leads add constraint marketing_leads_barbershops_co
 
 alter table public.marketing_leads drop constraint if exists marketing_leads_order_channel_check;
 alter table public.marketing_leads add constraint marketing_leads_order_channel_check
-  check (order_channel is null or order_channel in ('whatsapp','telefone','representante','visita','outro'));
+  check (order_channel is null or order_channel in ('whatsapp','representante','planilha','outro'));
 
 alter table public.marketing_leads drop constraint if exists marketing_leads_lengths_check;
 alter table public.marketing_leads add constraint marketing_leads_lengths_check

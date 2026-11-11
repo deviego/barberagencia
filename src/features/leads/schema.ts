@@ -6,14 +6,13 @@ import { BR_UFS } from "@/lib/br-ufs";
  * O servidor SEMPRE revalida com este schema (o client pode ser ignorado).
  */
 
-export const ORDER_CHANNELS = ["whatsapp", "telefone", "representante", "visita", "outro"] as const;
+export const ORDER_CHANNELS = ["whatsapp", "representante", "planilha", "outro"] as const;
 export type OrderChannel = (typeof ORDER_CHANNELS)[number];
 
 export const ORDER_CHANNEL_LABELS: Record<OrderChannel, string> = {
   whatsapp: "WhatsApp",
-  telefone: "Telefone",
   representante: "Representante",
-  visita: "Visita na barbearia",
+  planilha: "Planilha",
   outro: "Outro",
 };
 
