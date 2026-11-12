@@ -4,9 +4,25 @@ import { randomUUID, randomBytes } from "crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isUnitAdmin } from "@/lib/rbac";
-import { safeEqual } from "@/lib/crypto/safe-equal";
 import { getRequestOrigin } from "@/lib/http";
 import { notifyInvite } from "@/server/notifications/notify";
+import { isUuid } from "@/lib/auth/acting";
+import { ipTenantKey } from "@/lib/rate-limit";
+import { hashIp, hitRateLimit, requestIp } from "@/server/rate-limit";
+import { resolveTotemTenant } from "./data";
+import {
+  TOTEM_ERRORS,
+  TOTEM_LIMITS,
+  TOTEM_RATE_SCOPES,
+  TOTEM_TENANT_CAPS,
+  TOTEM_TENANT_CAP_LOG,
+  totemNameError,
+  TotemRegisterSchema,
+  totemJoinErrorMessage,
+  totemName,
+  totemPhoneDigits,
+  totemPhoneToStore,
+} from "./totem-rules";
 
 /** Sessão de admin da barbearia (UNIT_ADMIN+ ou MASTER). Retorna o tenantId ou null. */
 async function requireAdminTenant() {
@@ -15,40 +31,89 @@ async function requireAdminTenant() {
   return user.tenantId;
 }
 
-const onlyDigits = (s: string) => (s || "").replace(/\D/g, "");
+type TotemFail = { ok: false; error: string };
+const fail = (error: string): TotemFail => ({ ok: false, error });
 
-/** Valida slug + token do totem. Retorna o tenant (id/name/flags) ou null. */
-async function validateTotem(slug: string, token: string) {
-  if (!slug || !token) return null;
-  const admin = createSupabaseAdminClient();
-  const { data: t } = await admin
-    .from("tenants")
-    .select("id, name, totem_token")
-    .eq("subdomain", slug)
+/**
+ * Limite de tentativas: por IP da hospedagem + barbearia e um teto por barbearia somando todas
+ * as origens (nas três ações). Retorna o erro a devolver, ou null se liberado.
+ *   - Sem RATE_LIMIT_IP_SALT: a camada por IP é pulada (com alerta); os tetos por barbearia valem.
+ *   - Sem conseguir conferir no banco (ex.: schema-50 não aplicada): recusa.
+ */
+async function totemRateLimit(action: "lookup" | "register" | "join", tenantId: string): Promise<TotemFail | null> {
+  const ipHash = hashIp(await requestIp());
+  if (ipHash) {
+    const res = await hitRateLimit(TOTEM_RATE_SCOPES[action], ipTenantKey(ipHash, tenantId), TOTEM_LIMITS[action]);
+    if (res === "limited") return fail(TOTEM_ERRORS.rateLimited);
+    if (res === "unavailable") return fail(TOTEM_ERRORS.unavailable);
+  } else {
+    console.error(`[totem] RATE_LIMIT_IP_SALT ausente ou curto; limite por IP pulado em ${action}`);
+  }
+
+  const cap = await hitRateLimit(TOTEM_RATE_SCOPES[`${action}Tenant`], tenantId, TOTEM_TENANT_CAPS[action]);
+  if (cap === "limited") {
+    console.error(`${TOTEM_TENANT_CAP_LOG} acao=${action} tenant=${tenantId}`);
+    return fail(TOTEM_ERRORS.unavailable);
+  }
+  if (cap === "unavailable") return fail(TOTEM_ERRORS.unavailable);
+  return null;
+}
+
+type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
+
+/**
+ * Busca do totem (nome + plano) pela regra única de totem_resolve_client_id.
+ * null = não cadastrado; "error" = não foi possível consultar.
+ */
+async function lookupTotemClient(admin: AdminClient, tenantId: string, digits: string) {
+  const { data, error } = await admin.rpc("totem_lookup_client", { p_tenant: tenantId, p_digits: digits });
+  if (error) {
+    console.error(`[totem] busca falhou (${error.code ?? "sem código"})`);
+    return "error" as const;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return { name: row.name as string, hasPlan: Boolean(row.has_plan), planName: (row.plan_name as string) ?? null };
+}
+
+/** Serviço oferecido no totem: da barbearia e ativo (mesmo filtro de getQueueServices). */
+async function isOfferedService(admin: AdminClient, id: string, tenantId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("services")
+    .select("id")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .eq("active", true)
     .maybeSingle();
-  if (!t || !safeEqual(t.totem_token as string | null, token)) return null;
-  return { id: t.id as string, name: t.name as string };
+  return !error && !!data;
+}
+
+/** Barbeiro oferecido no totem: da barbearia, ativo e que atende fila (mesmo filtro de getQueueBarbers). */
+async function isOfferedBarber(admin: AdminClient, id: string, tenantId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("barbers")
+    .select("id")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .eq("active", true)
+    .eq("accepts_queue", true)
+    .maybeSingle();
+  return !error && !!data;
 }
 
 /** Busca cliente por telefone na barbearia + info de plano. */
 export async function totemLookup(slug: string, token: string, phone: string) {
-  const tenant = await validateTotem(slug, token);
-  if (!tenant) return { ok: false as const, error: "Totem inválido." };
-  const digits = onlyDigits(phone);
-  if (digits.length < 10) return { ok: false as const, error: "Telefone inválido." };
+  const tenant = await resolveTotemTenant(slug, token);
+  if (!tenant) return fail(TOTEM_ERRORS.invalidTotem);
+  const digits = totemPhoneDigits(phone);
+  if (!digits) return fail(TOTEM_ERRORS.invalidPhone);
+  const limited = await totemRateLimit("lookup", tenant.id);
+  if (limited) return limited;
 
-  const admin = createSupabaseAdminClient();
-  const { data } = await admin.rpc("totem_find_client", { p_tenant: tenant.id, p_digits: digits });
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return { ok: true as const, found: false as const };
-  return {
-    ok: true as const,
-    found: true as const,
-    clientId: row.id as string,
-    name: row.name as string,
-    hasPlan: Boolean(row.has_plan),
-    planName: (row.plan_name as string) ?? null,
-  };
+  const found = await lookupTotemClient(createSupabaseAdminClient(), tenant.id, digits);
+  if (found === "error") return fail(TOTEM_ERRORS.unavailable);
+  if (!found) return { ok: true as const, found: false as const };
+  return { ok: true as const, found: true as const, ...found };
 }
 
 /** Cadastro rápido pelo totem: cria o cliente + boas-vindas no WhatsApp (link do app). */
@@ -57,20 +122,30 @@ export async function totemRegister(
   token: string,
   input: { phone: string; name: string; birthDate?: string | null }
 ) {
-  const tenant = await validateTotem(slug, token);
-  if (!tenant) return { ok: false as const, error: "Totem inválido." };
-  const name = input.name?.trim();
-  const digits = onlyDigits(input.phone);
-  if (!name) return { ok: false as const, error: "Informe o nome." };
-  if (digits.length < 10) return { ok: false as const, error: "Telefone inválido." };
-  const phone = input.phone.trim();
+  const tenant = await resolveTotemTenant(slug, token);
+  if (!tenant) return fail(TOTEM_ERRORS.invalidTotem);
+  const digits = totemPhoneDigits(input?.phone);
+  if (!digits) return fail(TOTEM_ERRORS.invalidPhone);
+  const parsed = TotemRegisterSchema.safeParse(input);
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    return fail(field === "birthDate" ? TOTEM_ERRORS.invalidDate : TOTEM_ERRORS.registerFailed);
+  }
+  const checkedName = totemName(parsed.data.name);
+  if (!checkedName.ok) {
+    return fail(totemNameError(checkedName.reason));
+  }
+  const name = checkedName.name;
+  const phone = totemPhoneToStore(digits);
+  const limited = await totemRateLimit("register", tenant.id);
+  if (limited) return limited;
 
   const admin = createSupabaseAdminClient();
 
   // Já existe (dedupe por telefone)? retorna.
-  const dup = await admin.rpc("totem_find_client", { p_tenant: tenant.id, p_digits: digits });
-  const existing = Array.isArray(dup.data) ? dup.data[0] : dup.data;
-  if (existing) return { ok: true as const, clientId: existing.id as string, name: existing.name as string };
+  const existing = await lookupTotemClient(admin, tenant.id, digits);
+  if (existing === "error") return fail(TOTEM_ERRORS.registerFailed);
+  if (existing) return { ok: true as const, name: existing.name };
 
   const { data: client, error } = await admin
     .from("clients")
@@ -78,53 +153,90 @@ export async function totemRegister(
       tenant_id: tenant.id,
       name,
       phone,
-      birth_date: input.birthDate || null,
+      birth_date: parsed.data.birthDate || null,
       status: "INVITED",
     })
-    .select("id, name")
+    .select("name")
     .single();
-  if (error || !client) return { ok: false as const, error: error?.message ?? "Falha ao cadastrar." };
+  if (error || !client) {
+    console.error(`[totem] cadastro falhou (${error?.code ?? "sem código"})`);
+    return fail(TOTEM_ERRORS.registerFailed);
+  }
 
   // Convite/boas-vindas no WhatsApp com link do app (best-effort).
+  // Acima do teto diário da barbearia (ou sem conseguir conferir), o cadastro vale e nada é enviado.
   try {
-    const inviteToken = randomUUID();
-    await admin.from("client_invites").insert({
-      tenant_id: tenant.id,
-      token: inviteToken,
-      name,
-      phone,
-      expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-    });
-    const origin = await getRequestOrigin();
-    const link = origin ? `${origin}/convite/${inviteToken}` : "";
-    await notifyInvite({ name, phone, email: null, tenantName: tenant.name, tenantId: tenant.id, link });
+    const invite = await hitRateLimit(TOTEM_RATE_SCOPES.invite, tenant.id, TOTEM_LIMITS.invitesPerTenantDay);
+    if (invite === "ok") {
+      const inviteToken = randomUUID();
+      await admin.from("client_invites").insert({
+        tenant_id: tenant.id,
+        token: inviteToken,
+        name,
+        phone,
+        expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      });
+      const origin = await getRequestOrigin();
+      const link = origin ? `${origin}/convite/${inviteToken}` : "";
+      await notifyInvite({ name, phone, email: null, tenantName: tenant.name, tenantId: tenant.id, link });
+    }
   } catch {
     /* boas-vindas não bloqueiam o cadastro */
   }
 
-  return { ok: true as const, clientId: client.id as string, name: client.name as string };
+  return { ok: true as const, name: client.name as string };
 }
 
-/** Gera a senha da fila pelo totem (em nome do cliente). */
+/** Gera a senha da fila pelo totem. O cliente é resolvido no servidor a partir do telefone. */
 export async function totemJoinQueue(
   slug: string,
   token: string,
-  clientId: string,
+  phone: string,
   serviceId?: string | null,
   barberId?: string | null
 ) {
-  const tenant = await validateTotem(slug, token);
-  if (!tenant) return { ok: false as const, error: "Totem inválido." };
+  const tenant = await resolveTotemTenant(slug, token);
+  if (!tenant) return fail(TOTEM_ERRORS.invalidTotem);
+  const digits = totemPhoneDigits(phone);
+  if (!digits) return fail(TOTEM_ERRORS.invalidPhone);
+  const service = serviceId || null;
+  const barber = barberId || null;
+  if ((service && !isUuid(service)) || (barber && !isUuid(barber))) return fail(TOTEM_ERRORS.invalidChoice);
+  // Barbeiro só é oferecido quando a barbearia liga a escolha de barbeiro.
+  if (barber && !tenant.pickBarber) return fail(TOTEM_ERRORS.invalidChoice);
+  const limited = await totemRateLimit("join", tenant.id);
+  if (limited) return limited;
+
   const admin = createSupabaseAdminClient();
+
+  // Mesma regra da busca (totem_resolve_client_id): o id nunca sai do servidor.
+  const resolved = await admin.rpc("totem_resolve_client_id", { p_tenant: tenant.id, p_digits: digits });
+  if (resolved.error) {
+    console.error(`[totem] cliente não resolvido (${resolved.error.code ?? "sem código"})`);
+    return fail(TOTEM_ERRORS.joinFailed);
+  }
+  const clientId = typeof resolved.data === "string" ? resolved.data : null;
+  if (!clientId) return fail(TOTEM_ERRORS.clientNotFound);
+
+  // Serviço e barbeiro conferidos aqui também (a função do banco confere de novo).
+  const [serviceOk, barberOk] = await Promise.all([
+    service ? isOfferedService(admin, service, tenant.id) : true,
+    barber ? isOfferedBarber(admin, barber, tenant.id) : true,
+  ]);
+  if (!serviceOk || !barberOk) return fail(TOTEM_ERRORS.invalidChoice);
+
   const { data, error } = await admin.rpc("join_queue_totem", {
     p_tenant_id: tenant.id,
     p_client_id: clientId,
-    p_service_id: serviceId ?? null,
-    p_barber_id: barberId ?? null,
+    p_service_id: service,
+    p_barber_id: barber,
   });
-  if (error) return { ok: false as const, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;
-  return { ok: true as const, ticket: row?.ticket_number as number, id: row?.id as string };
+  if (error || typeof row?.ticket_number !== "number") {
+    if (error) console.error(`[totem] senha falhou (${error.code ?? "sem código"})`);
+    return fail(totemJoinErrorMessage(error?.message));
+  }
+  return { ok: true as const, ticket: row.ticket_number as number };
 }
 
 /** ADMIN (UNIT_ADMIN+/MASTER): regenera o token do totem (invalida o link antigo). */
@@ -134,7 +246,7 @@ export async function regenerateTotemToken() {
   const admin = createSupabaseAdminClient();
   const token = randomBytes(24).toString("hex");
   const { error } = await admin.from("tenants").update({ totem_token: token }).eq("id", tenantId);
-  if (error) return { ok: false as const, error: error.message };
+  if (error) return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
   return { ok: true as const, token };
 }
 
@@ -146,7 +258,7 @@ export async function setQueueMode(mode: "TOTEM" | "APP" | "BOTH") {
   const { error } = await admin
     .from("tenant_settings")
     .upsert({ tenant_id: tenantId, queue_mode: mode }, { onConflict: "tenant_id" });
-  if (error) return { ok: false as const, error: error.message };
+  if (error) return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
   return { ok: true as const };
 }
 
@@ -158,6 +270,6 @@ export async function setQueuePlanRequiresService(enabled: boolean) {
   const { error } = await admin
     .from("tenant_settings")
     .upsert({ tenant_id: tenantId, queue_plan_requires_service: enabled }, { onConflict: "tenant_id" });
-  if (error) return { ok: false as const, error: error.message };
+  if (error) return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
   return { ok: true as const };
 }
