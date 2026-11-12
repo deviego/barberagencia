@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/features/seo/site";
 import { LegalDoc } from "@/components/legal-doc";
-import { PRIVACY } from "@/lib/legal/content";
+import { PRIVACY, PRIVACY_PLATFORM } from "@/lib/legal/content";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
 
 export const metadata: Metadata = {
   title: "Política de Privacidade — Barber Agência",
@@ -10,6 +11,9 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/privacidade` },
 };
 
-export default function PrivacidadePage() {
-  return <LegalDoc doc={PRIVACY} />;
+export default async function PrivacidadePage() {
+  // Mesmo critério do layout (legal): sem barbearia no contexto (sessão ou cookie bb_tenant) = página da plataforma.
+  // Em contexto de barbearia (white-label) a política fica sem a seção da Barber Agência.
+  const tenant = await getCurrentTenant();
+  return <LegalDoc doc={tenant.id ? PRIVACY : PRIVACY_PLATFORM} />;
 }

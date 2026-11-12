@@ -3,9 +3,7 @@
  * Sem dados de nenhuma barbearia específica; o contato é feito pelos canais da própria barbearia.
  */
 
-export const LEGAL_CONTACT = {
-  updatedAt: "20 de julho de 2026",
-};
+import { BARBERAGENCIA_EMAIL, BARBERAGENCIA_WHATSAPP_DISPLAY } from "@/lib/contact";
 
 export interface LegalSection {
   title: string;
@@ -16,12 +14,15 @@ export interface LegalDocument {
   title: string;
   subtitle: string;
   intro: string;
+  /** Data da última atualização (cada documento tem a sua). */
+  updatedAt: string;
   sections: LegalSection[];
 }
 
 export const TERMS: LegalDocument = {
   title: "Termos de Uso",
   subtitle: "Plataforma de agendamentos",
+  updatedAt: "20 de julho de 2026",
   intro:
     "Bem-vindo à nossa plataforma de agendamentos. Ao reservar um horário, você concorda com as regras de funcionamento da nossa barbearia descritas abaixo.",
   sections: [
@@ -71,6 +72,7 @@ export const TERMS: LegalDocument = {
 export const PRIVACY: LegalDocument = {
   title: "Política de Privacidade",
   subtitle: "Plataforma de agendamentos",
+  updatedAt: "20 de julho de 2026",
   intro:
     "Este documento explica como a barbearia coleta, utiliza, armazena e protege os dados pessoais dos clientes na plataforma de agendamento, em total conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 – LGPD).",
   sections: [
@@ -119,6 +121,26 @@ export const PRIVACY: LegalDocument = {
       title: "7. Canal de atendimento",
       paragraphs: [
         "Para exercer seus direitos ou tirar dúvidas sobre a sua privacidade, fale com a administração da barbearia pelos canais oficiais (o WhatsApp de atendimento aparece na página de Suporte no app).",
+      ],
+    },
+  ],
+};
+
+/**
+ * Política servida no domínio da plataforma (sem barbearia no contexto): acrescenta a seção do formulário
+ * de distribuidoras, que é da Barber Agência. Nos contextos de barbearia (white-label) vale só a PRIVACY.
+ */
+export const PRIVACY_PLATFORM: LegalDocument = {
+  ...PRIVACY,
+  updatedAt: "10 de novembro de 2026",
+  sections: [
+    ...PRIVACY.sections,
+    {
+      title: "8. Formulário para distribuidoras (site da Barber Agência)",
+      paragraphs: [
+        "Na página \"Para distribuidoras\" do site da Barber Agência, coletamos nome, nome da empresa, cidade, UF, WhatsApp, número de barbearias atendidas e como você recebe pedidos hoje, além da data, da hora e da versão do aceite. Usamos esses dados só para falar com você sobre o sistema, pelo WhatsApp informado, com base no seu consentimento (Art. 7º, I da LGPD). Esses dados não são vendidos nem enviados para ferramentas de anúncio.",
+        "Se você não virar cliente, guardamos os dados por até 12 meses; depois disso, eles são anonimizados.",
+        `Para pedir acesso, correção ou exclusão desses dados, ou revogar o aceite, fale com a Barber Agência pelo WhatsApp ${BARBERAGENCIA_WHATSAPP_DISPLAY} ou pelo e-mail ${BARBERAGENCIA_EMAIL}.`,
       ],
     },
   ],
