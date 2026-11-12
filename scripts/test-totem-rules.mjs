@@ -28,8 +28,19 @@ registerHooks({
 
 const { isOverLimit, ipTenantKey } = await import("@/lib/rate-limit");
 const { isLeadRateLimited, LEAD_RATE_LIMIT } = await import("@/features/leads/rate-limit");
-const { TOTEM_ERRORS, TOTEM_LIMITS, TOTEM_RATE_SCOPES, TotemRegisterSchema, totemJoinErrorMessage, totemPhoneDigits } =
-  await import("@/features/queue/totem-rules");
+const {
+  TOTEM_ERRORS,
+  TOTEM_LIMITS,
+  TOTEM_TENANT_CAPS,
+  TOTEM_RATE_SCOPES,
+  TOTEM_NAME_MAX,
+  TotemRegisterSchema,
+  isRealIsoDate,
+  totemJoinErrorMessage,
+  totemName,
+  totemPhoneDigits,
+  totemPhoneToStore,
+} = await import("@/features/queue/totem-rules");
 
 let passed = 0;
 function test(name, fn) {
@@ -50,17 +61,53 @@ test("telefone: recusa curto, longo, vazio e tipos errados", () => {
   }
 });
 
-test("cadastro: nome obrigatório e com tamanho máximo; data opcional em ISO", () => {
-  const base = { phone: "(21) 99999-0000", name: "  Fulano de Tal  " };
-  const ok = TotemRegisterSchema.safeParse(base);
-  assert.equal(ok.success, true);
-  assert.equal(ok.data.name, "Fulano de Tal");
+test("telefone gravado: sai dos dígitos validados e mantém os mesmos dígitos", () => {
+  assert.equal(totemPhoneToStore("21999990000"), "(21) 99999-0000");
+  assert.equal(totemPhoneToStore("2133330000"), "(21) 3333-0000");
+  assert.equal(totemPhoneToStore("5521999990000"), "5521999990000");
+  for (const typed of ["21 9 9999 0000", "(21)99999-0000", "+55 (21) 99999-0000", "21-3333-0000"]) {
+    const digits = totemPhoneDigits(typed);
+    assert.equal(totemPhoneToStore(digits).replace(/\D/g, ""), digits, typed);
+  }
+});
+
+test("nome: só letras (com acento), espaço, apóstrofo, hífen e ponto, até 60", () => {
+  for (const good of ["Fulano de Tal", "José D'Ávila", "Ana-Clara", "Sr. João", "Íris", "  Maria   Antônia  "]) {
+    assert.equal(totemName(good).ok, true, good);
+  }
+  assert.equal(totemName("  Maria   Antônia  ").name, "Maria Antônia");
+  assert.equal(totemName("Jose\u0301").name, "José"); // acento decomposto vira NFC
+  assert.equal(totemName("a".repeat(TOTEM_NAME_MAX)).ok, true);
+  for (const bad of [
+    "a".repeat(TOTEM_NAME_MAX + 1),
+    "Fulano 123",
+    "Fulano https://exemplo.test",
+    "Fulano *negrito*",
+    "Fulano\nBeltrano",
+    "Fulano_",
+    "Fulano @ Tal",
+    "Fulano 😀",
+    "...",
+    "- -",
+  ]) {
+    assert.deepEqual(totemName(bad), { ok: false, reason: "chars" }, JSON.stringify(bad));
+  }
+  for (const empty of ["", "   ", null, undefined, 123, {}]) {
+    assert.deepEqual(totemName(empty), { ok: false, reason: "empty" });
+  }
+});
+
+test("data de nascimento: opcional; só dia que existe, em ISO, sem futuro", () => {
+  const today = new Date(Date.UTC(2026, 10, 12));
+  for (const good of ["1990-05-20", "2000-02-29", "2026-11-12"]) assert.equal(isRealIsoDate(good, today), true, good);
+  for (const bad of ["1990-02-31", "2001-02-29", "1990-13-01", "1990-00-10", "20/05/1990", "1990-5-2", "2026-11-13", "1899-12-31", ""]) {
+    assert.equal(isRealIsoDate(bad, today), false, bad);
+  }
+  const base = { phone: "(21) 99999-0000", name: "Fulano de Tal" };
+  assert.equal(TotemRegisterSchema.safeParse(base).success, true);
   assert.equal(TotemRegisterSchema.safeParse({ ...base, birthDate: null }).success, true);
   assert.equal(TotemRegisterSchema.safeParse({ ...base, birthDate: "1990-05-20" }).success, true);
-  assert.equal(TotemRegisterSchema.safeParse({ ...base, name: "   " }).success, false);
-  assert.equal(TotemRegisterSchema.safeParse({ ...base, name: "a".repeat(81) }).success, false);
-  assert.equal(TotemRegisterSchema.safeParse({ ...base, birthDate: "20/05/1990" }).success, false);
-  assert.equal(TotemRegisterSchema.safeParse({ ...base, birthDate: "1990-99-99" }).success, false);
+  assert.equal(TotemRegisterSchema.safeParse({ ...base, birthDate: "1990-02-31" }).success, false);
   assert.equal(TotemRegisterSchema.safeParse({ ...base, name: 123 }).success, false);
 });
 
@@ -84,13 +131,18 @@ test("erro ao gerar senha: código estável vira mensagem fixa; texto do banco n
 });
 
 test("limite: libera até o limite e recusa a partir dele", () => {
-  for (const [name, rule] of Object.entries(TOTEM_LIMITS)) {
+  for (const [name, rule] of Object.entries({ ...TOTEM_LIMITS, ...Object.fromEntries(Object.entries(TOTEM_TENANT_CAPS).map(([k, v]) => [`teto ${k}`, v])) })) {
     assert.ok(Number.isInteger(rule.limit) && rule.limit >= 1, `${name}.limit`);
     assert.ok(Number.isInteger(rule.windowSeconds) && rule.windowSeconds >= 1, `${name}.windowSeconds`);
     for (let done = 0; done < rule.limit; done++) assert.equal(isOverLimit(done, rule), false);
     assert.equal(isOverLimit(rule.limit, rule), true, `${name}: passou do limite`);
   }
   assert.equal(TOTEM_LIMITS.invitesPerTenantDay.windowSeconds, 86400);
+  assert.deepEqual(TOTEM_TENANT_CAPS.lookup, { limit: 120, windowSeconds: 3600 });
+  assert.deepEqual(TOTEM_TENANT_CAPS.register, { limit: 60, windowSeconds: 86400 });
+  // O teto por barbearia tem escopo próprio (não divide o contador com a camada por IP).
+  assert.notEqual(TOTEM_RATE_SCOPES.lookupTenant, TOTEM_RATE_SCOPES.lookup);
+  assert.notEqual(TOTEM_RATE_SCOPES.registerTenant, TOTEM_RATE_SCOPES.register);
 });
 
 test("limite: chave separa barbearias e escopos não se repetem", () => {
@@ -125,11 +177,13 @@ test("migration: idempotente, RLS ligada e execute só para service_role", () =>
   for (const sig of [
     "rate_limit_hit(text, text, int, int)",
     "join_queue_totem(uuid, uuid, uuid, uuid)",
+    "totem_resolve_client_id(uuid, text)",
     "totem_lookup_client(uuid, text)",
   ]) {
     assert.ok(sql.includes(`revoke execute on function public.${sig} from public, anon, authenticated`), sig);
     assert.ok(sql.includes(`grant execute on function public.${sig} to service_role`), sig);
   }
+  assert.ok(sql.includes("grant select, insert on table public.rate_limit_events to service_role"));
   assert.doesNotMatch(sql, /^\s*(drop|delete|truncate)\b/im, "migration não pode apagar nada");
 });
 
@@ -138,16 +192,23 @@ test("migration: join_queue_totem confere as três origens e mantém a assinatur
   for (const code of ["TOTEM_CLIENT_NOT_IN_TENANT", "TOTEM_SERVICE_NOT_IN_TENANT", "TOTEM_BARBER_NOT_IN_TENANT"]) {
     assert.ok(sql.includes(`raise exception '${code}'`), code);
   }
-  assert.equal((sql.match(/tenant_id = p_tenant_id\s*\) then/g) ?? []).length, 3);
+  assert.ok(sql.includes("s.tenant_id = p_tenant_id and s.active"));
+  assert.ok(sql.includes("b.tenant_id = p_tenant_id and b.active and b.accepts_queue"));
+  assert.ok(sql.includes("pg_advisory_xact_lock(hashtextextended('queue_ticket:'"));
 });
 
-test("migration: busca nova não devolve id e totem_find_client não é recriada", () => {
+test("migration: uma regra só (ordenada) para achar o cliente; busca sem id; totem_find_client não é recriada", () => {
+  assert.equal((sql.match(/order by c\.created_at, c\.id/g) ?? []).length, 1);
+  assert.ok(sql.includes("where c.id = public.totem_resolve_client_id(p_tenant, p_digits)"));
+  assert.equal((sql.match(/regexp_replace\(coalesce\(c\.phone/g) ?? []).length, 1, "regra de telefone duplicada");
   assert.match(sql, /function public\.totem_lookup_client\(p_tenant uuid, p_digits text\)\s*returns table\(name text, has_plan boolean, plan_name text\)/);
   assert.doesNotMatch(sql, /function public\.totem_find_client/);
 });
 
 test("ações e tela: sem id do cliente no contrato e sem texto do banco na resposta", () => {
-  assert.doesNotMatch(actions, /clientId/);
+  assert.doesNotMatch(actions, /clientId: |id: row/);
+  assert.doesNotMatch(actions, /totem_find_client|validateTotem/);
+  assert.equal((actions.match(/await resolveTotemTenant\(slug, token\)/g) ?? []).length, 3);
   assert.doesNotMatch(kiosk, /clientId|c\.id\b/);
   assert.doesNotMatch(actions, /error:\s*error\??\.message/);
   assert.doesNotMatch(actions, /\?\?\s*"Falha/);
