@@ -10,7 +10,7 @@ type Svc = { id: string; name: string; priceBrl: number };
 type Barber = { id: string; name: string };
 type Step = "idle" | "phone" | "register" | "service" | "ticket";
 
-type Client = { id: string; name: string; hasPlan: boolean; planName: string | null };
+type Client = { name: string; hasPlan: boolean; planName: string | null };
 
 export function TotemKiosk({
   slug,
@@ -68,7 +68,7 @@ export function TotemKiosk({
       const res = await totemLookup(slug, token, phone);
       if (!res.ok) return setError(res.error);
       if (res.found) {
-        const c: Client = { id: res.clientId, name: res.name, hasPlan: res.hasPlan, planName: res.planName };
+        const c: Client = { name: res.name, hasPlan: res.hasPlan, planName: res.planName };
         setClient(c);
         if (c.hasPlan && !planRequiresService) join(c, null, null);
         else setStep("service");
@@ -84,7 +84,7 @@ export function TotemKiosk({
     startTransition(async () => {
       const res = await totemRegister(slug, token, { phone, name: regName, birthDate: toISO(regBirth) });
       if (!res.ok) return setError(res.error);
-      setClient({ id: res.clientId, name: res.name, hasPlan: false, planName: null });
+      setClient({ name: res.name, hasPlan: false, planName: null });
       setStep("service");
     });
   }
@@ -92,7 +92,7 @@ export function TotemKiosk({
   function join(c: Client, svc: string | null, brb: string | null) {
     setError(null);
     startTransition(async () => {
-      const res = await totemJoinQueue(slug, token, c.id, svc, brb);
+      const res = await totemJoinQueue(slug, token, phone, svc, brb);
       if (!res.ok) return setError(res.error);
       setTicket({
         n: res.ticket,
