@@ -32,6 +32,8 @@ const {
   TOTEM_ERRORS,
   TOTEM_LIMITS,
   TOTEM_TENANT_CAPS,
+  TOTEM_TENANT_CAP_LOG,
+  totemNameError,
   TOTEM_RATE_SCOPES,
   TOTEM_NAME_MAX,
   TotemRegisterSchema,
@@ -78,8 +80,23 @@ test("nome: só letras (com acento), espaço, apóstrofo, hífen e ponto, até 6
   assert.equal(totemName("  Maria   Antônia  ").name, "Maria Antônia");
   assert.equal(totemName("Jose\u0301").name, "José"); // acento decomposto vira NFC
   assert.equal(totemName("a".repeat(TOTEM_NAME_MAX)).ok, true);
+  // apóstrofo tipográfico (teclado de tablet) vira apóstrofo simples
+  assert.equal(totemName("José D\u2019Ávila").name, "José D'Ávila");
+  assert.equal(totemName("D\u2018Ávila").name, "D'Ávila");
+  // nome longo tem motivo e mensagem próprios
+  assert.deepEqual(totemName("a".repeat(TOTEM_NAME_MAX + 1)), { ok: false, reason: "long" });
+  assert.equal(totemNameError("long"), TOTEM_ERRORS.invalidNameLong);
+  assert.equal(totemNameError("chars"), TOTEM_ERRORS.invalidNameChars);
+  assert.equal(totemNameError("empty"), TOTEM_ERRORS.invalidName);
+  assert.equal(totemName("1".repeat(TOTEM_NAME_MAX + 1)).reason, "chars"); // caractere inválido vem antes do tamanho
+  // ponto só como abreviação: fim de palavra, seguido de espaço ou do fim do nome
+  for (const good of ["Fulano Jr.", "Sra. Ana", "Sr. João P. Silva", "Dr. A."]) {
+    assert.equal(totemName(good).ok, true, good);
+  }
+  for (const bad of ["exemplo.test", "Fulano exemplo.com.br", "a.b", "Fulano .", ".Fulano", "Fulano..", "Fulano -.", "Sr.João"]) {
+    assert.deepEqual(totemName(bad), { ok: false, reason: "chars" }, JSON.stringify(bad));
+  }
   for (const bad of [
-    "a".repeat(TOTEM_NAME_MAX + 1),
     "Fulano 123",
     "Fulano https://exemplo.test",
     "Fulano *negrito*",
@@ -140,6 +157,14 @@ test("limite: libera até o limite e recusa a partir dele", () => {
   assert.equal(TOTEM_LIMITS.invitesPerTenantDay.windowSeconds, 86400);
   assert.deepEqual(TOTEM_TENANT_CAPS.lookup, { limit: 120, windowSeconds: 3600 });
   assert.deepEqual(TOTEM_TENANT_CAPS.register, { limit: 60, windowSeconds: 86400 });
+  assert.deepEqual(TOTEM_TENANT_CAPS.join, { limit: 120, windowSeconds: 3600 });
+  assert.notEqual(TOTEM_RATE_SCOPES.joinTenant, TOTEM_RATE_SCOPES.join);
+  // As três ações passam pelo teto por barbearia, com o mesmo marcador de log.
+  assert.equal(TOTEM_TENANT_CAP_LOG, "[totem][teto-barbearia]");
+  const actionsSrc = readFileSync(path.join(SRC, "features/queue/totem-actions.ts"), "utf8");
+  assert.ok(!actionsSrc.includes('action !== "join"'));
+  assert.equal(actionsSrc.split("TOTEM_TENANT_CAP_LOG").length - 1, 2); // import + um único ponto de log
+  for (const a of ["lookup", "register", "join"]) assert.ok(actionsSrc.includes(`totemRateLimit("${a}"`), a);
   // O teto por barbearia tem escopo próprio (não divide o contador com a camada por IP).
   assert.notEqual(TOTEM_RATE_SCOPES.lookupTenant, TOTEM_RATE_SCOPES.lookup);
   assert.notEqual(TOTEM_RATE_SCOPES.registerTenant, TOTEM_RATE_SCOPES.register);

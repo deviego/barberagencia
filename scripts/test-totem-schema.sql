@@ -4,6 +4,9 @@
 --   psql "postgresql://postgres@127.0.0.1:<porta>/<banco_descartavel>" -v ON_ERROR_STOP=1 -f scripts/test-totem-schema.sql
 --
 -- O script recusa rodar se a conexão não for local.
+-- ATENÇÃO: essa conferência olha só o endereço que o servidor enxerga. Um banco remoto acessado
+-- por túnel (ssh -L, proxy local) também aparece como 127.0.0.1 e passaria. Confira você mesmo
+-- que o destino é um banco descartável antes de rodar. Nunca aponte para banco do projeto.
 \set ON_ERROR_STOP on
 begin;
 

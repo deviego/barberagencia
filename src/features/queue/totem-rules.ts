@@ -22,7 +22,12 @@ export const TOTEM_LIMITS = {
 export const TOTEM_TENANT_CAPS = {
   lookup: { limit: 120, windowSeconds: 60 * 60 },
   register: { limit: 60, windowSeconds: 24 * 60 * 60 },
+  /** Mesmo valor da busca: cada atendimento faz uma busca e gera uma senha. */
+  join: { limit: 120, windowSeconds: 60 * 60 },
 } as const satisfies Record<string, RateRule>;
+
+/** Marcador fixo da linha de log de teto por barbearia (igual nas três ações; fácil de buscar). */
+export const TOTEM_TENANT_CAP_LOG = "[totem][teto-barbearia]";
 
 export const TOTEM_RATE_SCOPES = {
   lookup: "totem_lookup",
@@ -31,6 +36,7 @@ export const TOTEM_RATE_SCOPES = {
   invite: "totem_invite",
   lookupTenant: "totem_lookup_tenant",
   registerTenant: "totem_register_tenant",
+  joinTenant: "totem_join_tenant",
 } as const;
 
 export const TOTEM_ERRORS = {
@@ -38,6 +44,7 @@ export const TOTEM_ERRORS = {
   invalidPhone: "Telefone inválido.",
   invalidName: "Informe o nome.",
   invalidNameChars: "Digite o nome só com letras.",
+  invalidNameLong: "Nome muito longo. Use até 60 letras.",
   invalidDate: "Data de nascimento inválida.",
   invalidChoice: "Opção indisponível. Escolha de novo.",
   clientNotFound: "Não encontramos seu cadastro. Comece de novo.",
@@ -68,16 +75,37 @@ export function totemPhoneToStore(digits: string): string {
 export const TOTEM_NAME_MAX = 60;
 /** Letras (com acento), espaço, apóstrofo, hífen e ponto. O nome entra no texto do convite. */
 const TOTEM_NAME_RE = /^[\p{L}\p{M} '.-]+$/u;
+/**
+ * Ponto só como abreviação: logo depois de uma letra e seguido de espaço ou do fim do nome
+ * ("Jr.", "Sra. Ana"). Ponto no meio do texto ("a.b") vira link em aplicativos de mensagem.
+ */
+const TOTEM_NAME_BAD_DOT_RE = /(^|[^\p{L}\p{M}])\.|\.(?! |$)/u;
 
-/** Nome do cadastro normalizado (NFC, espaços simples) ou o motivo da recusa. Quebra de linha e tab são recusados. */
-export function totemName(name: unknown): { ok: true; name: string } | { ok: false; reason: "empty" | "chars" } {
+/**
+ * Nome do cadastro normalizado (NFC, espaços simples, apóstrofo tipográfico vira ') ou o motivo
+ * da recusa. Quebra de linha e tab são recusados.
+ */
+export function totemName(
+  name: unknown
+): { ok: true; name: string } | { ok: false; reason: "empty" | "chars" | "long" } {
   if (typeof name !== "string") return { ok: false, reason: "empty" };
-  const clean = name.normalize("NFC").replace(/^ +| +$/g, "").replace(/ {2,}/g, " ");
+  const clean = name
+    .normalize("NFC")
+    .replace(/[\u2018\u2019]/g, "'") // teclado de tablet troca ' por ’
+    .replace(/^ +| +$/g, "")
+    .replace(/ {2,}/g, " ");
   if (!clean) return { ok: false, reason: "empty" };
-  if (clean.length > TOTEM_NAME_MAX || !TOTEM_NAME_RE.test(clean) || !/\p{L}/u.test(clean)) {
+  if (!TOTEM_NAME_RE.test(clean) || !/\p{L}/u.test(clean) || TOTEM_NAME_BAD_DOT_RE.test(clean)) {
     return { ok: false, reason: "chars" };
   }
+  if (clean.length > TOTEM_NAME_MAX) return { ok: false, reason: "long" };
   return { ok: true, name: clean };
+}
+
+/** Mensagem fixa para cada motivo de recusa do nome. */
+export function totemNameError(reason: "empty" | "chars" | "long"): string {
+  if (reason === "empty") return TOTEM_ERRORS.invalidName;
+  return reason === "long" ? TOTEM_ERRORS.invalidNameLong : TOTEM_ERRORS.invalidNameChars;
 }
 
 /** true se "AAAA-MM-DD" é um dia que existe (31/02 não passa) e não está no futuro. */

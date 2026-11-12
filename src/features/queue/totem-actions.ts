@@ -15,6 +15,8 @@ import {
   TOTEM_LIMITS,
   TOTEM_RATE_SCOPES,
   TOTEM_TENANT_CAPS,
+  TOTEM_TENANT_CAP_LOG,
+  totemNameError,
   TotemRegisterSchema,
   totemJoinErrorMessage,
   totemName,
@@ -33,8 +35,8 @@ type TotemFail = { ok: false; error: string };
 const fail = (error: string): TotemFail => ({ ok: false, error });
 
 /**
- * Limite de tentativas: por IP da hospedagem + barbearia e, na busca e no cadastro, um teto por
- * barbearia somando todas as origens. Retorna o erro a devolver, ou null se liberado.
+ * Limite de tentativas: por IP da hospedagem + barbearia e um teto por barbearia somando todas
+ * as origens (nas três ações). Retorna o erro a devolver, ou null se liberado.
  *   - Sem RATE_LIMIT_IP_SALT: a camada por IP é pulada (com alerta); os tetos por barbearia valem.
  *   - Sem conseguir conferir no banco (ex.: schema-50 não aplicada): recusa.
  */
@@ -48,14 +50,12 @@ async function totemRateLimit(action: "lookup" | "register" | "join", tenantId: 
     console.error(`[totem] RATE_LIMIT_IP_SALT ausente ou curto; limite por IP pulado em ${action}`);
   }
 
-  if (action !== "join") {
-    const cap = await hitRateLimit(TOTEM_RATE_SCOPES[`${action}Tenant`], tenantId, TOTEM_TENANT_CAPS[action]);
-    if (cap === "limited") {
-      console.error(`[totem] teto por barbearia atingido em ${action} (tenant ${tenantId})`);
-      return fail(TOTEM_ERRORS.unavailable);
-    }
-    if (cap === "unavailable") return fail(TOTEM_ERRORS.unavailable);
+  const cap = await hitRateLimit(TOTEM_RATE_SCOPES[`${action}Tenant`], tenantId, TOTEM_TENANT_CAPS[action]);
+  if (cap === "limited") {
+    console.error(`${TOTEM_TENANT_CAP_LOG} acao=${action} tenant=${tenantId}`);
+    return fail(TOTEM_ERRORS.unavailable);
   }
+  if (cap === "unavailable") return fail(TOTEM_ERRORS.unavailable);
   return null;
 }
 
@@ -133,7 +133,7 @@ export async function totemRegister(
   }
   const checkedName = totemName(parsed.data.name);
   if (!checkedName.ok) {
-    return fail(checkedName.reason === "empty" ? TOTEM_ERRORS.invalidName : TOTEM_ERRORS.invalidNameChars);
+    return fail(totemNameError(checkedName.reason));
   }
   const name = checkedName.name;
   const phone = totemPhoneToStore(digits);
