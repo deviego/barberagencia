@@ -3,17 +3,20 @@
 --   1. rate_limit_events + rate_limit_hit(): armazenamento genérico de limite de tentativas
 --      (mesmo padrão do schema-35: hash de IP com sal do servidor, nunca o IP cru).
 --   2. join_queue_totem(): mesma assinatura e mesmo retorno; passa a conferir que cliente,
---      serviço e barbeiro são da barbearia informada.
---   3. totem_lookup_client(): busca do totem com as colunas que a tela usa (sem id).
---      totem_find_client() NÃO muda.
+--      serviço e barbeiro são da barbearia informada (serviço ativo; barbeiro ativo e que
+--      atende fila) e numera as senhas com bloqueio por barbearia + dia.
+--   3. totem_resolve_client_id(): regra única (e ordenada) para achar o cliente pelo telefone.
+--   4. totem_lookup_client(): busca do totem com as colunas que a tela usa (sem id), pela
+--      mesma regra. totem_find_client() NÃO muda.
 --
 -- Segurança:
 --   * rate_limit_events: RLS ligada e NENHUMA policy; grants revogados de anon/authenticated.
---   * As três funções: execute só para service_role.
+--   * As quatro funções: execute só para service_role.
 --   * rate_limit_events não guarda dado pessoal: escopo, chave (hash) e horário.
 --
 -- Rollback:
 --   drop function if exists public.totem_lookup_client(uuid, text);
+--   drop function if exists public.totem_resolve_client_id(uuid, text);
 --   drop function if exists public.rate_limit_hit(text, text, int, int);
 --   drop table if exists public.rate_limit_events;
 --   join_queue_totem: reaplicar o bloco da função em supabase/schema-19.sql.
@@ -31,6 +34,8 @@ create index if not exists rate_limit_events_scope_key_created_idx
 alter table public.rate_limit_events enable row level security;
 -- Sem policies de propósito: nenhum acesso via PostgREST para anon/authenticated.
 revoke all on table public.rate_limit_events from anon, authenticated;
+-- Explícito, para não depender dos privilégios padrão do projeto.
+grant select, insert on table public.rate_limit_events to service_role;
 
 -- Conta as tentativas aceitas de (escopo, chave) na janela e, se couber mais uma, registra.
 -- true = liberado (e registrado); false = acima do limite (nada é gravado).
@@ -66,7 +71,10 @@ grant execute on function public.rate_limit_hit(text, text, int, int) to service
 
 -- ---- 2. Entrar na fila pelo totem: confere a barbearia de cada id -------------
 -- Mesma assinatura e mesmo retorno do schema-19. Erros com código estável na mensagem:
---   TOTEM_CLIENT_NOT_IN_TENANT | TOTEM_SERVICE_NOT_IN_TENANT | TOTEM_BARBER_NOT_IN_TENANT
+--   TOTEM_CLIENT_NOT_IN_TENANT  cliente não é da barbearia
+--   TOTEM_SERVICE_NOT_IN_TENANT serviço não é da barbearia ou está inativo
+--   TOTEM_BARBER_NOT_IN_TENANT  barbeiro não é da barbearia, está inativo ou não atende fila
+-- (os mesmos filtros da lista mostrada no totem)
 create or replace function public.join_queue_totem(
   p_tenant_id uuid, p_client_id uuid, p_service_id uuid, p_barber_id uuid
 ) returns public.queue_entries language plpgsql security definer set search_path = public as $$
@@ -81,15 +89,20 @@ begin
     raise exception 'TOTEM_CLIENT_NOT_IN_TENANT';
   end if;
   if p_service_id is not null and not exists (
-    select 1 from public.services s where s.id = p_service_id and s.tenant_id = p_tenant_id
+    select 1 from public.services s
+     where s.id = p_service_id and s.tenant_id = p_tenant_id and s.active
   ) then
     raise exception 'TOTEM_SERVICE_NOT_IN_TENANT';
   end if;
   if p_barber_id is not null and not exists (
-    select 1 from public.barbers b where b.id = p_barber_id and b.tenant_id = p_tenant_id
+    select 1 from public.barbers b
+     where b.id = p_barber_id and b.tenant_id = p_tenant_id and b.active and b.accepts_queue
   ) then
     raise exception 'TOTEM_BARBER_NOT_IN_TENANT';
   end if;
+
+  -- Uma senha por vez por barbearia + dia: pedidos simultâneos esperam em vez de falhar.
+  perform pg_advisory_xact_lock(hashtextextended('queue_ticket:' || p_tenant_id::text || ':' || v_day::text, 0));
 
   -- Já está na fila hoje? retorna (atualizando serviço/barbeiro se informados).
   select * into v_row from public.queue_entries
@@ -117,20 +130,33 @@ end $$;
 revoke execute on function public.join_queue_totem(uuid, uuid, uuid, uuid) from public, anon, authenticated;
 grant execute on function public.join_queue_totem(uuid, uuid, uuid, uuid) to service_role;
 
--- ---- 3. Busca do totem: só o que a tela usa ----------------------------------
--- Mesma regra de totem_find_client (schema-19), sem a coluna id.
+-- ---- 3. Regra única para achar o cliente pelo telefone ----------------------
+-- Telefone repetido na mesma barbearia: vale sempre o cadastro mais antigo (desempate por id).
+-- A busca (abaixo) e a geração da senha (server action) usam esta mesma função.
+create or replace function public.totem_resolve_client_id(p_tenant uuid, p_digits text)
+returns uuid language sql stable security definer set search_path = public as $$
+  select c.id
+    from public.clients c
+   where c.tenant_id = p_tenant
+     and regexp_replace(coalesce(c.phone, ''), '\D', '', 'g') = p_digits
+   order by c.created_at, c.id
+   limit 1
+$$;
+revoke execute on function public.totem_resolve_client_id(uuid, text) from public, anon, authenticated;
+grant execute on function public.totem_resolve_client_id(uuid, text) to service_role;
+
+-- ---- 4. Busca do totem: só o que a tela usa ----------------------------------
+-- Mesmas colunas de totem_find_client (schema-19), sem a coluna id.
 create or replace function public.totem_lookup_client(p_tenant uuid, p_digits text)
 returns table(name text, has_plan boolean, plan_name text)
-language sql security definer set search_path = public as $$
+language sql stable security definer set search_path = public as $$
   select c.name,
          exists(select 1 from public.client_subscriptions s where s.client_id = c.id and s.status = 'ACTIVE') as has_plan,
          (select cp.name from public.client_subscriptions s
              join public.combo_plans cp on cp.id = s.combo_plan_id
             where s.client_id = c.id and s.status = 'ACTIVE' limit 1) as plan_name
     from public.clients c
-   where c.tenant_id = p_tenant
-     and regexp_replace(coalesce(c.phone, ''), '\D', '', 'g') = p_digits
-   limit 1
+   where c.id = public.totem_resolve_client_id(p_tenant, p_digits)
 $$;
 revoke execute on function public.totem_lookup_client(uuid, text) from public, anon, authenticated;
 grant execute on function public.totem_lookup_client(uuid, text) to service_role;

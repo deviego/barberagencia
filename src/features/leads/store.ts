@@ -1,6 +1,6 @@
 import "server-only";
+import { createHash } from "crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { hashIp } from "@/server/rate-limit";
 import { LEAD_RATE_LIMIT, type LeadOrigem, type LeadStatus } from "./rate-limit";
 
 /*
@@ -15,7 +15,11 @@ import { LEAD_RATE_LIMIT, type LeadOrigem, type LeadStatus } from "./rate-limit"
 const TABLE = "marketing_leads";
 
 /** sha256(ip + salt). Retorna null se o salt do servidor não estiver configurado. */
-export const hashLeadIp = hashIp;
+export function hashLeadIp(ip: string): string | null {
+  const salt = process.env.LEAD_IP_SALT;
+  if (!salt || salt.length < 16) return null;
+  return createHash("sha256").update(ip + salt).digest("hex");
+}
 
 /** Contagens para o rate limit persistente. Lança erro se o banco falhar (o chamador recusa). */
 export async function countRecentLeads(ipHash: string): Promise<{ ipRecent: number; globalLastHour: number }> {
