@@ -16,7 +16,7 @@ export async function sendReportNow(ym?: string) {
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
   const { url: base, token } = waGatewayEnv() ?? {};
-  if (!base || !token) return { ok: false as const, error: "Gateway não configurado (WA_SERVICE_URL/TOKEN)." };
+  if (!base || !token) return { ok: false as const, error: "Gateway de WhatsApp não configurado neste ambiente." };
   try {
     const url = `${base.replace(/\/$/, "")}/report/run${ym ? `?ym=${encodeURIComponent(ym)}` : ""}`;
     const res = await fetch(url, { method: "POST", headers: { "x-wa-token": token }, signal: AbortSignal.timeout(60000) });
@@ -33,7 +33,7 @@ export async function sendBarbershopReport(tenantId: string, from?: string, to?:
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
   const { url: base, token } = waGatewayEnv() ?? {};
-  if (!base || !token) return { ok: false as const, error: "Gateway não configurado (WA_SERVICE_URL/TOKEN)." };
+  if (!base || !token) return { ok: false as const, error: "Gateway de WhatsApp não configurado neste ambiente." };
   try {
     const res = await fetch(`${base.replace(/\/$/, "")}/report/send`, {
       method: "POST",

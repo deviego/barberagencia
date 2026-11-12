@@ -23,7 +23,8 @@ export const PRODUCTION_SUPABASE_HOST = "tusfxbnnrypjtzqcvpov.supabase.co";
 /** true se a URL aponta para o projeto de produção (ou não dá para ler o host dela). */
 export function isProductionSupabaseUrl(url: string): boolean {
   try {
-    return new URL(url).hostname.toLowerCase() === PRODUCTION_SUPABASE_HOST;
+    // "host." (com ponto final) é o mesmo destino de "host".
+    return new URL(url).hostname.toLowerCase().replace(/\.+$/, "") === PRODUCTION_SUPABASE_HOST;
   } catch {
     return true;
   }

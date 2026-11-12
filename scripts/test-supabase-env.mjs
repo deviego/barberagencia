@@ -116,7 +116,7 @@ test("preview sem STAGING_*: recusa, nunca devolve as de produção", () => {
 });
 
 test("preview com a URL do projeto de produção (ou URL ilegível): recusa", () => {
-  for (const url of [`https://${PRODUCTION_SUPABASE_HOST}`, `https://${PRODUCTION_SUPABASE_HOST.toUpperCase()}/rest/v1`, "nao-e-url"]) {
+  for (const url of [`https://${PRODUCTION_SUPABASE_HOST}`, `https://${PRODUCTION_SUPABASE_HOST.toUpperCase()}/rest/v1`, `https://${PRODUCTION_SUPABASE_HOST}.`, `https://${PRODUCTION_SUPABASE_HOST}.:443/x`, "nao-e-url"]) {
     const env = { ...onVercel("preview"), ...STG, NEXT_PUBLIC_STAGING_SUPABASE_URL: url };
     refuses(() => resolveSupabasePublicEnv(env), /projeto próprio/);
     refuses(() => resolveSupabaseAdminEnv(env), /projeto próprio/);
@@ -197,6 +197,22 @@ test("build: preview faltando qualquer variável quebra, e concorda com o runtim
   assert.equal(check.previewEnvProblems({ VERCEL_ENV: "preview", ...PROD }).length, 3);
   assert.throws(() => check.assertPreviewEnv({ VERCEL_ENV: "preview", ...STG, STAGING_WA_SERVICE_URL: STG_WA.STAGING_WA_SERVICE_URL }), /as duas ou nenhuma/);
   assert.equal(check.PRODUCTION_SUPABASE_HOST, PRODUCTION_SUPABASE_HOST);
+});
+
+test("build no Vercel sem VERCEL_ENV: recusa; fora do Vercel segue como local", () => {
+  for (const v of [undefined, ""]) {
+    assert.throws(() => check.assertPreviewEnv({ VERCEL: "1", VERCEL_ENV: v, ...PROD, ...STG }), /VERCEL_ENV ausente/);
+  }
+  assert.doesNotThrow(() => check.assertPreviewEnv({ VERCEL: "1", VERCEL_ENV: "production", ...PROD }));
+  assert.doesNotThrow(() => check.assertPreviewEnv({ VERCEL: "1", VERCEL_ENV: "preview", ...STG }));
+  assert.doesNotThrow(() => check.assertPreviewEnv({ ...PROD }));
+});
+
+test("estático: mensagens de 'não configurado' não citam nome de variável do gateway", () => {
+  const read = (p) => readFileSync(path.join(SRC, p), "utf8");
+  for (const f of ["features/admin/whatsapp-actions.ts", "features/platform/actions.ts", "app/api/master/report/pdf/route.ts", "features/admin/actions.ts", "features/orders/actions.ts"]) {
+    assert.ok(!read(f).includes("WA_SERVICE"), f);
+  }
 });
 
 test("estático: variáveis só nos resolvedores; service role fora do módulo público", () => {

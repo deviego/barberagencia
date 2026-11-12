@@ -19,7 +19,7 @@ function parseDate(s: string | null): Date | undefined {
 /**
  * PDF profissional do relatório. O PDF é renderizado no gateway (pdfkit em Node
  * completo, sem os problemas de fonte em serverless); este route apenas monta os
- * dados e faz o proxy. Requer WA_SERVICE_URL/WA_SERVICE_TOKEN.
+ * dados e faz o proxy. Requer o gateway configurado (ver src/server/wa-env.ts).
  * - Plataforma:  /api/master/report/pdf?ym=YYYY-MM
  * - Barbearia:   /api/master/report/pdf?tenant=<id>&from=YYYY-MM-DD&to=YYYY-MM-DD
  */
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   const { url: base, token } = waGatewayEnv() ?? {};
   if (!base || !token) {
-    return NextResponse.json({ error: "Gateway (WA_SERVICE_URL/TOKEN) não configurado — necessário para gerar o PDF." }, { status: 503 });
+    return NextResponse.json({ error: "Gateway de WhatsApp não configurado neste ambiente — necessário para gerar o PDF." }, { status: 503 });
   }
 
   const tenant = url.searchParams.get("tenant");

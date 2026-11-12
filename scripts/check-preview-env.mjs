@@ -12,8 +12,16 @@ const REQUIRED = [
   "STAGING_SUPABASE_SERVICE_ROLE_KEY",
 ];
 
-/** Lista de problemas (só nomes de variável, nunca valores). Fora do preview: sempre vazia. */
+/**
+ * Lista de problemas (só nomes de variável, nunca valores).
+ * Fora do Vercel e em produção: sempre vazia.
+ */
 export function previewEnvProblems(env) {
+  // Build no Vercel sem VERCEL_ENV: não dá para saber o ambiente, e o preview seria tratado
+  // como local (nomes padrão). Recusa em vez de seguir.
+  if (env.VERCEL && !env.VERCEL_ENV) {
+    return ["VERCEL_ENV ausente em build no Vercel (as variáveis de sistema precisam estar expostas ao projeto)"];
+  }
   if (env.VERCEL_ENV !== "preview") return [];
   const problems = REQUIRED.filter((name) => !env[name]).map((name) => `${name} ausente`);
 
@@ -21,7 +29,8 @@ export function previewEnvProblems(env) {
   if (url) {
     let host = null;
     try {
-      host = new URL(url).hostname.toLowerCase();
+      // "host." (com ponto final) é o mesmo destino de "host".
+      host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
     } catch {
       /* host fica null */
     }
@@ -42,13 +51,15 @@ export function assertPreviewEnv(env) {
   const problems = previewEnvProblems(env);
   if (problems.length) {
     throw new Error(
-      `Build de preview recusado: ambiente de homologação incompleto.\n- ${problems.join("\n- ")}\n` +
+      `Build recusado: ambiente de homologação incompleto ou ambiente indefinido.\n- ${problems.join("\n- ")}\n` +
         "O preview não usa as variáveis de produção."
     );
   }
   // Rastro no log do build (só nomes, nunca valores).
   if (env.VERCEL_ENV === "preview") {
     const wa = env.STAGING_WA_SERVICE_URL ? "ligado (STAGING_WA_SERVICE_URL, STAGING_WA_SERVICE_TOKEN)" : "desligado";
-    console.log(`[check-preview-env] VERCEL_ENV=preview; presentes: ${REQUIRED.join(", ")}; WhatsApp: ${wa}`);
+    console.log(`[check-preview-env] VERCEL_ENV=preview; destino: homologação; presentes: ${REQUIRED.join(", ")}; WhatsApp: ${wa}`);
+  } else if (env.VERCEL) {
+    console.log(`[check-preview-env] VERCEL_ENV=${env.VERCEL_ENV}; destino: padrão (fora do preview)`);
   }
 }

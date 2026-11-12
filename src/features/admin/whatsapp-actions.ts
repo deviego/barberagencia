@@ -14,7 +14,7 @@ interface WaStatus {
 
 async function gateway(path: string, init?: RequestInit): Promise<{ res?: Response; error?: string }> {
   const { url: base, token } = waGatewayEnv() ?? {};
-  if (!base || !token) return { error: "Gateway de WhatsApp não configurado (WA_SERVICE_URL)." };
+  if (!base || !token) return { error: "Gateway de WhatsApp não configurado neste ambiente." };
   const user = await getSessionUser();
   if (!user?.tenantId) return { error: "Sem tenant" };
   try {
