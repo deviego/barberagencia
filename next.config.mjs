@@ -1,3 +1,5 @@
+import { assertPreviewEnv } from "./scripts/check-preview-env.mjs";
+
 // Content-Security-Policy compatível com o app:
 // - script inline do tema + hidratação do Next → 'unsafe-inline' (e 'unsafe-eval' p/ dev)
 // - next/font é self-hosted (sem fonts.googleapis); estilos inline (Tailwind/styled-jsx)
@@ -24,9 +26,16 @@ const SECURITY_HEADERS = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+// Preview do Vercel: sem o ambiente de homologação completo o build quebra aqui
+// (em vez de subir e falhar só em runtime). Fora do preview não confere nada.
+assertPreviewEnv(process.env);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Cópia de VERCEL_ENV gravada no bundle: é por ela que o navegador sabe o ambiente
+  // (src/lib/supabase/env.ts). Não depende do prefixo automático do Vercel.
+  env: { NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "" },
   // Buscadores e crawlers de IA recebem title/description/canonical/OG no <head> (sem streaming de metadata).
   // A lista padrão do Next não inclui GPTBot, ClaudeBot, PerplexityBot etc.
   htmlLimitedBots:

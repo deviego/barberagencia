@@ -8,6 +8,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getClientDetail } from "./data";
 import { sendEmail } from "@/server/notifications/resend";
+import { waGatewayEnv } from "@/server/wa-env";
 import {
   notifyAppointmentConfirmed,
   notifyServiceStarted,
@@ -939,8 +940,7 @@ export async function deletePlan(id: string) {
 export async function requestFinancialReport() {
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
-  const base = process.env.WA_SERVICE_URL;
-  const token = process.env.WA_SERVICE_TOKEN;
+  const { url: base, token } = waGatewayEnv() ?? {};
   if (!base || !token) return { ok: false as const, error: "WhatsApp da barbearia não configurado. Conecte em Configurações." };
 
   let ok = false;

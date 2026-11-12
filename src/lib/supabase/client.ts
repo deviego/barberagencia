@@ -1,6 +1,7 @@
 "use client";
 import { createBrowserClient } from "@supabase/ssr";
 import { STAFF, areaFromKey, areaKeyFor } from "./area";
+import { supabasePublicEnv } from "./env";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 
 /** Supabase client no browser (anon key, sob RLS) usando o cookie da ÁREA atual. */
@@ -11,9 +12,10 @@ export function createSupabaseBrowserClient() {
   const cookie = typeof document !== "undefined" ? document.cookie : "";
   const previewAsClient = areaKey === "client" && cookie.includes(`${VIEW_AS_CLIENT_COOKIE}=1`) && cookie.includes("sb-stf");
   const area = previewAsClient ? STAFF : areaFromKey(areaKey);
+  const { url, anonKey } = supabasePublicEnv();
   return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookieOptions: { name: area.name, path: area.path, sameSite: "lax", secure: true },
     }
