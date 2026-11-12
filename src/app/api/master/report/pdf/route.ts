@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMonthlyReport, getBarbershopReport } from "@/features/platform/report";
 import { authorizeReport } from "../_auth";
+import { waGatewayEnv } from "@/server/wa-env";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   if (!(await authorizeReport(request))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const base = process.env.WA_SERVICE_URL;
-  const token = process.env.WA_SERVICE_TOKEN;
+  const { url: base, token } = waGatewayEnv() ?? {};
   if (!base || !token) {
     return NextResponse.json({ error: "Gateway (WA_SERVICE_URL/TOKEN) não configurado — necessário para gerar o PDF." }, { status: 503 });
   }
