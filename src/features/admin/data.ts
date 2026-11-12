@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 
 /** Solicitações de agendamento (REQUESTED) do tenant do admin. */
@@ -26,8 +27,9 @@ export async function getDashboard() {
   const dayEnd = new Date(dayStart);
   dayEnd.setDate(dayEnd.getDate() + 1);
 
-  const [rev, apptsToday, subs, pending, sixRev, today] = await Promise.all([
+  const [rev, revDay, apptsToday, subs, pending, sixRev, today] = await Promise.all([
     supabase.from("financial_entries").select("amount_brl").eq("type", "REVENUE").gte("occurred_at", monthStart.toISOString()),
+    supabase.from("financial_entries").select("amount_brl").eq("type", "REVENUE").gte("occurred_at", dayStart.toISOString()).lt("occurred_at", dayEnd.toISOString()),
     supabase.from("appointments").select("id", { count: "exact", head: true }).gte("start_at", dayStart.toISOString()).lt("start_at", dayEnd.toISOString()),
     supabase.from("client_subscriptions").select("id", { count: "exact", head: true }).eq("status", "ACTIVE"),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "REQUESTED"),
@@ -36,6 +38,7 @@ export async function getDashboard() {
   ]);
 
   const revenueMonth = (rev.data ?? []).reduce((s, r) => s + Number(r.amount_brl), 0);
+  const revenueToday = (revDay.data ?? []).reduce((s, r) => s + Number(r.amount_brl), 0);
   const buckets = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     return { month: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), value: 0, current: i === 5 };
@@ -47,6 +50,7 @@ export async function getDashboard() {
   }
 
   return {
+    revenueToday,
     revenueMonth,
     apptsToday: apptsToday.count ?? 0,
     subscribers: subs.count ?? 0,
@@ -56,16 +60,17 @@ export async function getDashboard() {
   };
 }
 
-/** Financeiro do mês (reais). */
-export async function getFinance() {
+/** Financeiro de um período (reais). Sem args = mês corrente. */
+export async function getFinance(fromISO?: string, toISO?: string) {
   const supabase = await createSupabaseServerClient();
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const { data } = await supabase
+  const from = fromISO ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  let query = supabase
     .from("financial_entries")
     .select("type, amount_brl, method, occurred_at")
-    .gte("occurred_at", monthStart.toISOString())
-    .order("occurred_at", { ascending: false });
+    .gte("occurred_at", from);
+  if (toISO) query = query.lt("occurred_at", toISO);
+  const { data } = await query.order("occurred_at", { ascending: false });
   const rows = (data ?? []) as { type: string; amount_brl: number; method: string | null; occurred_at: string }[];
 
   const revenue = rows.filter((r) => r.type === "REVENUE").reduce((s, r) => s + Number(r.amount_brl), 0);
@@ -89,6 +94,99 @@ export async function getFinance() {
   const receipts = rows.filter((r) => r.type === "REVENUE").slice(0, 8);
   return { revenue, expenses, closing: revenue - expenses, withdrawals, byMethod, receipts };
 }
+
+type Row = Record<string, unknown>;
+const relOne = (rel: unknown): Row | null => (Array.isArray(rel) ? ((rel[0] as Row) ?? null) : ((rel as Row) ?? null));
+
+/**
+ * Detalhamento do financeiro num período: recebimentos com cliente + serviços, e
+ * o ranking de serviços mais vendidos (%). Fonte = `sales`/`sale_items` (todo
+ * recebimento passa por createSale). Service-role escopado ao tenant da sessão.
+ */
+export async function getFinanceDetails(fromISO: string, toISO: string) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { receipts: [], services: [] as ServiceStat[] };
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .from("sales")
+    .select("id, total_brl, created_at, clients(name), payments(method), sale_items(name, qty, kind, price_brl)")
+    .eq("tenant_id", user.tenantId)
+    .gte("created_at", fromISO)
+    .lt("created_at", toISO)
+    .order("created_at", { ascending: false });
+  const rows = (data ?? []) as Row[];
+
+  const receipts = rows.slice(0, 40).map((s) => ({
+    datetime: s.created_at as string,
+    clientName: (relOne(s.clients)?.name as string) ?? "Cliente avulso",
+    method: (relOne(s.payments)?.method as string) ?? null,
+    total: Number(s.total_brl ?? 0),
+    items: ((s.sale_items as Row[]) ?? []).map((it) => ({ name: it.name as string, qty: Number(it.qty ?? 1), kind: it.kind as string })),
+  }));
+
+  const acc: Record<string, { name: string; value: number; qty: number }> = {};
+  for (const s of rows) {
+    for (const it of (s.sale_items as Row[]) ?? []) {
+      if (it.kind !== "service") continue;
+      const name = (it.name as string) ?? "Serviço";
+      (acc[name] ??= { name, value: 0, qty: 0 });
+      acc[name].value += Number(it.price_brl ?? 0) * Number(it.qty ?? 1);
+      acc[name].qty += Number(it.qty ?? 1);
+    }
+  }
+  const totalSvc = Object.values(acc).reduce((a, s) => a + s.value, 0);
+  const services: ServiceStat[] = Object.values(acc)
+    .map((s) => ({ ...s, pct: totalSvc > 0 ? Math.round((s.value / totalSvc) * 100) : 0 }))
+    .sort((a, b) => b.value - a.value);
+
+  return { receipts, services };
+}
+export type ServiceStat = { name: string; value: number; qty: number; pct: number };
+
+/**
+ * Faturamento por barbeiro num período (base = agendamentos do barbeiro, com os
+ * itens de serviço). Receita = itens NÃO cobertos por plano (o que entra no caixa).
+ * Não inclui vendas de balcão sem barbeiro. Service-role escopado ao tenant.
+ */
+export async function getFinanceByBarber(fromISO: string, toISO: string) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { barbers: [] as BarberFinanceRow[], detailed: [] as BarberReceipt[] };
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .from("appointments")
+    .select("id, start_at, barber_id, payment_method, clients(name), barbers(name), appointment_items(name, qty, price_brl, kind, covered_by_plan)")
+    .eq("tenant_id", user.tenantId)
+    .gte("start_at", fromISO)
+    .lt("start_at", toISO)
+    .neq("status", "CANCELLED")
+    .order("start_at", { ascending: false });
+  const rows = (data ?? []) as Row[];
+
+  const summary = new Map<string, BarberFinanceRow>();
+  const detailed: BarberReceipt[] = [];
+  for (const a of rows) {
+    if (!a.barber_id) continue;
+    const items = (a.appointment_items as Row[]) ?? [];
+    const revenue = items.reduce((s, it) => s + (it.covered_by_plan ? 0 : Number(it.price_brl ?? 0) * Number(it.qty ?? 1)), 0);
+    const bid = a.barber_id as string;
+    const bname = (relOne(a.barbers)?.name as string) ?? "Barbeiro";
+    const cur = summary.get(bid) ?? { id: bid, name: bname, appts: 0, revenue: 0 };
+    cur.appts += 1;
+    cur.revenue += revenue;
+    summary.set(bid, cur);
+    detailed.push({
+      barberId: bid,
+      datetime: a.start_at as string,
+      clientName: (relOne(a.clients)?.name as string) ?? "Cliente",
+      method: (a.payment_method as string) ?? null,
+      total: revenue,
+      items: items.filter((it) => it.kind === "service").map((it) => ({ name: it.name as string, qty: Number(it.qty ?? 1) })),
+    });
+  }
+  return { barbers: [...summary.values()].sort((a, b) => b.revenue - a.revenue), detailed };
+}
+export type BarberFinanceRow = { id: string; name: string; appts: number; revenue: number };
+export type BarberReceipt = { barberId: string; datetime: string; clientName: string; method: string | null; total: number; items: { name: string; qty: number }[] };
 
 export async function getCampaigns() {
   const supabase = await createSupabaseServerClient();
@@ -219,6 +317,46 @@ export async function getSlotStep(): Promise<number> {
   return Number.isFinite(v) ? Math.min(120, Math.max(5, v)) : 30;
 }
 
+/** Planos (combos) com os serviços do combo e os clientes vinculados (para o gerenciador). */
+export async function getPlansManage() {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: plans }, { data: cps }, { data: subs }] = await Promise.all([
+    supabase
+      .from("combo_plans")
+      .select("id, name, cuts, scope, price_brl, booking_mode, forfeit_on_noshow, active")
+      .order("name"),
+    supabase.from("combo_plan_services").select("combo_plan_id, service_id"),
+    supabase.from("client_subscriptions").select("combo_plan_id, saldo_cortes, clients(name, phone)").eq("status", "ACTIVE"),
+  ]);
+  const svcByPlan = new Map<string, string[]>();
+  for (const r of (cps ?? []) as Row[]) {
+    const k = r.combo_plan_id as string;
+    svcByPlan.set(k, [...(svcByPlan.get(k) ?? []), r.service_id as string]);
+  }
+  const subsByPlan = new Map<string, { name: string; phone: string | null; saldo: number }[]>();
+  for (const r of (subs ?? []) as Row[]) {
+    const k = r.combo_plan_id as string;
+    const c = relOne(r.clients);
+    subsByPlan.set(k, [
+      ...(subsByPlan.get(k) ?? []),
+      { name: (c?.name as string) ?? "Cliente", phone: (c?.phone as string) ?? null, saldo: Number(r.saldo_cortes ?? 0) },
+    ]);
+  }
+  return ((plans ?? []) as Row[]).map((p) => ({
+    id: p.id as string,
+    name: p.name as string,
+    cuts: Number(p.cuts ?? 0),
+    scope: (p.scope as string) ?? null,
+    priceBrl: Number(p.price_brl ?? 0),
+    bookingMode: (p.booking_mode as string) ?? "FLEXIBLE",
+    forfeitOnNoshow: !!p.forfeit_on_noshow,
+    active: p.active !== false,
+    serviceIds: svcByPlan.get(p.id as string) ?? [],
+    subscribers: subsByPlan.get(p.id as string) ?? [],
+  }));
+}
+export type PlanManageRow = Awaited<ReturnType<typeof getPlansManage>>[number];
+
 /** Bloqueios/folgas futuros da agenda (barber_id null = barbearia inteira). */
 export async function getScheduleBlocks() {
   const supabase = await createSupabaseServerClient();
@@ -322,10 +460,10 @@ export async function getComandas() {
 export async function getClientDetail(id: string) {
   const supabase = await createSupabaseServerClient();
   const [{ data: client }, { data: sub }, { data: history }] = await Promise.all([
-    supabase.from("clients").select("id, name, email, phone, active, avatar_url").eq("id", id).maybeSingle(),
+    supabase.from("clients").select("id, name, email, phone, active, status, avatar_url").eq("id", id).maybeSingle(),
     supabase
       .from("client_subscriptions")
-      .select("saldo_cortes, status, fixed_weekday, fixed_start_min, combo_plans(name, cuts, price_brl, booking_mode)")
+      .select("saldo_cortes, status, fixed_weekday, fixed_start_min, fixed_barber_id, combo_plan_id, combo_plans(name, cuts, price_brl, booking_mode)")
       .eq("client_id", id)
       .eq("status", "ACTIVE")
       .limit(1)
@@ -337,12 +475,11 @@ export async function getClientDetail(id: string) {
       .order("start_at", { ascending: false })
       .limit(20),
   ]);
-  const { data: children } = await supabase
-    .from("children")
-    .select("id, name, age, photo_url")
-    .eq("client_id", id)
-    .order("created_at", { ascending: true });
-  return { client, sub, history: history ?? [], children: children ?? [] };
+  const [{ data: children }, { data: barbers }] = await Promise.all([
+    supabase.from("children").select("id, name, age, photo_url").eq("client_id", id).order("created_at", { ascending: true }),
+    supabase.from("barbers").select("id, name").eq("active", true).order("name"),
+  ]);
+  return { client, sub, history: history ?? [], children: children ?? [], barbers: barbers ?? [] };
 }
 
 /** Agenda do dia (todos os status ativos) do tenant. */

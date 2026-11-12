@@ -56,7 +56,6 @@ export function PlanUsage({ view }: { view: PlanUsageView }) {
           <Gauge size={16} className="text-text-muted" />
           <div className="text-overline uppercase text-text-muted">Meu plano</div>
           <Badge variant="accent">{view.planLabel}</Badge>
-          {!view.gated && <Badge variant="success">Teste — tudo liberado</Badge>}
         </div>
         <UpgradeButton currentPlan={view.plan} label="Fazer upgrade" />
       </div>

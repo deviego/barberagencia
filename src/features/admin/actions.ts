@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getRequestOrigin } from "@/lib/http";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getClientDetail } from "./data";
@@ -119,6 +120,21 @@ export async function createInvite(values: { name?: string; phone?: string; emai
   const supabase = await createSupabaseServerClient();
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+
+  // Telefone não pode repetir — bloqueia e mostra o cliente que já tem o número.
+  {
+    const digits = (values.phone ?? "").replace(/\D/g, "");
+    if (digits.length >= 10) {
+      const { data: withPhone } = await supabase
+        .from("clients")
+        .select("id, name, phone")
+        .eq("tenant_id", user.tenantId)
+        .not("phone", "is", null);
+      const dup = (withPhone ?? []).find((c) => String(c.phone ?? "").replace(/\D/g, "") === digits);
+      if (dup) return { ok: false as const, error: `Já existe um cliente com esse telefone: ${dup.name as string}. Escolha outro número.` };
+    }
+  }
+
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   const { error } = await supabase.from("client_invites").insert({
@@ -171,6 +187,60 @@ export async function createInvite(values: { name?: string; phone?: string; emai
   }
   revalidatePath("/admin/clientes");
   return { ok: true as const, token };
+}
+
+/** Reconvida um cliente que ainda não criou acesso (status INVITED): expira os convites
+ *  pendentes dele, gera um link novo (48h) e reenvia por WhatsApp/e-mail. */
+export async function reinviteClient(clientId: string) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido." };
+  const supabase = await createSupabaseServerClient();
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id, name, email, phone, status, user_id")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (!client) return { ok: false as const, error: "Cliente não encontrado." };
+  if (client.status !== "INVITED" || client.user_id) return { ok: false as const, error: "Este cliente já tem acesso." };
+  const name = (client.name as string | null) ?? null;
+  const email = (client.email as string | null) ?? null;
+  const phone = (client.phone as string | null) ?? null;
+
+  // Só o último link vale: expira os convites pendentes deste cliente.
+  for (const [col, val] of [["phone", phone], ["email", email]] as const) {
+    if (!val) continue;
+    await supabase
+      .from("client_invites")
+      .update({ status: "EXPIRED" })
+      .eq("tenant_id", user.tenantId)
+      .eq("status", "PENDING")
+      .eq(col, val);
+  }
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase.from("client_invites").insert({
+    tenant_id: user.tenantId,
+    token,
+    name,
+    email,
+    phone,
+    expires_at: expiresAt,
+  });
+  if (error) return { ok: false as const, error: error.message };
+
+  let whatsapp: "SENT" | "SKIPPED" | "FAILED" | null = null;
+  try {
+    const link = `${await getRequestOrigin()}/convite/${token}`;
+    const tenant = await getCurrentTenant();
+    ({ whatsapp } = await notifyInvite({ name, phone, email, tenantName: tenant.name, tenantId: user.tenantId, link }));
+  } catch {
+    whatsapp = phone ? "FAILED" : null;
+  }
+  revalidatePath("/admin/clientes");
+  return { ok: true as const, token, whatsapp };
 }
 
 /** Cria uma campanha de marketing. */
@@ -259,6 +329,110 @@ export async function addFixedMakeup(clientId: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("add_fixed_makeup", { p_client_id: clientId });
   if (error) return { ok: false as const, error: error.message };
+  // Sincroniza o contador de "reservados" (saldo_cortes) com a nova reserva.
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: clientId });
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin/agenda");
+  return { ok: true as const };
+}
+
+/** Remove um corte do plano fixo (admin) — sempre a ÚLTIMA reserva da fila; as datas
+ *  próximas não mudam.
+ *  - Reserva extra (de um "Repor", acima do total do plano)? só cancela — desfaz a reposição.
+ *  - Senão é DÉBITO (cliente já usou o corte, ex.: cortou antes de assinar): cancela com
+ *    plan_debited=true, e o ensure_fixed_reservations não recria essa data (schema-31). */
+export async function removeFixedCut(clientId: string) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido." };
+  const supabase = await createSupabaseServerClient();
+  const { data: sub } = await supabase
+    .from("client_subscriptions")
+    .select("combo_plan_id, combo_plans(cuts, booking_mode)")
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE")
+    .limit(1)
+    .maybeSingle();
+  const rel = sub?.combo_plans as { cuts?: number; booking_mode?: string } | { cuts?: number; booking_mode?: string }[] | null;
+  const plan = Array.isArray(rel) ? rel[0] : rel;
+  if (!sub || plan?.booking_mode !== "FIXED") return { ok: false as const, error: "Cliente sem plano fixo ativo." };
+  const cuts = Math.max(1, Number(plan.cuts ?? 1));
+
+  const { data: reservations } = await supabase
+    .from("appointments")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("combo_plan_id", sub.combo_plan_id as string)
+    .eq("consumed_from_plan", true)
+    .gt("start_at", new Date().toISOString())
+    .neq("status", "CANCELLED")
+    .order("start_at", { ascending: true });
+  const list = reservations ?? [];
+  if (!list.length) return { ok: false as const, error: "Cliente sem cortes reservados para remover." };
+
+  const extra = list.length > cuts;
+  const target = list[list.length - 1].id as string;
+  const { error } = await supabase
+    .from("appointments")
+    .update({ status: "CANCELLED", plan_debited: !extra })
+    .eq("id", target);
+  if (error) return { ok: false as const, error: error.message };
+
+  // Sincroniza o contador de "reservados" (saldo_cortes).
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: clientId });
+  try {
+    await notifyAppointmentCancelled(target);
+  } catch {
+    /* notificação não deve quebrar o fluxo */
+  }
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin");
+  return { ok: true as const };
+}
+
+/** [Admin] Ajusta o saldo de cortes do plano ativo do cliente (+1 ou -1), limitado a 0..total. */
+export async function adjustClientCuts(clientId: string, delta: number) {
+  if (!clientId || (delta !== 1 && delta !== -1)) return { ok: false as const, error: "Ajuste inválido." };
+  const supabase = await createSupabaseServerClient();
+  const { data: sub } = await supabase
+    .from("client_subscriptions")
+    .select("id, saldo_cortes, combo_plans(cuts)")
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE")
+    .limit(1)
+    .maybeSingle();
+  if (!sub) return { ok: false as const, error: "Cliente sem plano ativo." };
+  const rel = sub.combo_plans as { cuts?: number } | { cuts?: number }[] | null;
+  const total = Number((Array.isArray(rel) ? rel[0]?.cuts : rel?.cuts) ?? 0) || 0;
+  const cur = Number(sub.saldo_cortes ?? 0);
+  const next = Math.max(0, Math.min(total > 0 ? total : cur + 1, cur + delta));
+  if (next !== cur) {
+    const { error } = await supabase.from("client_subscriptions").update({ saldo_cortes: next }).eq("id", sub.id as string);
+    if (error) return { ok: false as const, error: error.message };
+  }
+  revalidatePath("/admin/clientes");
+  revalidatePath("/admin");
+  return { ok: true as const, saldo: next };
+}
+
+/** [Admin] Altera o dia/horário/barbeiro do plano FIXO do cliente e reagenda as reservas. */
+export async function changeFixedPlanSlot(
+  clientId: string,
+  input: { weekday: number; startMin: number; barberId: string }
+) {
+  if (!clientId) return { ok: false as const, error: "Cliente inválido." };
+  if (!input.barberId) return { ok: false as const, error: "Selecione o barbeiro." };
+  if (input.weekday < 0 || input.weekday > 6 || input.startMin < 0 || input.startMin >= 1440)
+    return { ok: false as const, error: "Dia/horário inválidos." };
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("client_subscriptions")
+    .update({ fixed_weekday: input.weekday, fixed_start_min: input.startMin, fixed_barber_id: input.barberId })
+    .eq("client_id", clientId)
+    .eq("status", "ACTIVE");
+  if (error) return { ok: false as const, error: error.message };
+  // Remove as reservas futuras do slot antigo e recria no novo (mesmo serviço do plano).
+  await supabase.rpc("cancel_future_plan_appointments", { p_client_id: clientId });
+  await supabase.rpc("ensure_fixed_reservations", { p_client_id: clientId });
   revalidatePath("/admin/clientes");
   revalidatePath("/admin/agenda");
   return { ok: true as const };
@@ -275,12 +449,29 @@ export async function createClientAdmin(input: { name: string; phone?: string; e
   const email = input.email?.trim() || null;
   const phone = input.phone?.trim() || null;
 
-  // Dedupe leve: se já existe cliente com o mesmo e-mail/telefone, reaproveita.
-  if (email || phone) {
-    let q = supabase.from("clients").select("id, name").eq("tenant_id", user.tenantId);
-    q = email ? q.eq("email", email) : q.eq("phone", phone as string);
-    const { data: existing } = await q.limit(1).maybeSingle();
+  // E-mail: se já existe cliente com o mesmo e-mail, reaproveita (não duplica).
+  if (email) {
+    const { data: existing } = await supabase
+      .from("clients")
+      .select("id, name")
+      .eq("tenant_id", user.tenantId)
+      .eq("email", email)
+      .limit(1)
+      .maybeSingle();
     if (existing) return { ok: true as const, client: { id: existing.id as string, name: existing.name as string } };
+  }
+  // Telefone: NÃO pode repetir — bloqueia e mostra o cliente que já tem o número.
+  if (phone) {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length >= 10) {
+      const { data: withPhone } = await supabase
+        .from("clients")
+        .select("id, name, phone")
+        .eq("tenant_id", user.tenantId)
+        .not("phone", "is", null);
+      const dup = (withPhone ?? []).find((c) => String(c.phone ?? "").replace(/\D/g, "") === digits);
+      if (dup) return { ok: false as const, error: `Já existe um cliente com esse telefone: ${dup.name as string}. Escolha outro número.` };
+    }
   }
 
   const { data, error } = await supabase
@@ -457,7 +648,7 @@ export async function createAppointmentAdmin(input: {
     const to = new Date(new Date(input.startAt).getTime() + 1000).toISOString();
     const { data: blocks } = await supabase.rpc("blocked_ranges", { p_barber_id: input.barberId, p_from: from, p_to: to });
     if (Array.isArray(blocks) && blocks.length > 0)
-      return { ok: false as const, error: "Esse horário está bloqueado na agenda." };
+      return { ok: false as const, error: "Agenda travada neste horário — a barbearia está fechada ou o barbeiro está indisponível. Escolha outro horário." };
   }
 
   const { data, error } = await supabase
@@ -690,6 +881,109 @@ export async function removeScheduleBlock(id: string) {
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin/agenda");
   return { ok: true as const };
+}
+
+/** [Admin] Cria/edita um plano (combo) e sincroniza os serviços do combo. */
+export async function savePlan(
+  id: string | null,
+  values: { name: string; cuts: number; scope?: string; priceBrl: number; bookingMode: string; forfeitOnNoshow: boolean; active: boolean },
+  serviceIds: string[]
+) {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const name = values.name?.trim();
+  if (!name) return { ok: false as const, error: "Informe o nome do plano." };
+  const supabase = await createSupabaseServerClient();
+  const clean = [...new Set(serviceIds.filter(Boolean))];
+  const payload = {
+    name,
+    cuts: Math.max(0, Math.floor(Number(values.cuts) || 0)),
+    scope: values.scope?.trim() || null,
+    price_brl: Number(values.priceBrl) || 0,
+    booking_mode: values.bookingMode === "FIXED" ? "FIXED" : "FLEXIBLE",
+    forfeit_on_noshow: !!values.forfeitOnNoshow,
+    service_id: clean[0] ?? null, // semente do modo FIXO
+    active: values.active !== false,
+  };
+
+  let planId = id;
+  if (id) {
+    const { error } = await supabase.from("combo_plans").update(payload).eq("id", id);
+    if (error) return { ok: false as const, error: error.message };
+  } else {
+    const { data, error } = await supabase.from("combo_plans").insert({ ...payload, tenant_id: user.tenantId }).select("id").single();
+    if (error) return { ok: false as const, error: error.message };
+    planId = data.id as string;
+  }
+
+  await supabase.from("combo_plan_services").delete().eq("combo_plan_id", planId);
+  if (clean.length) {
+    const { error } = await supabase.from("combo_plan_services").insert(clean.map((s) => ({ combo_plan_id: planId, service_id: s })));
+    if (error) return { ok: false as const, error: error.message };
+  }
+  revalidatePath("/admin/servicos");
+  return { ok: true as const };
+}
+
+/** [Admin] Desativa um plano (soft delete). */
+export async function deletePlan(id: string) {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("combo_plans").update({ active: false }).eq("id", id);
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/admin/servicos");
+  return { ok: true as const };
+}
+
+/** [Barbearia] Solicita o relatório financeiro do MÊS: gera o PDF e envia no
+ *  WhatsApp da própria barbearia (via gateway) e registra a solicitação. */
+export async function requestFinancialReport() {
+  const user = await getSessionUser();
+  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  const base = process.env.WA_SERVICE_URL;
+  const token = process.env.WA_SERVICE_TOKEN;
+  if (!base || !token) return { ok: false as const, error: "WhatsApp da barbearia não configurado. Conecte em Configurações." };
+
+  let ok = false;
+  let phone: string | undefined;
+  let error: string | undefined;
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/report/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-wa-token": token },
+      body: JSON.stringify({ tenant: user.tenantId }), // sem from/to → mês corrente
+      signal: AbortSignal.timeout(60000),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; phone?: string };
+    phone = data.phone;
+    ok = res.ok && data.ok !== false;
+    if (!ok) error = data.error || `Gateway respondeu ${res.status}`;
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Falha de rede";
+  }
+
+  // Registro da solicitação (auditoria — visível ao Master pelos logs).
+  try {
+    const admin = createSupabaseAdminClient();
+    await admin.from("notification_log").insert({
+      tenant_id: user.tenantId,
+      channel: "whatsapp",
+      template: "report_requested",
+      recipient: phone ?? null,
+      status: ok ? "SENT" : "FAILED",
+    });
+  } catch {
+    /* log não bloqueia */
+  }
+
+  if (!ok) {
+    const friendly = /not_connected|needs_reconnect|409/.test(error ?? "")
+      ? "O WhatsApp da barbearia não está conectado. Conecte em Configurações e tente de novo."
+      : /sem telefone|phone/.test(error ?? "")
+        ? "A barbearia não tem telefone cadastrado (Configurações)."
+        : error ?? "Falha ao solicitar o relatório.";
+    return { ok: false as const, error: friendly };
+  }
+  return { ok: true as const, phone };
 }
 
 /** Marca uma retirada de produto como entregue (PICKED_UP). */

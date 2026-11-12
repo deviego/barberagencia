@@ -21,6 +21,8 @@ const PUBLIC_PREFIXES = [
   "/design-system", "/termos", "/privacidade", "/convite", "/documentacao",
   "/api/master/report", // protegido por token próprio (não exige sessão)
 ];
+/** robots/sitemap/llms.txt: servidos direto (antes iam para /client/login). */
+const SEO_FILES = new Set(["/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt"]);
 /** Páginas de login: se já logado (na área), redireciona para a home da área. */
 const AUTH_PAGES = ["/client/login", "/client/cadastro", "/client/otp", "/admin/login", "/master/login", "/distributor/login"];
 
@@ -67,6 +69,9 @@ export async function middleware(request: NextRequest) {
     url.port = "";
     return NextResponse.redirect(url, 308);
   }
+
+  // Arquivos para buscadores e IAs: públicos, sem sessão e sem consulta ao Supabase.
+  if (SEO_FILES.has(path)) return NextResponse.next();
 
   // Raiz = landing page pública (marketing). Não exige sessão.
   // Também captura o cookie de afiliado (?ref=CODE) para atribuição de indicação.
