@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { parseBRLToNumber } from "@/lib/masks";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { requireActiveDistributor } from "@/features/distributor/guard";
 
 interface CrudSchema {
   fields: string[];
@@ -44,9 +46,19 @@ const SCHEMAS: Record<string, CrudSchema> = {
   },
 };
 
+/** Distribuidor só edita com contrato assinado e conta ativa. Retorna a mensagem de recusa ou null. */
+async function distributorBlock(table: string): Promise<string | null> {
+  const tenant = await getCurrentTenant();
+  if (tenant.kind !== "DISTRIBUTOR" && table !== "distributor_customers") return null;
+  const access = await requireActiveDistributor();
+  return access.ok ? null : access.error;
+}
+
 export async function saveRow(table: string, id: string | null, values: Record<string, unknown>) {
   const schema = SCHEMAS[table];
   if (!schema) return { ok: false as const, error: "Tabela inválida" };
+  const blocked = await distributorBlock(table);
+  if (blocked) return { ok: false as const, error: blocked };
   const supabase = await createSupabaseServerClient();
 
   const payload: Record<string, unknown> = {};
@@ -82,6 +94,8 @@ export async function saveRow(table: string, id: string | null, values: Record<s
 export async function deleteRow(table: string, id: string) {
   const schema = SCHEMAS[table];
   if (!schema) return { ok: false as const, error: "Tabela inválida" };
+  const blocked = await distributorBlock(table);
+  if (blocked) return { ok: false as const, error: blocked };
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from(table).update({ active: false }).eq("id", id);
   if (error) return { ok: false as const, error: error.message };
