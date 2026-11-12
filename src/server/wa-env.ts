@@ -1,5 +1,5 @@
 import "server-only";
-import { resolveSupabasePublicEnv, type SupabaseEnvVars, type SupabaseTarget } from "@/lib/supabase/env";
+import { SupabaseEnvError, resolveSupabasePublicEnv, type SupabaseEnvVars, type SupabaseTarget } from "@/lib/supabase/env";
 
 /**
  * Endereço e segredo do gateway de WhatsApp para o ambiente atual. Só no servidor.
@@ -27,8 +27,12 @@ export function resolveWaGatewayEnv(env: WaEnvVars): WaGatewayEnv | null {
   let target: SupabaseTarget;
   try {
     target = resolveSupabasePublicEnv(env).target;
-  } catch {
-    return null; // ambiente recusado: nada de WhatsApp
+  } catch (e) {
+    // Ambiente recusado: nada de WhatsApp. Registra o motivo (a mensagem só cita nomes de
+    // variável, nunca valores) para "WhatsApp não envia" ter explicação no log.
+    const reason = e instanceof SupabaseEnvError ? e.message : "erro ao resolver o ambiente";
+    console.error(`[wa-env] gateway de WhatsApp desligado: ${reason}`);
+    return null;
   }
   const url = target === "staging" ? env.STAGING_WA_SERVICE_URL : env.WA_SERVICE_URL;
   const token = target === "staging" ? env.STAGING_WA_SERVICE_TOKEN : env.WA_SERVICE_TOKEN;
