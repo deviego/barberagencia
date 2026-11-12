@@ -37,6 +37,9 @@ export function resolveSupabaseAdminEnv(env: SupabaseServerEnvVars): SupabaseAdm
 }
 
 const runtimeEnv: SupabaseServerEnvVars = {
+  get NODE_ENV() {
+    return process.env.NODE_ENV;
+  },
   get VERCEL_ENV() {
     return process.env.VERCEL_ENV;
   },

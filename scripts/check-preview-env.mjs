@@ -12,30 +12,42 @@ const REQUIRED = [
   "STAGING_SUPABASE_SERVICE_ROLE_KEY",
 ];
 
-/**
- * Lista de problemas (só nomes de variável, nunca valores).
- * Fora do Vercel e em produção: sempre vazia.
- */
+const PRODUCTION_SUPABASE_REF = PRODUCTION_SUPABASE_HOST.split(".")[0];
+
+/** Host da URL sem ponto final e em minúsculas; null se a URL não dá para ler. */
+function hostOf(url) {
+  try {
+    // "host." (com ponto final) é o mesmo destino de "host".
+    return new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
+  } catch {
+    return null;
+  }
+}
+const isProductionHost = (host) => host === PRODUCTION_SUPABASE_HOST || host.split(".")[0] === PRODUCTION_SUPABASE_REF;
+
+/** Lista de problemas (só nomes de variável, nunca valores). */
 export function previewEnvProblems(env) {
   // Build no Vercel sem VERCEL_ENV: não dá para saber o ambiente, e o preview seria tratado
   // como local (nomes padrão). Recusa em vez de seguir.
   if (env.VERCEL && !env.VERCEL_ENV) {
     return ["VERCEL_ENV ausente em build no Vercel (as variáveis de sistema precisam estar expostas ao projeto)"];
   }
-  if (env.VERCEL_ENV !== "preview") return [];
+  if (env.VERCEL_ENV !== "preview") {
+    // Trava que não depende de VERCEL_ENV existir: o projeto de produção só é aceito com
+    // VERCEL_ENV=production ou em modo de desenvolvimento (next dev).
+    const host = env.NEXT_PUBLIC_SUPABASE_URL ? hostOf(env.NEXT_PUBLIC_SUPABASE_URL) : null;
+    if (host && isProductionHost(host) && env.VERCEL_ENV !== "production" && env.NODE_ENV !== "development") {
+      return ["NEXT_PUBLIC_SUPABASE_URL aponta para o projeto de produção, mas VERCEL_ENV não é production"];
+    }
+    return [];
+  }
   const problems = REQUIRED.filter((name) => !env[name]).map((name) => `${name} ausente`);
 
   const url = env.NEXT_PUBLIC_STAGING_SUPABASE_URL;
   if (url) {
-    let host = null;
-    try {
-      // "host." (com ponto final) é o mesmo destino de "host".
-      host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
-    } catch {
-      /* host fica null */
-    }
+    const host = hostOf(url);
     if (host === null) problems.push("NEXT_PUBLIC_STAGING_SUPABASE_URL não é uma URL válida");
-    else if (host === PRODUCTION_SUPABASE_HOST) {
+    else if (isProductionHost(host)) {
       problems.push("NEXT_PUBLIC_STAGING_SUPABASE_URL aponta para o projeto de produção");
     }
   }
@@ -52,7 +64,7 @@ export function assertPreviewEnv(env) {
   if (problems.length) {
     throw new Error(
       `Build recusado: ambiente de homologação incompleto ou ambiente indefinido.\n- ${problems.join("\n- ")}\n` +
-        "O preview não usa as variáveis de produção."
+        "Só a produção declarada (VERCEL_ENV=production) usa o projeto de produção."
     );
   }
   // Rastro no log do build (só nomes, nunca valores).

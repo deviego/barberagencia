@@ -10,6 +10,9 @@
  *   - local (sem Vercel) → NEXT_PUBLIC_SUPABASE_*, como sempre foi.
  *   - preview sem qualquer uma das STAGING_* → recusa (tudo ou nada; nunca mistura ambientes).
  *   - preview com a URL do projeto de produção → recusa.
+ *   - o projeto de produção só é aceito com VERCEL_ENV=production ou em modo de desenvolvimento
+ *     (next dev). Vale mesmo se VERCEL_ENV não existir: um preview sem as variáveis de sistema
+ *     não cai no banco de produção.
  *
  * O build de preview também quebra nesses casos: ver scripts/check-preview-env.mjs (next.config.mjs).
  */
@@ -20,17 +23,28 @@
  */
 export const PRODUCTION_SUPABASE_HOST = "tusfxbnnrypjtzqcvpov.supabase.co";
 
-/** true se a URL aponta para o projeto de produção (ou não dá para ler o host dela). */
-export function isProductionSupabaseUrl(url: string): boolean {
+/** Identificador do projeto de produção (primeiro rótulo do host). */
+const PRODUCTION_SUPABASE_REF = PRODUCTION_SUPABASE_HOST.split(".")[0];
+
+/** "production" se o host é do projeto de produção, "other" se não é, "invalid" se a URL não dá para ler. */
+export function supabaseUrlKind(url: string): "production" | "other" | "invalid" {
+  let host: string;
   try {
     // "host." (com ponto final) é o mesmo destino de "host".
-    return new URL(url).hostname.toLowerCase().replace(/\.+$/, "") === PRODUCTION_SUPABASE_HOST;
+    host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
   } catch {
-    return true;
+    return "invalid";
   }
+  return host === PRODUCTION_SUPABASE_HOST || host.split(".")[0] === PRODUCTION_SUPABASE_REF ? "production" : "other";
+}
+
+/** true se a URL aponta para o projeto de produção (ou não dá para ler o host dela). */
+export function isProductionSupabaseUrl(url: string): boolean {
+  return supabaseUrlKind(url) !== "other";
 }
 
 export type SupabaseEnvVars = {
+  readonly NODE_ENV?: string;
   readonly VERCEL_ENV?: string;
   readonly NEXT_PUBLIC_VERCEL_ENV?: string;
   readonly NEXT_PUBLIC_SUPABASE_URL?: string;
@@ -105,6 +119,15 @@ export function resolveSupabasePublicEnv(env: SupabaseEnvVars): SupabasePublicEn
   const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url) throw new SupabaseEnvError("NEXT_PUBLIC_SUPABASE_URL ausente");
   if (!anonKey) throw new SupabaseEnvError("NEXT_PUBLIC_SUPABASE_ANON_KEY ausente");
+  // Trava que não depende de VERCEL_ENV existir: o projeto de produção só é aceito em produção
+  // declarada (no navegador vale a cópia gravada no build) ou em modo de desenvolvimento.
+  const declared = env.VERCEL_ENV || env.NEXT_PUBLIC_VERCEL_ENV;
+  if (supabaseUrlKind(url) === "production" && declared !== "production" && env.NODE_ENV !== "development") {
+    throw new SupabaseEnvError(
+      "NEXT_PUBLIC_SUPABASE_URL aponta para o projeto de produção, mas VERCEL_ENV não é production. " +
+        "Fora da produção esse projeto só é aceito em modo de desenvolvimento."
+    );
+  }
   return { target, url, anonKey };
 }
 
@@ -114,6 +137,9 @@ export function resolveSupabasePublicEnv(env: SupabaseEnvVars): SupabasePublicEn
  * São getters para a leitura ser sob demanda: em produção os de STAGING_* nunca são chamados.
  */
 const runtimeEnv: SupabaseEnvVars = {
+  get NODE_ENV() {
+    return process.env.NODE_ENV;
+  },
   get VERCEL_ENV() {
     return process.env.VERCEL_ENV;
   },

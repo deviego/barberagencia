@@ -44,6 +44,7 @@ const STG = {
 const WA = { WA_SERVICE_URL: "https://wa-padrao.example.test", WA_SERVICE_TOKEN: "token-padrao" };
 const STG_WA = { STAGING_WA_SERVICE_URL: "https://wa-homolog.example.test", STAGING_WA_SERVICE_TOKEN: "token-homolog" };
 const onVercel = (v) => ({ VERCEL_ENV: v, NEXT_PUBLIC_VERCEL_ENV: v });
+const PROD_HOST = { NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_SUPABASE_HOST}` };
 
 /** Env de preview em que qualquer leitura dos nomes padrão (Supabase ou WhatsApp) estoura. */
 function defaultForbidden(env) {
@@ -165,15 +166,55 @@ test("mensagens de erro citam só nomes de variável, nunca valores", () => {
 
 test("WhatsApp: produção e local usam os nomes de sempre e não leem STAGING_*", () => {
   for (const v of ["production", "development", undefined]) {
-    const env = stagingForbidden({ VERCEL_ENV: v, ...WA, ...STG_WA });
+    const env = stagingForbidden({ VERCEL_ENV: v, ...PROD, ...WA, ...STG_WA });
     assert.deepEqual(resolveWaGatewayEnv(env), { url: WA.WA_SERVICE_URL, token: "token-padrao" });
   }
-  assert.equal(resolveWaGatewayEnv(stagingForbidden({ VERCEL_ENV: "production", ...STG_WA })), null);
-  assert.equal(resolveWaGatewayEnv({ VERCEL_ENV: "production", WA_SERVICE_URL: WA.WA_SERVICE_URL }), null);
+  assert.equal(resolveWaGatewayEnv(stagingForbidden({ VERCEL_ENV: "production", ...PROD, ...STG_WA })), null);
+  assert.equal(resolveWaGatewayEnv({ VERCEL_ENV: "production", ...PROD, WA_SERVICE_URL: WA.WA_SERVICE_URL }), null);
+});
+
+test("WhatsApp segue a decisão do Supabase: onde o Supabase recusa, fica desligado", () => {
+  const all = { ...PROD, ...STG, ...WA, ...STG_WA };
+  const cases = [
+    { VERCEL_ENV: "preview", ...all }, // build de outro ambiente rodando como preview
+    { VERCEL_ENV: "production", NEXT_PUBLIC_VERCEL_ENV: "preview", ...all }, // e o contrário
+    { ...onVercel("preview"), ...PROD, ...WA, ...STG_WA }, // preview sem homologação do Supabase
+    { ...WA, ...STG_WA }, // sem Supabase configurado
+    { ...all, ...PROD_HOST }, // sem VERCEL_ENV, apontando para produção, fora do modo de desenvolvimento
+  ];
+  for (const env of cases) {
+    assert.throws(() => resolveSupabasePublicEnv(env), SupabaseEnvError);
+    assert.equal(resolveWaGatewayEnv(env), null);
+  }
+});
+
+test("projeto de produção só com VERCEL_ENV=production ou em modo de desenvolvimento", () => {
+  const variants = [PROD_HOST.NEXT_PUBLIC_SUPABASE_URL, `https://${PRODUCTION_SUPABASE_HOST.toUpperCase()}.`, `https://${PRODUCTION_SUPABASE_HOST.split(".")[0]}.supabase.in`];
+  for (const url of variants) {
+    const base = { ...PROD, ...WA, NEXT_PUBLIC_SUPABASE_URL: url };
+    // aceito
+    for (const extra of [onVercel("production"), { VERCEL_ENV: "production" }, { NEXT_PUBLIC_VERCEL_ENV: "production" }, { NODE_ENV: "development" }, { ...onVercel("development"), NODE_ENV: "development" }]) {
+      assert.equal(resolveSupabasePublicEnv({ ...base, ...extra }).url, url);
+      assert.equal(resolveSupabaseAdminEnv({ ...base, ...extra }).serviceRoleKey, "service-padrao");
+      assert.notEqual(resolveWaGatewayEnv({ ...base, ...extra }), null);
+    }
+    // recusado, no runtime e no build
+    for (const extra of [{}, { NODE_ENV: "production" }, { NODE_ENV: "test" }, onVercel("development"), { VERCEL_ENV: "outro" }]) {
+      refuses(() => resolveSupabasePublicEnv({ ...base, ...extra }), /VERCEL_ENV não é production/);
+      refuses(() => resolveSupabaseAdminEnv({ ...base, ...extra }), /VERCEL_ENV não é production/);
+      assert.equal(resolveWaGatewayEnv({ ...base, ...extra }), null);
+      assert.throws(() => check.assertPreviewEnv({ ...base, ...extra }), /VERCEL_ENV não é production/);
+    }
+    assert.doesNotThrow(() => check.assertPreviewEnv({ ...base, VERCEL: "1", VERCEL_ENV: "production", NODE_ENV: "production" }));
+    assert.doesNotThrow(() => check.assertPreviewEnv({ ...base, NODE_ENV: "development" }));
+  }
+  // outro projeto, sem VERCEL_ENV: segue como local
+  assert.doesNotThrow(() => check.assertPreviewEnv({ ...PROD, NODE_ENV: "production" }));
+  assert.equal(resolveSupabasePublicEnv({ ...PROD, NODE_ENV: "production" }).target, "default");
 });
 
 test("WhatsApp: preview nunca lê os nomes de produção; sem STAGING_WA_* fica desligado", () => {
-  const p = (extra) => defaultForbidden({ VERCEL_ENV: "preview", ...WA, ...extra });
+  const p = (extra) => defaultForbidden({ ...onVercel("preview"), ...PROD, ...STG, ...WA, ...extra });
   assert.equal(resolveWaGatewayEnv(p({})), null);
   assert.equal(resolveWaGatewayEnv(p({ STAGING_WA_SERVICE_URL: STG_WA.STAGING_WA_SERVICE_URL })), null);
   assert.equal(resolveWaGatewayEnv(p({ STAGING_WA_SERVICE_TOKEN: "token-homolog" })), null);
