@@ -35,10 +35,11 @@ const SCHEMAS: Record<string, CrudSchema> = {
   },
   barbers: { fields: ["name", "active"], numeric: [], path: "/admin/barbeiros" },
   clients: { fields: ["name", "email", "phone", "active"], numeric: [], path: "/admin/clientes" },
+  // O vínculo com a barbearia (customer_tenant_id) não é editável por aqui; vem do fluxo de aceite.
   distributor_customers: {
     fields: [
       "trade_name", "legal_name", "contact_name", "contact_phone", "contact_email",
-      "address_street", "address_city", "address_state", "address_zip", "customer_tenant_id", "active",
+      "address_street", "address_city", "address_state", "address_zip", "active",
     ],
     numeric: [],
     path: "/distributor/clientes",
