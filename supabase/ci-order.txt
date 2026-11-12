@@ -35,3 +35,4 @@ schema-28-schedule.sql
 schema-29-combo-services.sql
 schema-30-auth-phone.sql
 schema-31-fixed-plan-debit.sql
+schema-35-marketing-leads.sql
