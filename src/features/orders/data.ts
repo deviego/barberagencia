@@ -1,6 +1,6 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getSessionUser } from "@/lib/auth/session";
+import { requireBarbershopAdmin, requireDistributorAdmin } from "./guards";
 
 type Row = Record<string, unknown>;
 const num = (v: unknown) => Number(v ?? 0);
@@ -30,10 +30,10 @@ async function tenantNames(admin: ReturnType<typeof createSupabaseAdminClient>, 
 
 /** [Barbearia] Distribuidores que têm esta barbearia na carteira. */
 export async function getSuppliers(): Promise<Supplier[]> {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return [];
+  const g = await requireBarbershopAdmin();
+  if (!g.ok) return [];
   const admin = createSupabaseAdminClient();
-  const { data } = await admin.from("distributor_customers").select("tenant_id").eq("customer_tenant_id", user.tenantId).eq("active", true);
+  const { data } = await admin.from("distributor_customers").select("tenant_id").eq("customer_tenant_id", g.tenantId).eq("active", true);
   const ids = [...new Set(((data ?? []) as Row[]).map((r) => r.tenant_id as string))];
   const names = await tenantNames(admin, ids);
   return ids.map((id) => ({ id, name: names.get(id) ?? "Distribuidor" }));
@@ -41,14 +41,14 @@ export async function getSuppliers(): Promise<Supplier[]> {
 
 /** [Barbearia] Catálogo de um distribuidor (só se estiver na carteira). Sem expor custo. */
 export async function getSupplierCatalog(distributorId: string): Promise<{ supplier: Supplier; products: CatalogProduct[] } | null> {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return null;
+  const g = await requireBarbershopAdmin();
+  if (!g.ok) return null;
   const admin = createSupabaseAdminClient();
   const { data: link } = await admin
     .from("distributor_customers")
     .select("id")
     .eq("tenant_id", distributorId)
-    .eq("customer_tenant_id", user.tenantId)
+    .eq("customer_tenant_id", g.tenantId)
     .eq("active", true)
     .maybeSingle();
   if (!link) return null;
@@ -94,16 +94,16 @@ async function ordersWith(admin: ReturnType<typeof createSupabaseAdminClient>, f
 
 /** [Distribuidor] Pedidos recebidos (barbearia como contraparte). */
 export async function getDistributorOrders(): Promise<OrderView[]> {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return [];
+  const g = await requireDistributorAdmin();
+  if (!g.ok) return [];
   const admin = createSupabaseAdminClient();
-  return ordersWith(admin, { col: "distributor_id", id: user.tenantId }, "customer_tenant_id");
+  return ordersWith(admin, { col: "distributor_id", id: g.tenantId }, "customer_tenant_id");
 }
 
 /** [Barbearia] Meus pedidos aos distribuidores. */
 export async function getMySupplierOrders(): Promise<OrderView[]> {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return [];
+  const g = await requireBarbershopAdmin();
+  if (!g.ok) return [];
   const admin = createSupabaseAdminClient();
-  return ordersWith(admin, { col: "customer_tenant_id", id: user.tenantId }, "distributor_id");
+  return ordersWith(admin, { col: "customer_tenant_id", id: g.tenantId }, "distributor_id");
 }
