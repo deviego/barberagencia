@@ -1,8 +1,11 @@
 import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { getDistributorAccess } from "@/features/distributor/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DistributorDashboard() {
+  // O layout não é fronteira: a página também confere o acesso antes de buscar dados.
+  if (!(await getDistributorAccess()).ok) return null;
   const tenant = await getCurrentTenant();
   return (
     <div className="flex flex-col gap-6">
