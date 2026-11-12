@@ -5,6 +5,7 @@ import { getRequestOrigin } from "@/lib/http";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
+import { isUnitAdmin } from "@/lib/rbac";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getClientDetail } from "./data";
 import { sendEmail } from "@/server/notifications/resend";
@@ -938,7 +939,7 @@ export async function deletePlan(id: string) {
  *  WhatsApp da própria barbearia (via gateway) e registra a solicitação. */
 export async function requestFinancialReport() {
   const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  if (!user?.tenantId || !user.role || !isUnitAdmin(user.role)) return { ok: false as const, error: "Sem permissão" };
   const base = process.env.WA_SERVICE_URL;
   const token = process.env.WA_SERVICE_TOKEN;
   if (!base || !token) return { ok: false as const, error: "WhatsApp da barbearia não configurado. Conecte em Configurações." };
@@ -980,7 +981,7 @@ export async function requestFinancialReport() {
       ? "O WhatsApp da barbearia não está conectado. Conecte em Configurações e tente de novo."
       : /sem telefone|phone/.test(error ?? "")
         ? "A barbearia não tem telefone cadastrado (Configurações)."
-        : error ?? "Falha ao solicitar o relatório.";
+        : "Não foi possível solicitar o relatório agora. Tente de novo mais tarde.";
     return { ok: false as const, error: friendly };
   }
   return { ok: true as const, phone };
