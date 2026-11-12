@@ -1,9 +1,12 @@
 import { getDistributorOrders } from "@/features/orders/data";
 import { OrderCard } from "@/features/orders/components/order-card";
+import { getDistributorAccess } from "@/features/distributor/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DistributorPedidosPage() {
+  // O layout não é fronteira: a página também confere o acesso antes de buscar dados.
+  if (!(await getDistributorAccess()).ok) return null;
   const orders = await getDistributorOrders();
   return (
     <div className="flex flex-col gap-6">

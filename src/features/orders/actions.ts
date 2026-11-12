@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getSessionUser } from "@/lib/auth/session";
-import { isUuid } from "@/lib/auth/acting";
 import { formatBRL } from "@/lib/utils";
+import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { getSupplierAvailability, requireActiveDistributor } from "@/features/distributor/guard";
+import { requireBarbershopAdmin, requireOrderParticipantAdmin } from "./guards";
+import { mapOrderRpcError, PlaceOrderSchema, placeOrderInputError, SetOrderStatusSchema } from "./schema";
 
 const STATUS_MSG: Record<string, string> = {
   CONFIRMED: "foi ACEITO ✅",
@@ -43,20 +45,26 @@ async function tenantName(admin: ReturnType<typeof createSupabaseAdminClient>, t
 
 /** [Barbearia] Cria um pedido a um distribuidor (RPC transacional). */
 export async function placeOrder(distributorId: string, items: { productId: string; qty: number }[], note?: string) {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sessão inválida." };
-  if (!isUuid(distributorId)) return { ok: false as const, error: "Distribuidor inválido." };
-  const clean = items.filter((i) => isUuid(i.productId) && i.qty > 0).map((i) => ({ product_id: i.productId, qty: Math.floor(i.qty) }));
-  if (!clean.length) return { ok: false as const, error: "Carrinho vazio." };
+  const g = await requireBarbershopAdmin();
+  if (!g.ok) return { ok: false as const, error: g.error };
+  const parsed = PlaceOrderSchema.safeParse({ distributorId, items, note });
+  if (!parsed.success) return { ok: false as const, error: placeOrderInputError(parsed.error) };
+  const input = parsed.data;
+  if ((await getSupplierAvailability(input.distributorId)) !== "OPEN")
+    return { ok: false as const, error: "Este fornecedor não está recebendo pedidos agora." };
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("place_order", { p_distributor: distributorId, p_items: clean, p_note: note ?? null });
-  if (error) return { ok: false as const, error: error.message };
+  const { data, error } = await supabase.rpc("place_order", {
+    p_distributor: input.distributorId,
+    p_items: input.items.map((i) => ({ product_id: i.productId, qty: i.qty })),
+    p_note: input.note,
+  });
+  if (error) return { ok: false as const, error: mapOrderRpcError(error) };
 
   // Alerta o distribuidor (best-effort).
   try {
     const admin = createSupabaseAdminClient();
-    const [phone, buyer] = await Promise.all([tenantPhone(admin, distributorId), tenantName(admin, user.tenantId)]);
+    const [phone, buyer] = await Promise.all([tenantPhone(admin, distributorId), tenantName(admin, g.tenantId)]);
     await notify(distributorId, phone, `📥 Novo pedido de *${buyer}* na Barber Agência. Acesse o painel para aceitar.`);
   } catch {
     /* ignore */
@@ -68,13 +76,18 @@ export async function placeOrder(distributorId: string, items: { productId: stri
 
 /** [Distribuidor/Barbearia] Muda o status do pedido (RPC valida papel + estoque). */
 export async function setOrderStatus(orderId: string, status: string) {
-  const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sessão inválida." };
-  if (!isUuid(orderId)) return { ok: false as const, error: "Pedido inválido." };
+  const g = await requireOrderParticipantAdmin();
+  if (!g.ok) return { ok: false as const, error: g.error };
+  const parsed = SetOrderStatusSchema.safeParse({ orderId, status });
+  if (!parsed.success) return { ok: false as const, error: "Pedido inválido." };
+  if ((await getCurrentTenant()).kind === "DISTRIBUTOR") {
+    const access = await requireActiveDistributor();
+    if (!access.ok) return { ok: false as const, error: access.error };
+  }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.rpc("set_order_status", { p_order_id: orderId, p_status: status });
-  if (error) return { ok: false as const, error: error.message };
+  const { error } = await supabase.rpc("set_order_status", { p_order_id: parsed.data.orderId, p_status: parsed.data.status });
+  if (error) return { ok: false as const, error: mapOrderRpcError(error) };
 
   // Notifica a barbearia compradora (best-effort, pela sessão do distribuidor).
   try {
