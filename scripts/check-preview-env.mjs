@@ -46,4 +46,9 @@ export function assertPreviewEnv(env) {
         "O preview não usa as variáveis de produção."
     );
   }
+  // Rastro no log do build (só nomes, nunca valores).
+  if (env.VERCEL_ENV === "preview") {
+    const wa = env.STAGING_WA_SERVICE_URL ? "ligado (STAGING_WA_SERVICE_URL, STAGING_WA_SERVICE_TOKEN)" : "desligado";
+    console.log(`[check-preview-env] VERCEL_ENV=preview; presentes: ${REQUIRED.join(", ")}; WhatsApp: ${wa}`);
+  }
 }
