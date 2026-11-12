@@ -1,0 +1,105 @@
+// Dados de TESTE (100% fictícios, @example.test) para um banco recém-criado: staging ou Supabase local.
+// Módulo único da semeadura, sem dependências: quem chama injeta `q` (SQL) e `ensureUser` (Admin API).
+// Assim a mesma lógica serve à primeira carga do staging e ao ambiente local, e é testável sem banco.
+//
+// Regras:
+// - Só INSERT e SELECT. Nenhum delete, update, truncate ou drop. Rodar de novo não duplica nem altera nada.
+// - Nenhuma senha aqui: a senha de cada usuário é gerada por quem chama.
+// - Todo e-mail termina em @example.test (domínio reservado, não entrega e-mail a ninguém).
+
+export const TENANTS = {
+  plataforma: { name: "Barber Agência (Plataforma Teste)", subdomain: "plataforma-teste", contract: "SIGNED" },
+  barbearia: { name: "Barbearia Teste", subdomain: "barbearia-teste", contract: "SIGNED" },
+  distAtivo: { name: "Distribuidor Ativo Teste", subdomain: "distribuidor-ativo", contract: "SIGNED", extra: { kind: "DISTRIBUTOR", saas_plan: "distribuidor", status: "ACTIVE" } },
+  distPendente: { name: "Distribuidor Pendente Teste", subdomain: "distribuidor-pendente", contract: "PENDING", extra: { kind: "DISTRIBUTOR", saas_plan: "distribuidor", status: "ACTIVE" } },
+  distSuspenso: { name: "Distribuidor Suspenso Teste", subdomain: "distribuidor-suspenso", contract: "SIGNED", extra: { kind: "DISTRIBUTOR", saas_plan: "distribuidor", status: "SUSPENDED" } },
+};
+
+export const USERS = [
+  { email: "master@example.test", tenant: "plataforma", role: "MASTER", entra: "/master/login" },
+  { email: "dono.barbearia@example.test", tenant: "barbearia", role: "UNIT_ADMIN", entra: "/admin/login" },
+  { email: "dist.ativo@example.test", tenant: "distAtivo", role: "UNIT_ADMIN", entra: "/distributor/login" },
+  { email: "dist.pendente@example.test", tenant: "distPendente", role: "UNIT_ADMIN", entra: "/distributor/login" },
+  { email: "dist.suspenso@example.test", tenant: "distSuspenso", role: "UNIT_ADMIN", entra: "/distributor/login" },
+  { email: "cliente@example.test", tenant: "barbearia", role: "CLIENT", entra: "/b/barbearia-teste e depois /client/login" },
+];
+
+const PRODUCTS = [
+  ["Pomada Modeladora Teste", 35],
+  ["Óleo para Barba Teste", 29.9],
+];
+
+/**
+ * @param {{ q: (sql: string, params?: unknown[]) => Promise<any[]>, ensureUser: (email: string) => Promise<string> }} deps
+ *   q devolve as linhas; ensureUser cria o usuário (ou acha o que já existe) e devolve o id.
+ * @returns {Promise<{ tenants: Record<string, string>, users: Record<string, string> }>} ids por chave/e-mail
+ */
+export async function runSeed({ q, ensureUser }) {
+  for (const u of USERS) if (!u.email.endsWith("@example.test")) throw new Error("Usuário de teste fora de @example.test.");
+
+  // Barbearias e distribuidores, com o básico que o painel espera (marca, configurações, contrato).
+  const tenants = {};
+  for (const [key, t] of Object.entries(TENANTS)) {
+    const found = await q("select id from public.tenants where subdomain = $1", [t.subdomain]);
+    if (found[0]) {
+      tenants[key] = found[0].id;
+    } else {
+      const row = { name: t.name, subdomain: t.subdomain, saas_plan: "advance", ...t.extra };
+      const cols = Object.keys(row);
+      const inserted = await q(
+        `insert into public.tenants (${cols.join(", ")}) values (${cols.map((_, i) => `$${i + 1}`).join(", ")}) returning id`,
+        cols.map((c) => row[c])
+      );
+      tenants[key] = inserted[0].id;
+    }
+    const id = tenants[key];
+    await q("insert into public.branding (tenant_id) values ($1) on conflict do nothing", [id]);
+    await q("insert into public.tenant_settings (tenant_id) values ($1) on conflict do nothing", [id]);
+    const signed = t.contract === "SIGNED";
+    await q(
+      `insert into public.tenant_contracts (tenant_id, status, signed_at, signed_name, legal_name, trade_name)
+       select $1, $2, $3, $4, 'Empresa Fictícia LTDA', 'Nome Fantasia Fictício'
+       where not exists (select 1 from public.tenant_contracts where tenant_id = $1)`,
+      [id, t.contract, signed ? new Date() : null, signed ? "Responsável Fictício" : null]
+    );
+  }
+
+  // Usuários e vínculos.
+  const users = {};
+  for (const u of USERS) {
+    const id = await ensureUser(u.email);
+    users[u.email] = id;
+    await q(
+      `insert into public.memberships (user_id, tenant_id, role)
+       select $1, $2, $3 where not exists (select 1 from public.memberships where user_id = $1 and tenant_id = $2)`,
+      [id, tenants[u.tenant], u.role]
+    );
+  }
+
+  // Barbearia Teste: 1 barbeiro (seg a sáb, 9h às 18h), 1 serviço e o cliente com login.
+  const B = tenants.barbearia;
+  if (!(await q("select 1 from public.barbers where tenant_id = $1", [B])).length) {
+    const [barber] = await q("insert into public.barbers (tenant_id, name) values ($1, 'Barbeiro Teste') returning id", [B]);
+    for (let wd = 1; wd <= 6; wd++)
+      await q("insert into public.working_hours (barber_id, weekday, start_min, end_min) values ($1, $2, 540, 1080)", [barber.id, wd]);
+  }
+  if (!(await q("select 1 from public.services where tenant_id = $1", [B])).length)
+    await q("insert into public.services (tenant_id, name, duration_min, price_brl) values ($1, 'Corte Teste', 30, 40)", [B]);
+  const cliente = users["cliente@example.test"];
+  if (!(await q("select 1 from public.clients where user_id = $1", [cliente])).length)
+    await q("insert into public.clients (tenant_id, user_id, name, email) values ($1, $2, 'Cliente Teste', 'cliente@example.test')", [B, cliente]);
+
+  // Distribuidor ativo: 2 produtos e a Barbearia Teste na carteira.
+  const DA = tenants.distAtivo;
+  if (!(await q("select 1 from public.products where tenant_id = $1", [DA])).length)
+    for (const [name, price] of PRODUCTS)
+      await q("insert into public.products (tenant_id, name, price_brl, active) values ($1, $2, $3, true)", [DA, name, price]);
+  if (!(await q("select 1 from public.distributor_customers where tenant_id = $1 and customer_tenant_id = $2", [DA, B])).length)
+    await q(
+      `insert into public.distributor_customers (tenant_id, customer_tenant_id, trade_name, contact_name, contact_email, active)
+       values ($1, $2, 'Barbearia Teste', 'Dono Teste', 'dono.barbearia@example.test', true)`,
+      [DA, B]
+    );
+
+  return { tenants, users };
+}

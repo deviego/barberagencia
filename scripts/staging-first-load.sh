@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 
 for arg in "$@"; do
   case "$arg" in
-    --local | --so-usuarios) ;;
+    --local | --so-dados-de-teste) ;;
     *) echo "✗ Opção desconhecida. Este comando não recebe URL nem senha como argumento." >&2; exit 1 ;;
   esac
 done
@@ -23,7 +23,7 @@ done
 
 limpar() {
   if pbcopy </dev/null 2>/dev/null; then
-    echo "Área de transferência limpa."
+    echo "Área de transferência limpa. Se você usa app de histórico de área de transferência (Raycast, Maccy, Alfred...), apague o snippet de lá também."
   else
     echo "✗ NÃO consegui limpar a área de transferência. Copie qualquer outro texto agora." >&2
   fi

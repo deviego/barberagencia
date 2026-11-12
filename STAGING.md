@@ -15,38 +15,60 @@ tocar nos dados de produção (clientes reais já usam a plataforma).
 2. Pegue, em **Project Settings → API**: `Project URL`, `anon key`, `service_role key`.
 3. Em **Project Settings → Database → Connection string**, pegue a **Direct** (porta 5432).
 
-## Passo 2 — Replicar o schema no banco de staging
-**Antes:** baixe o certificado do Supabase **do projeto de staging**: Project Settings → Database →
-**SSL Configuration** → *Download certificate* (arquivo `prod-ca-2021.crt`; o nome é esse mesmo em todo projeto).
+## Passo 2 — Primeira carga do banco de staging (só o Diego roda)
+Projeto de staging: `fscujfbgfbiknhjvfqif`. Nenhum agente roda este passo nem lê o que foi copiado.
 
-Na raiz do repo, **só por variáveis de ambiente** (nunca passe a URL como argumento: aparece no `ps` e no
-histórico do shell). Para a senha não ir para o histórico, digite-a com `read -s`:
+**Uma vez, antes:** baixe o certificado do Supabase **do projeto de staging**: Project Settings → Database →
+**SSL Configuration** → *Download certificate*. Deixe o `prod-ca-2021.crt` em `~/Downloads`
+(ou aponte outro caminho com `SUPABASE_CA_CERT`).
+
+**A carga, em um comando:**
+1. No Vercel, abra a página do banco de staging e clique em **Copy Snippet**.
+2. Logo em seguida, na raiz do repositório:
 
 ```bash
-export STAGING_PROJECT_REF="<REF do projeto de staging>"      # 20 letras/números, aparece na URL do painel
-export SUPABASE_CA_CERT="$HOME/Downloads/prod-ca-2021.crt"
-read -s -p "Senha do Postgres de staging: " PGPASS_STAGING; echo
-export STAGING_DATABASE_URL="postgresql://postgres.${STAGING_PROJECT_REF}:${PGPASS_STAGING}@aws-N-<região>.pooler.supabase.com:5432/postgres"
-#   ou a conexão direta: postgresql://postgres:${PGPASS_STAGING}@db.${STAGING_PROJECT_REF}.supabase.co:5432/postgres
-node scripts/bootstrap-staging.mjs
-unset PGPASS_STAGING STAGING_DATABASE_URL
+bash scripts/staging-first-load.sh
 ```
-> Se a senha tiver caracteres especiais (`@ : / ? #`), use a versão já codificada que o painel mostra na connection string.
 
-O script (lógica em `scripts/lib/schema-apply.mjs`, o mesmo módulo do CI):
-- aplica os `supabase/schema*.sql` na ordem de **`supabase/ci-order.txt`** (ordem em que foram criados),
-  em **uma passada**, cada arquivo numa transação, e **para no primeiro erro**;
-- confere que o `ci-order.txt` lista exatamente os `schema*.sql` do repositório (arquivo fora da lista,
-  inexistente, repetido ou `seed*` → recusa). **Nunca** aplica seeds;
-- **só aceita o projeto de staging** (allowlist): host `db.<REF>.supabase.co` com usuário `postgres`, ou o pooler
-  `aws-N-<região>.pooler.supabase.com` com usuário `postgres.<REF>`. A ref de produção é recusada em qualquer
-  lugar, e `?host=` / `?hostaddr=` na URL também;
-- usa SSL **com verificação** do certificado (`SUPABASE_CA_CERT`); recusa `sslmode=disable/allow/prefer/no-verify`;
-- **aborta antes de aplicar qualquer coisa se o schema `public` já tiver alguma tabela** (protege produção e
-  qualquer banco em uso, independentemente da URL).
+> **Atenção, histórico de área de transferência:** o comando limpa a área de transferência no fim (também em
+> erro), mas **não alcança apps de histórico** (Raycast, Maccy, Alfred, Paste) nem o que a Área de Transferência Universal
+> já mandou para outro aparelho Apple. Se você usa algum app de histórico, pause-o antes de copiar ou apague o item do snippet de lá depois.
 
-O banco de staging precisa estar **vazio** (projeto recém-criado). Se parar no meio, apague e recrie o projeto
-(ou resete o banco) antes de rodar de novo.
+O que o comando faz (`scripts/staging-first-load.mjs`):
+- lê a área de transferência **só em memória**: a senha do banco não é gravada em disco, não é impressa, não
+  vira argumento de processo (`ps`) e não entra no histórico do shell;
+- escolhe, entre as URLs do snippet, a do **pooler de sessão (porta 5432)**, que funciona em rede IPv4. A conexão
+  direta (`db.<ref>.supabase.co`, IPv6) nunca é usada;
+- **só aceita o projeto de staging**: a ref de staging no usuário do pooler, na URL da API e na chave; a ref de
+  produção é recusada em qualquer campo; SSL sempre verificado com o certificado acima;
+- **aborta se o schema `public` já tiver alguma tabela** (só roda em banco vazio);
+- aplica os `supabase/schema*.sql` na ordem de **`supabase/ci-order.txt`**, em uma passada, cada arquivo numa
+  transação, e para no primeiro erro. O `ci-order.txt` tem de listar exatamente os `schema*.sql` do repositório;
+  `seed*.sql` nunca entra;
+- cria os **dados de teste** (abaixo) e imprime um resumo sem segredos;
+- não tem `drop`, `truncate`, `delete`, `update` nem reset em lugar nenhum.
+
+**Dados de teste criados** (`scripts/lib/test-seed.mjs`; tudo fictício, e-mails `@example.test`):
+
+| E-mail | Papel | Onde | Entra em |
+|---|---|---|---|
+| `master@example.test` | MASTER | Barber Agência (Plataforma Teste) | `/master/login` |
+| `dono.barbearia@example.test` | UNIT_ADMIN | Barbearia Teste (`barbearia-teste`): 1 barbeiro, 1 serviço | `/admin/login` |
+| `dist.ativo@example.test` | UNIT_ADMIN | Distribuidor Ativo Teste: contrato assinado, 2 produtos, Barbearia Teste na carteira | `/distributor/login` |
+| `dist.pendente@example.test` | UNIT_ADMIN | Distribuidor Pendente Teste: contrato pendente | `/distributor/login` |
+| `dist.suspenso@example.test` | UNIT_ADMIN | Distribuidor Suspenso Teste: conta suspensa | `/distributor/login` |
+| `cliente@example.test` | CLIENT | Barbearia Teste | `/b/barbearia-teste`, depois `/client/login` |
+
+Os usuários são criados pela Admin API com **senha gerada na hora**, uma por usuário. As senhas ficam só em
+`.staging-test-users.json` na raiz do repositório (permissão 600, ignorado pelo git). São credenciais de teste,
+não a senha do banco.
+
+**Se der erro:**
+- antes de aplicar (snippet errado, certificado ausente, banco não vazio): nada foi alterado; corrija e rode de novo;
+- no meio do schema: o comando diz em qual arquivo parou. O banco ficou pela metade e o comando não roda de novo
+  nele (exige banco vazio). Não apague nada por conta própria: avise o CTO com o nome do arquivo;
+- o schema aplicou e só os dados de teste falharam: copie o snippet de novo e rode
+  `bash scripts/staging-first-load.sh --so-dados-de-teste` (só insere o que falta; não altera o que já existe).
 
 Confira o resultado (somente leitura) no SQL Editor do **staging**. O esperado é tudo `true`:
 ```sql
@@ -61,10 +83,22 @@ select pg_get_functiondef('public.auth_tenant_id'::regproc) like '%x-act-tenant%
 > Por que não mais "2 passadas": o jeito antigo aplicava sem erro, mas gerava um banco diferente da produção
 > (`auth_tenant_id` sem o "Atuar como" do MASTER e `authenticated` sem EXECUTE nessas 3 funções). Detalhes em
 > `docs/spikes/2026-11-ci-supabase-efemero.md` (branch `spike/ci-supabase-efemero`).
->
-> Alternativa (mirror exato via dump): `pg_dump --schema-only --no-owner --no-privileges --schema=public "<PROD_DIRECT_URL>" > schema.sql` e depois `psql "<STAGING_DIRECT_URL>" -f schema.sql`. É o caminho da ADR 0002 (baseline) e o mais fiel; o dump é feito pelo Diego.
 
-Depois, opcional: crie 1–2 barbearias de teste pelo painel Master do preview.
+### Alternativa manual (só o schema, sem dados de teste)
+`scripts/bootstrap-staging.mjs` usa as mesmas guardas (`scripts/lib/schema-apply.mjs`) e recebe o destino por
+variáveis de ambiente (nunca por argumento). Para a senha não ir para o histórico, digite-a com `read -s`:
+
+```bash
+export STAGING_PROJECT_REF="fscujfbgfbiknhjvfqif"
+export SUPABASE_CA_CERT="$HOME/Downloads/prod-ca-2021.crt"
+read -s -p "Senha do Postgres de staging: " PGPASS_STAGING; echo
+export STAGING_DATABASE_URL="postgresql://postgres.${STAGING_PROJECT_REF}:${PGPASS_STAGING}@aws-N-<região>.pooler.supabase.com:5432/postgres"
+node scripts/bootstrap-staging.mjs
+unset PGPASS_STAGING STAGING_DATABASE_URL
+```
+> Se a senha tiver caracteres especiais (`@ : / ? #`), use a versão já codificada que o painel mostra na connection string.
+>
+> Outra alternativa (mirror exato via dump): `pg_dump --schema-only --no-owner --no-privileges --schema=public "<PROD_DIRECT_URL>" > schema.sql` e depois `psql "<STAGING_DIRECT_URL>" -f schema.sql`. É o caminho da ADR 0002 (baseline) e o mais fiel; o dump é feito pelo Diego.
 
 ## Passo 3 — Branch `staging` (já criada)
 A branch `staging` já existe no repositório. Toda mudança para testar:
