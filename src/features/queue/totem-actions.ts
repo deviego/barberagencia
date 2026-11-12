@@ -4,19 +4,22 @@ import { randomUUID, randomBytes } from "crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isUnitAdmin } from "@/lib/rbac";
-import { safeEqual } from "@/lib/crypto/safe-equal";
 import { getRequestOrigin } from "@/lib/http";
 import { notifyInvite } from "@/server/notifications/notify";
 import { isUuid } from "@/lib/auth/acting";
 import { ipTenantKey } from "@/lib/rate-limit";
 import { hashIp, hitRateLimit, requestIp } from "@/server/rate-limit";
+import { resolveTotemTenant } from "./data";
 import {
   TOTEM_ERRORS,
   TOTEM_LIMITS,
   TOTEM_RATE_SCOPES,
+  TOTEM_TENANT_CAPS,
   TotemRegisterSchema,
   totemJoinErrorMessage,
+  totemName,
   totemPhoneDigits,
+  totemPhoneToStore,
 } from "./totem-rules";
 
 /** Sessão de admin da barbearia (UNIT_ADMIN+ ou MASTER). Retorna o tenantId ou null. */
@@ -26,75 +29,91 @@ async function requireAdminTenant() {
   return user.tenantId;
 }
 
-/** Valida slug + token do totem. Retorna o tenant (id/name/flags) ou null. */
-async function validateTotem(slug: string, token: string) {
-  if (!slug || !token) return null;
-  const admin = createSupabaseAdminClient();
-  const { data: t } = await admin
-    .from("tenants")
-    .select("id, name, totem_token")
-    .eq("subdomain", slug)
-    .maybeSingle();
-  if (!t || !safeEqual(t.totem_token as string | null, token)) return null;
-  return { id: t.id as string, name: t.name as string };
-}
-
 type TotemFail = { ok: false; error: string };
 const fail = (error: string): TotemFail => ({ ok: false, error });
 
-/** Limite de tentativas por IP da hospedagem + barbearia. Retorna o erro a devolver, ou null se liberado. */
+/**
+ * Limite de tentativas: por IP da hospedagem + barbearia e, na busca e no cadastro, um teto por
+ * barbearia somando todas as origens. Retorna o erro a devolver, ou null se liberado.
+ *   - Sem RATE_LIMIT_IP_SALT: a camada por IP é pulada (com alerta); os tetos por barbearia valem.
+ *   - Sem conseguir conferir no banco (ex.: schema-50 não aplicada): recusa.
+ */
 async function totemRateLimit(action: "lookup" | "register" | "join", tenantId: string): Promise<TotemFail | null> {
   const ipHash = hashIp(await requestIp());
-  if (!ipHash) {
-    console.error("[totem] LEAD_IP_SALT ausente ou curto; ação recusada");
-    return fail(TOTEM_ERRORS.unavailable);
+  if (ipHash) {
+    const res = await hitRateLimit(TOTEM_RATE_SCOPES[action], ipTenantKey(ipHash, tenantId), TOTEM_LIMITS[action]);
+    if (res === "limited") return fail(TOTEM_ERRORS.rateLimited);
+    if (res === "unavailable") return fail(TOTEM_ERRORS.unavailable);
+  } else {
+    console.error(`[totem] RATE_LIMIT_IP_SALT ausente ou curto; limite por IP pulado em ${action}`);
   }
-  const res = await hitRateLimit(TOTEM_RATE_SCOPES[action], ipTenantKey(ipHash, tenantId), TOTEM_LIMITS[action]);
-  if (res === "limited") return fail(TOTEM_ERRORS.rateLimited);
-  if (res === "unavailable") return fail(TOTEM_ERRORS.unavailable);
+
+  if (action !== "join") {
+    const cap = await hitRateLimit(TOTEM_RATE_SCOPES[`${action}Tenant`], tenantId, TOTEM_TENANT_CAPS[action]);
+    if (cap === "limited") {
+      console.error(`[totem] teto por barbearia atingido em ${action} (tenant ${tenantId})`);
+      return fail(TOTEM_ERRORS.unavailable);
+    }
+    if (cap === "unavailable") return fail(TOTEM_ERRORS.unavailable);
+  }
   return null;
 }
 
-/** Resolve o cliente pelo telefone DENTRO da barbearia do totem. O id nunca sai do servidor. */
-async function findTotemClient(tenantId: string, digits: string): Promise<{ id: string; name: string } | null | "error"> {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.rpc("totem_find_client", { p_tenant: tenantId, p_digits: digits });
-  if (error) return "error";
+type AdminClient = ReturnType<typeof createSupabaseAdminClient>;
+
+/**
+ * Busca do totem (nome + plano) pela regra única de totem_resolve_client_id.
+ * null = não cadastrado; "error" = não foi possível consultar.
+ */
+async function lookupTotemClient(admin: AdminClient, tenantId: string, digits: string) {
+  const { data, error } = await admin.rpc("totem_lookup_client", { p_tenant: tenantId, p_digits: digits });
+  if (error) {
+    console.error(`[totem] busca falhou (${error.code ?? "sem código"})`);
+    return "error" as const;
+  }
   const row = Array.isArray(data) ? data[0] : data;
-  return row ? { id: row.id as string, name: row.name as string } : null;
+  if (!row) return null;
+  return { name: row.name as string, hasPlan: Boolean(row.has_plan), planName: (row.plan_name as string) ?? null };
 }
 
-/** true se o id (serviço ou barbeiro) é da barbearia. */
-async function belongsToTenant(table: "services" | "barbers", id: string, tenantId: string): Promise<boolean> {
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.from(table).select("id").eq("id", id).eq("tenant_id", tenantId).maybeSingle();
+/** Serviço oferecido no totem: da barbearia e ativo (mesmo filtro de getQueueServices). */
+async function isOfferedService(admin: AdminClient, id: string, tenantId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("services")
+    .select("id")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .eq("active", true)
+    .maybeSingle();
+  return !error && !!data;
+}
+
+/** Barbeiro oferecido no totem: da barbearia, ativo e que atende fila (mesmo filtro de getQueueBarbers). */
+async function isOfferedBarber(admin: AdminClient, id: string, tenantId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("barbers")
+    .select("id")
+    .eq("id", id)
+    .eq("tenant_id", tenantId)
+    .eq("active", true)
+    .eq("accepts_queue", true)
+    .maybeSingle();
   return !error && !!data;
 }
 
 /** Busca cliente por telefone na barbearia + info de plano. */
 export async function totemLookup(slug: string, token: string, phone: string) {
-  const tenant = await validateTotem(slug, token);
+  const tenant = await resolveTotemTenant(slug, token);
   if (!tenant) return fail(TOTEM_ERRORS.invalidTotem);
   const digits = totemPhoneDigits(phone);
   if (!digits) return fail(TOTEM_ERRORS.invalidPhone);
   const limited = await totemRateLimit("lookup", tenant.id);
   if (limited) return limited;
 
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.rpc("totem_lookup_client", { p_tenant: tenant.id, p_digits: digits });
-  if (error) {
-    console.error(`[totem] busca falhou (${error.code ?? "sem código"})`);
-    return fail(TOTEM_ERRORS.unavailable);
-  }
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return { ok: true as const, found: false as const };
-  return {
-    ok: true as const,
-    found: true as const,
-    name: row.name as string,
-    hasPlan: Boolean(row.has_plan),
-    planName: (row.plan_name as string) ?? null,
-  };
+  const found = await lookupTotemClient(createSupabaseAdminClient(), tenant.id, digits);
+  if (found === "error") return fail(TOTEM_ERRORS.unavailable);
+  if (!found) return { ok: true as const, found: false as const };
+  return { ok: true as const, found: true as const, ...found };
 }
 
 /** Cadastro rápido pelo totem: cria o cliente + boas-vindas no WhatsApp (link do app). */
@@ -103,33 +122,38 @@ export async function totemRegister(
   token: string,
   input: { phone: string; name: string; birthDate?: string | null }
 ) {
-  const tenant = await validateTotem(slug, token);
+  const tenant = await resolveTotemTenant(slug, token);
   if (!tenant) return fail(TOTEM_ERRORS.invalidTotem);
   const digits = totemPhoneDigits(input?.phone);
   if (!digits) return fail(TOTEM_ERRORS.invalidPhone);
   const parsed = TotemRegisterSchema.safeParse(input);
   if (!parsed.success) {
     const field = parsed.error.issues[0]?.path[0];
-    return fail(field === "name" ? TOTEM_ERRORS.invalidName : TOTEM_ERRORS.registerFailed);
+    return fail(field === "birthDate" ? TOTEM_ERRORS.invalidDate : TOTEM_ERRORS.registerFailed);
   }
-  const { name, birthDate } = parsed.data;
-  const phone = parsed.data.phone.trim();
+  const checkedName = totemName(parsed.data.name);
+  if (!checkedName.ok) {
+    return fail(checkedName.reason === "empty" ? TOTEM_ERRORS.invalidName : TOTEM_ERRORS.invalidNameChars);
+  }
+  const name = checkedName.name;
+  const phone = totemPhoneToStore(digits);
   const limited = await totemRateLimit("register", tenant.id);
   if (limited) return limited;
 
+  const admin = createSupabaseAdminClient();
+
   // Já existe (dedupe por telefone)? retorna.
-  const existing = await findTotemClient(tenant.id, digits);
+  const existing = await lookupTotemClient(admin, tenant.id, digits);
   if (existing === "error") return fail(TOTEM_ERRORS.registerFailed);
   if (existing) return { ok: true as const, name: existing.name };
 
-  const admin = createSupabaseAdminClient();
   const { data: client, error } = await admin
     .from("clients")
     .insert({
       tenant_id: tenant.id,
       name,
       phone,
-      birth_date: birthDate || null,
+      birth_date: parsed.data.birthDate || null,
       status: "INVITED",
     })
     .select("name")
@@ -171,31 +195,39 @@ export async function totemJoinQueue(
   serviceId?: string | null,
   barberId?: string | null
 ) {
-  const tenant = await validateTotem(slug, token);
+  const tenant = await resolveTotemTenant(slug, token);
   if (!tenant) return fail(TOTEM_ERRORS.invalidTotem);
   const digits = totemPhoneDigits(phone);
   if (!digits) return fail(TOTEM_ERRORS.invalidPhone);
   const service = serviceId || null;
   const barber = barberId || null;
   if ((service && !isUuid(service)) || (barber && !isUuid(barber))) return fail(TOTEM_ERRORS.invalidChoice);
+  // Barbeiro só é oferecido quando a barbearia liga a escolha de barbeiro.
+  if (barber && !tenant.pickBarber) return fail(TOTEM_ERRORS.invalidChoice);
   const limited = await totemRateLimit("join", tenant.id);
   if (limited) return limited;
 
-  const client = await findTotemClient(tenant.id, digits);
-  if (client === "error") return fail(TOTEM_ERRORS.joinFailed);
-  if (!client) return fail(TOTEM_ERRORS.clientNotFound);
+  const admin = createSupabaseAdminClient();
 
-  // Pertencimento conferido aqui também (a função do banco confere de novo).
+  // Mesma regra da busca (totem_resolve_client_id): o id nunca sai do servidor.
+  const resolved = await admin.rpc("totem_resolve_client_id", { p_tenant: tenant.id, p_digits: digits });
+  if (resolved.error) {
+    console.error(`[totem] cliente não resolvido (${resolved.error.code ?? "sem código"})`);
+    return fail(TOTEM_ERRORS.joinFailed);
+  }
+  const clientId = typeof resolved.data === "string" ? resolved.data : null;
+  if (!clientId) return fail(TOTEM_ERRORS.clientNotFound);
+
+  // Serviço e barbeiro conferidos aqui também (a função do banco confere de novo).
   const [serviceOk, barberOk] = await Promise.all([
-    service ? belongsToTenant("services", service, tenant.id) : true,
-    barber ? belongsToTenant("barbers", barber, tenant.id) : true,
+    service ? isOfferedService(admin, service, tenant.id) : true,
+    barber ? isOfferedBarber(admin, barber, tenant.id) : true,
   ]);
   if (!serviceOk || !barberOk) return fail(TOTEM_ERRORS.invalidChoice);
 
-  const admin = createSupabaseAdminClient();
   const { data, error } = await admin.rpc("join_queue_totem", {
     p_tenant_id: tenant.id,
-    p_client_id: client.id,
+    p_client_id: clientId,
     p_service_id: service,
     p_barber_id: barber,
   });

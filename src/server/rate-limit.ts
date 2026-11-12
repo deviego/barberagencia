@@ -11,10 +11,13 @@ import type { RateRule } from "@/lib/rate-limit";
  * montados no servidor, nunca recebidos do navegador.
  */
 
-/** sha256(ip + sal). Retorna null se o sal do servidor (LEAD_IP_SALT) não estiver configurado. */
+/**
+ * sha256(ip + sal). Retorna null se o sal do servidor (RATE_LIMIT_IP_SALT) não estiver configurado.
+ * O formulário de leads usa um sal próprio (LEAD_IP_SALT, em features/leads/store.ts).
+ */
 export function hashIp(ip: string): string | null {
-  const salt = process.env.LEAD_IP_SALT;
-  if (!salt || salt.length < 16) return null;
+  const salt = process.env.RATE_LIMIT_IP_SALT;
+  if (!salt || salt.length < 32) return null;
   return createHash("sha256").update(ip + salt).digest("hex");
 }
 
