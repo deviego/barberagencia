@@ -3,10 +3,21 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { NAV_LINKS, salesWaLink, WA_MESSAGES } from "@/features/landing/content";
+import { DISTRIBUTOR_NAV_LINK, NAV_LINKS, salesWaLink, WA_MESSAGES } from "@/features/landing/content";
 
-export function LandingHeader() {
+type Props = {
+  /** Prefixo das âncoras da home ("/" fora da home, para "#planos" virar "/#planos"). */
+  anchorBase?: string;
+  /** Mensagem do botão principal (WhatsApp comercial). */
+  ctaMessage?: string;
+};
+
+export function LandingHeader({ anchorBase = "", ctaMessage = WA_MESSAGES.start }: Props = {}) {
   const [open, setOpen] = useState(false);
+  const links = [
+    ...NAV_LINKS.map((l) => ({ ...l, href: l.href.startsWith("#") ? `${anchorBase}${l.href}` : l.href })),
+    DISTRIBUTOR_NAV_LINK,
+  ];
 
   return (
     <header
@@ -15,7 +26,7 @@ export function LandingHeader() {
     >
       <div className="mx-auto flex max-w-[1240px] flex-nowrap items-center justify-between gap-5 px-5 py-3.5 sm:px-8">
         {/* Marca */}
-        <a href="#produto" className="flex shrink-0 items-center gap-3">
+        <a href={`${anchorBase}#produto`} className="flex shrink-0 items-center gap-3">
           <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md bg-accent font-display text-[17px] font-black text-text-inverse">
             B✦
           </span>
@@ -24,9 +35,9 @@ export function LandingHeader() {
           </span>
         </a>
 
-        {/* Nav central (some abaixo de 1080px) */}
-        <nav className="hidden gap-0.5 text-[14px] min-[1081px]:flex">
-          {NAV_LINKS.map((l) => (
+        {/* Nav central (some abaixo de 1180px) */}
+        <nav className="hidden gap-0.5 text-[14px] min-[1181px]:flex">
+          {links.map((l) => (
             <a
               key={l.href}
               href={l.href}
@@ -41,19 +52,19 @@ export function LandingHeader() {
         <div className="flex shrink-0 items-center gap-2.5">
           <ThemeToggle />
           <a
-            href={salesWaLink(WA_MESSAGES.start)}
+            href={salesWaLink(ctaMessage)}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden whitespace-nowrap rounded-md bg-accent px-[18px] py-2 text-[14px] font-bold text-text-inverse transition-colors hover:bg-accent-hover min-[1081px]:inline-flex"
+            className="hidden whitespace-nowrap rounded-md bg-accent px-[18px] py-2 text-[14px] font-bold text-text-inverse transition-colors hover:bg-accent-hover min-[1181px]:inline-flex"
           >
             Começar agora
           </a>
-          {/* Hambúrguer (abaixo de 1080px) */}
+          {/* Hambúrguer (abaixo de 1180px) */}
           <button
             type="button"
             aria-label="Abrir menu"
             onClick={() => setOpen((o) => !o)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-text-2 transition-colors hover:border-accent hover:text-accent min-[1081px]:hidden"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-text-2 transition-colors hover:border-accent hover:text-accent min-[1181px]:hidden"
           >
             {open ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -62,9 +73,9 @@ export function LandingHeader() {
 
       {/* Menu mobile */}
       {open && (
-        <div className="border-t border-border bg-surface px-5 py-3 min-[1081px]:hidden">
+        <div className="border-t border-border bg-surface px-5 py-3 min-[1181px]:hidden">
           <nav className="flex flex-col gap-1">
-            {NAV_LINKS.map((l) => (
+            {links.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
@@ -76,7 +87,7 @@ export function LandingHeader() {
             ))}
             <div className="mt-2 flex flex-col gap-2">
               <a
-                href={salesWaLink(WA_MESSAGES.start)}
+                href={salesWaLink(ctaMessage)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-md bg-accent px-3 py-2.5 text-center text-[15px] font-bold text-text-inverse"

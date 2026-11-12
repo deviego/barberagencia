@@ -18,7 +18,7 @@ const PUBLIC_PREFIXES = [
   "/master/login", "/master/auth",
   "/distributor/login", "/distributor/auth",
   "/b",
-  "/design-system", "/termos", "/privacidade", "/convite", "/documentacao",
+  "/design-system", "/termos", "/privacidade", "/convite", "/documentacao", "/distribuidoras",
   "/api/master/report", // protegido por token próprio (não exige sessão)
 ];
 /** robots/sitemap/llms.txt: servidos direto (antes iam para /client/login). */

@@ -2,14 +2,23 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, ShoppingCart, Check } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Check, PackageX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatBRL } from "@/lib/utils";
 import { placeOrder } from "../actions";
 import type { CatalogProduct } from "../data";
 
-export function SupplierShop({ distributorId, products }: { distributorId: string; products: CatalogProduct[] }) {
+export function SupplierShop({
+  distributorId,
+  products,
+  availability = "OPEN",
+}: {
+  distributorId: string;
+  products: CatalogProduct[];
+  /** CLOSED: fornecedor não recebe pedidos (ex.: suspenso) — sem catálogo e sem carrinho. */
+  availability?: "OPEN" | "CLOSED";
+}) {
   const router = useRouter();
   const [cart, setCart] = useState<Record<string, number>>({});
   const [note, setNote] = useState("");
@@ -20,6 +29,15 @@ export function SupplierShop({ distributorId, products }: { distributorId: strin
   const set = (id: string, qty: number) => setCart((c) => { const n = { ...c }; if (qty <= 0) delete n[id]; else n[id] = qty; return n; });
   const total = Object.entries(cart).reduce((a, [id, q]) => a + (byId.get(id)?.priceBrl ?? 0) * q, 0);
   const count = Object.values(cart).reduce((a, q) => a + q, 0);
+
+  if (availability === "CLOSED") {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-8 text-center">
+        <PackageX size={28} className="text-text-muted" />
+        <p className="m-0 text-body font-semibold text-text">Este fornecedor não está recebendo pedidos agora.</p>
+      </div>
+    );
+  }
 
   function submit() {
     setMsg(null);
