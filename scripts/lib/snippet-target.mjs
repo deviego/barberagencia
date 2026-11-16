@@ -1,4 +1,4 @@
-// Primeira carga do staging: lê o snippet de variáveis copiado do Vercel ("Copy Snippet") e escolhe,
+// Homologação (staging): lê o snippet de variáveis copiado do Vercel ("Copy Snippet") e escolhe,
 // só em memória, o destino do banco e da Admin API. Sem efeitos colaterais (testável sem banco).
 //
 // Regras:

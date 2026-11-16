@@ -103,3 +103,23 @@ export async function runSeed({ q, ensureUser }) {
 
   return { tenants, users };
 }
+
+/**
+ * Guarda antes de semear: o schema tem de existir, e o banco não pode ter barbearia nem usuário que não
+ * seja de teste. Protege produção e qualquer banco com dados reais, independentemente da URL.
+ * Lança Error com mensagem sem dados pessoais (só contagens).
+ */
+export async function assertOnlyTestData(q) {
+  const [{ ok }] = await q(
+    "select (to_regclass('public.tenants') is not null and to_regclass('public.memberships') is not null " +
+      "and to_regclass('public.tenant_contracts') is not null and to_regclass('public.distributor_customers') is not null) as ok"
+  );
+  if (!ok) throw new Error("ABORTADO: o schema não está aplicado neste banco (faltam tabelas). Esta etapa não aplica schema.");
+  const subs = Object.values(TENANTS).map((t) => t.subdomain);
+  const [{ n: tenants }] = await q("select count(*)::int as n from public.tenants where not (subdomain = any($1))", [subs]);
+  if (tenants > 0)
+    throw new Error(`ABORTADO: o banco tem ${tenants} barbearia(s) que não são de teste. Só semeio banco sem dados reais.`);
+  const [{ n: users }] = await q("select count(*)::int as n from auth.users where email is null or email not like '%@example.test'");
+  if (users > 0)
+    throw new Error(`ABORTADO: o banco tem ${users} usuário(s) fora de @example.test. Só semeio banco sem dados reais.`);
+}

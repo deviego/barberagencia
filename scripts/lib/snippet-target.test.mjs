@@ -6,9 +6,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { GuardError, PROD_PROJECT_REF as PROD } from "./schema-apply.mjs";
-import { parseSnippet, targetsFromSnippet, STAGING_PROJECT_REF as REF } from "./first-load.mjs";
+import { parseSnippet, targetsFromSnippet, STAGING_PROJECT_REF as REF } from "./snippet-target.mjs";
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "first-load-"));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "snippet-target-"));
 const CA = path.join(tmp, "ca.crt");
 fs.writeFileSync(CA, "-----BEGIN CERTIFICATE-----\nZmFrZQ==\n-----END CERTIFICATE-----\n");
 const SECRET = "S3nhaFicticia-NAO-VAZAR";

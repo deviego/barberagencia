@@ -115,3 +115,25 @@ test("o módulo não traz senha nem chave", async () => {
   assert.doesNotMatch(src, /password\s*[:=]|teste123|service_role|eyJ/i);
   assert.equal(Object.keys(TENANTS).length, 5);
 });
+
+test("guarda: recusa banco sem schema, com barbearia real ou com usuário real; aceita banco só com dados de teste", async () => {
+  const { assertOnlyTestData } = await import("./test-seed.mjs");
+  const fake = ({ ok = true, tenants = 0, users = 0 }) => {
+    const seen = [];
+    const q = async (sql, params) => {
+      seen.push([sql, params]);
+      if (/to_regclass/.test(sql)) return [{ ok }];
+      if (/from public\.tenants/.test(sql)) return [{ n: tenants }];
+      if (/from auth\.users/.test(sql)) return [{ n: users }];
+      throw new Error(`SQL inesperado: ${sql}`);
+    };
+    return { q, seen };
+  };
+  await assert.rejects(assertOnlyTestData(fake({ ok: false }).q), /schema não está aplicado/);
+  await assert.rejects(assertOnlyTestData(fake({ tenants: 2 }).q), /2 barbearia/);
+  await assert.rejects(assertOnlyTestData(fake({ users: 1 }).q), /1 usuário/);
+  const good = fake({});
+  await assertOnlyTestData(good.q);
+  for (const [sql] of good.seen) assert.match(sql, /^select /);
+  assert.deepEqual(good.seen[1][1][0].sort(), Object.values(TENANTS).map((t) => t.subdomain).sort());
+});

@@ -15,40 +15,51 @@ tocar nos dados de produção (clientes reais já usam a plataforma).
 2. Pegue, em **Project Settings → API**: `Project URL`, `anon key`, `service_role key`.
 3. Em **Project Settings → Database → Connection string**, pegue a **Direct** (porta 5432).
 
-## Passo 2 — Primeira carga do banco de staging (só o Diego roda)
-Projeto de staging: `fscujfbgfbiknhjvfqif`. Nenhum agente roda este passo nem lê o que foi copiado.
+## Passo 2 — Banco de homologação: estado atual e dados de teste
+Projeto de staging: `fscujfbgfbiknhjvfqif`.
+
+### Estado atual (16/11/2026)
+- **O schema já está aplicado.** Foram carregados os 39 `supabase/schema*.sql` do commit `08a0c98` da `staging`,
+  pela página de Query do Vercel, na ordem de **`supabase/ci-order.txt`** (com a `schema-33` logo depois da
+  `schema-31` e a `schema-35` no fim). Resultado: 37 tabelas, 26 funções, 58 policies, RLS ligado.
+- **Sem dados:** nenhum usuário, nenhuma barbearia, nenhum seed. Os dados de teste (abaixo) ainda não foram
+  inseridos; dependem do OK do Diego.
+- O `supabase/ci-order.txt` é o registro da ordem aplicada. Toda `schema-NN` nova entra nele na posição em que
+  foi (ou será) aplicada; `seed*.sql` nunca entra.
+
+### Dados de teste (etapa separada; não aplica schema e não exige banco vazio)
+Só depois do OK do Diego, e avisando o CTO antes. Nenhum agente lê o snippet copiado.
 
 **Uma vez, antes:** baixe o certificado do Supabase **do projeto de staging**: Project Settings → Database →
 **SSL Configuration** → *Download certificate*. Deixe o `prod-ca-2021.crt` em `~/Downloads`
 (ou aponte outro caminho com `SUPABASE_CA_CERT`).
 
-**A carga, em um comando:**
 1. No Vercel, abra a página do banco de staging e clique em **Copy Snippet**.
 2. Logo em seguida, na raiz do repositório:
 
 ```bash
-bash scripts/staging-first-load.sh
+bash scripts/staging-test-seed.sh
 ```
 
 > **Atenção, histórico de área de transferência:** o comando limpa a área de transferência no fim (também em
-> erro), mas **não alcança apps de histórico** (Raycast, Maccy, Alfred, Paste) nem o que a Área de Transferência Universal
-> já mandou para outro aparelho Apple. Se você usa algum app de histórico, pause-o antes de copiar ou apague o item do snippet de lá depois.
+> erro), mas **não alcança apps de histórico** (Raycast, Maccy, Alfred, Paste) nem o que a Área de Transferência
+> Universal já mandou para outro aparelho Apple. Se você usa algum app de histórico, pause-o antes de copiar ou
+> apague o item do snippet de lá depois.
 
-O que o comando faz (`scripts/staging-first-load.mjs`):
+O que o comando faz (`scripts/staging-test-seed.mjs`):
 - lê a área de transferência **só em memória**: a senha do banco não é gravada em disco, não é impressa, não
   vira argumento de processo (`ps`) e não entra no histórico do shell;
 - escolhe, entre as URLs do snippet, a do **pooler de sessão (porta 5432)**, que funciona em rede IPv4. A conexão
   direta (`db.<ref>.supabase.co`, IPv6) nunca é usada;
 - **só aceita o projeto de staging**: a ref de staging no usuário do pooler, na URL da API e na chave; a ref de
   produção é recusada em qualquer campo; SSL sempre verificado com o certificado acima;
-- **aborta se o schema `public` já tiver alguma tabela** (só roda em banco vazio);
-- aplica os `supabase/schema*.sql` na ordem de **`supabase/ci-order.txt`**, em uma passada, cada arquivo numa
-  transação, e para no primeiro erro. O `ci-order.txt` tem de listar exatamente os `schema*.sql` do repositório;
-  `seed*.sql` nunca entra;
-- cria os **dados de teste** (abaixo) e imprime um resumo sem segredos;
-- não tem `drop`, `truncate`, `delete`, `update` nem reset em lugar nenhum.
+- **confere o banco antes de inserir**: aborta se o schema não estiver aplicado, se existir alguma barbearia que
+  não seja de teste ou algum usuário fora de `@example.test`;
+- insere os dados de teste (abaixo) e imprime um resumo sem segredos;
+- **só `insert` e `select`**: não tem `drop`, `truncate`, `delete`, `update` nem reset. Rodar de novo insere só o
+  que falta e não altera o que já existe (nem as senhas).
 
-**Dados de teste criados** (`scripts/lib/test-seed.mjs`; tudo fictício, e-mails `@example.test`):
+**Dados de teste** (`scripts/lib/test-seed.mjs`; tudo fictício, e-mails `@example.test`):
 
 | E-mail | Papel | Onde | Entra em |
 |---|---|---|---|
@@ -63,14 +74,12 @@ Os usuários são criados pela Admin API com **senha gerada na hora**, uma por u
 `.staging-test-users.json` na raiz do repositório (permissão 600, ignorado pelo git). São credenciais de teste,
 não a senha do banco.
 
-**Se der erro:**
-- antes de aplicar (snippet errado, certificado ausente, banco não vazio): nada foi alterado; corrija e rode de novo;
-- no meio do schema: o comando diz em qual arquivo parou. O banco ficou pela metade e o comando não roda de novo
-  nele (exige banco vazio). Não apague nada por conta própria: avise o CTO com o nome do arquivo;
-- o schema aplicou e só os dados de teste falharam: copie o snippet de novo e rode
-  `bash scripts/staging-first-load.sh --so-dados-de-teste` (só insere o que falta; não altera o que já existe).
+**Se der erro:** a mensagem diz se algo foi inserido. Antes da conferência do banco, nada é alterado. Se parar no
+meio, o que já entrou fica; copie o snippet de novo e rode o mesmo comando, que completa o que falta.
+Não apague nada à mão.
 
-Confira o resultado (somente leitura) no SQL Editor do **staging**. O esperado é tudo `true`:
+### Conferir o schema (somente leitura)
+No SQL Editor do **staging**, o esperado é tudo `true`:
 ```sql
 select pg_get_functiondef('public.auth_tenant_id'::regproc) like '%x-act-tenant%' as act_as,
        has_function_privilege('authenticated', 'public.blocked_ranges(uuid,timestamptz,timestamptz)', 'EXECUTE') as blocked_ranges,
@@ -80,25 +89,23 @@ select pg_get_functiondef('public.auth_tenant_id'::regproc) like '%x-act-tenant%
          where n.nspname = 'public' and c.relkind = 'r') as rls_em_todas;
 ```
 
-> Por que não mais "2 passadas": o jeito antigo aplicava sem erro, mas gerava um banco diferente da produção
-> (`auth_tenant_id` sem o "Atuar como" do MASTER e `authenticated` sem EXECUTE nessas 3 funções). Detalhes em
-> `docs/spikes/2026-11-ci-supabase-efemero.md` (branch `spike/ci-supabase-efemero`).
-
-### Alternativa manual (só o schema, sem dados de teste)
-`scripts/bootstrap-staging.mjs` usa as mesmas guardas (`scripts/lib/schema-apply.mjs`) e recebe o destino por
-variáveis de ambiente (nunca por argumento). Para a senha não ir para o histórico, digite-a com `read -s`:
+### Recriar o schema num banco NOVO e vazio (não é o caso do staging atual)
+`scripts/bootstrap-staging.mjs` aplica os `schema*.sql` na ordem do `ci-order.txt`, em uma passada, cada arquivo
+numa transação, e para no primeiro erro. Usa as mesmas guardas (`scripts/lib/schema-apply.mjs`): allowlist pela
+ref de staging, produção recusada, SSL verificado, e **aborta se o `public` já tiver alguma tabela**. Por isso
+ele **não roda** no banco de staging de hoje. Recebe o destino por variáveis de ambiente, nunca por argumento:
 
 ```bash
-export STAGING_PROJECT_REF="fscujfbgfbiknhjvfqif"
+export STAGING_PROJECT_REF="<ref do projeto novo>"
 export SUPABASE_CA_CERT="$HOME/Downloads/prod-ca-2021.crt"
-read -s -p "Senha do Postgres de staging: " PGPASS_STAGING; echo
+read -s -p "Senha do Postgres: " PGPASS_STAGING; echo
 export STAGING_DATABASE_URL="postgresql://postgres.${STAGING_PROJECT_REF}:${PGPASS_STAGING}@aws-N-<região>.pooler.supabase.com:5432/postgres"
 node scripts/bootstrap-staging.mjs
 unset PGPASS_STAGING STAGING_DATABASE_URL
 ```
-> Se a senha tiver caracteres especiais (`@ : / ? #`), use a versão já codificada que o painel mostra na connection string.
->
-> Outra alternativa (mirror exato via dump): `pg_dump --schema-only --no-owner --no-privileges --schema=public "<PROD_DIRECT_URL>" > schema.sql` e depois `psql "<STAGING_DIRECT_URL>" -f schema.sql`. É o caminho da ADR 0002 (baseline) e o mais fiel; o dump é feito pelo Diego.
+> Por que uma passada, na ordem: o jeito antigo (2 passadas) aplicava sem erro, mas gerava um banco diferente da
+> produção (`auth_tenant_id` sem o "Atuar como" do MASTER e `authenticated` sem EXECUTE em 3 funções). Detalhes em
+> `docs/spikes/2026-11-ci-supabase-efemero.md` (branch `spike/ci-supabase-efemero`).
 
 ## Passo 3 — Branch `staging` (já criada)
 A branch `staging` já existe no repositório. Toda mudança para testar:
