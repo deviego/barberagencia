@@ -9,7 +9,8 @@
 // - O destino passa pelas MESMAS guardas do bootstrap (stagingTarget): allowlist pela ref de staging,
 //   ref de produção recusada, SSL verificado com a CA do Supabase.
 // - Admin API: a URL tem de ser exatamente https://<ref de staging>.supabase.co e a chave service_role,
-//   quando for JWT, tem de ser dessa mesma ref.
+//   quando for JWT, tem de ser dessa mesma ref. Chave no formato novo (não JWT) não traz a ref: é aceita
+//   sem essa conferência, e o destino fica preso ao projeto só pela URL da API, que é fixa.
 import { parse } from "pg-connection-string";
 import { stagingTarget, localTarget, GuardError, PROD_PROJECT_REF } from "./schema-apply.mjs";
 

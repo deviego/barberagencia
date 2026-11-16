@@ -6,8 +6,11 @@
 // Uso — SÓ por variáveis de ambiente (argumento na linha de comando vaza no `ps` e no histórico):
 //   export STAGING_PROJECT_REF="<ref do projeto de staging>"
 //   export SUPABASE_CA_CERT="$HOME/Downloads/prod-ca-2021.crt"
-//   export STAGING_DATABASE_URL="postgresql://postgres.<ref>:<senha>@aws-N-<região>.pooler.supabase.com:5432/postgres"
+//   read -s -p "Senha do Postgres: " PGPASS_STAGING; echo     # sem eco e fora do histórico do shell
+//   export STAGING_DATABASE_URL="postgresql://postgres.<ref>:${PGPASS_STAGING}@aws-N-<região>.pooler.supabase.com:5432/postgres"
 //   node scripts/bootstrap-staging.mjs
+//   unset PGPASS_STAGING STAGING_DATABASE_URL
+// Nunca escreva a senha na linha do export: ela ficaria no histórico do shell.
 //
 // Guardas: allowlist pela STAGING_PROJECT_REF, ref de produção recusada, ?host=/?hostaddr= recusados,
 // SSL verificado com a CA do Supabase, e aborta se o schema public já tiver qualquer tabela.

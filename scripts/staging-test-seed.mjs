@@ -18,6 +18,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { connect, GuardError } from "./lib/schema-apply.mjs";
 import { targetsFromSnippet, STAGING_PROJECT_REF } from "./lib/snippet-target.mjs";
 import { runSeed, assertOnlyTestData, TENANTS, USERS } from "./lib/test-seed.mjs";
@@ -61,30 +62,33 @@ async function createUser({ apiUrl, serviceKey }, email, password) {
 async function seed(q, api) {
   const fresh = [];
   const existing = [];
+  // Contas criadas por este script em rodada anterior: as que estão no arquivo local de credenciais.
+  let previous = [];
+  try {
+    previous = JSON.parse(fs.readFileSync(credsFile, "utf8")).usuarios ?? [];
+  } catch {
+    /* sem arquivo anterior */
+  }
+  const ours = new Set(previous.map((p) => p.email));
   const ensureUser = async (email) => {
     const password = randomBytes(18).toString("base64url");
     const id = await createUser(api, email, password);
     const u = USERS.find((x) => x.email === email);
     if (id) {
       fresh.push({ email, papel: u.role, barbearia: TENANTS[u.tenant].subdomain, entra_em: u.entra, password });
-      return id;
+      return { id, created: true };
     }
     const rows = await q("select id from auth.users where email = $1", [email]);
     if (!rows[0]) throw new GuardError(`A Admin API diz que ${email} já existe, mas não o achei no banco.`);
     existing.push(email);
-    return rows[0].id;
+    // runSeed só reaproveita esta conta se ela já tiver o vínculo esperado ou estiver no nosso arquivo.
+    return { id: rows[0].id, created: false, inCredsFile: ours.has(email) };
   };
   try {
     await runSeed({ q, ensureUser });
   } finally {
     if (fresh.length) {
       // Junta com o arquivo de uma rodada anterior, para não perder a senha de quem já tinha sido criado.
-      let previous = [];
-      try {
-        previous = JSON.parse(fs.readFileSync(credsFile, "utf8")).usuarios ?? [];
-      } catch {
-        /* sem arquivo anterior */
-      }
       const usuarios = [...previous.filter((p) => !fresh.some((f) => f.email === p.email)), ...fresh];
       fs.writeFileSync(credsFile, JSON.stringify({ gerado_em: new Date().toISOString(), usuarios }, null, 2) + "\n", { mode: 0o600 });
       fs.chmodSync(credsFile, 0o600);
@@ -103,7 +107,10 @@ async function main() {
         "Download certificate. Deixe em ~/Downloads (ou aponte com SUPABASE_CA_CERT) e rode de novo."
     );
 
-  const t = targetsFromSnippet(await readStdin(), { local, caPath });
+  const snippet = await readStdin();
+  // Já está em memória: limpa a área de transferência agora, sem esperar o fim (o trap do .sh limpa de novo).
+  spawnSync("pbcopy", { input: "", stdio: ["pipe", "ignore", "ignore"] });
+  const t = targetsFromSnippet(snippet, { local, caPath });
   const where = local ? "Supabase LOCAL (teste)" : `staging (${STAGING_PROJECT_REF})`;
   console.log(`Destino: ${where}, ${t.db.host}:${t.db.port}, lido de ${t.dbFrom}${t.dbDerived ? " (porta trocada para 5432)" : ""}.`);
 

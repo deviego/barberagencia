@@ -30,8 +30,15 @@ const PRODUCTS = [
 ];
 
 /**
- * @param {{ q: (sql: string, params?: unknown[]) => Promise<any[]>, ensureUser: (email: string) => Promise<string> }} deps
- *   q devolve as linhas; ensureUser cria o usuário (ou acha o que já existe) e devolve o id.
+ * @param {{ q: (sql: string, params?: unknown[]) => Promise<any[]>,
+ *           ensureUser: (email: string) => Promise<{ id: string, created: boolean, inCredsFile?: boolean }> }} deps
+ *   q devolve as linhas. ensureUser cria o usuário e devolve { id, created: true }; se o e-mail já existia,
+ *   devolve { id, created: false, inCredsFile } (inCredsFile = está no arquivo local de credenciais de uma
+ *   rodada anterior, isto é, foi criado por este script).
+ *
+ * Conta que já existia só é reaproveitada com prova de que é nossa: já tem o vínculo esperado (mesma
+ * barbearia, mesmo papel) ou está no arquivo de credenciais. Fora disso ABORTA sem gravar vínculo: não se dá
+ * papel (muito menos MASTER) a uma conta cuja senha este script não conhece.
  * @returns {Promise<{ tenants: Record<string, string>, users: Record<string, string> }>} ids por chave/e-mail
  */
 export async function runSeed({ q, ensureUser }) {
@@ -67,7 +74,15 @@ export async function runSeed({ q, ensureUser }) {
   // Usuários e vínculos.
   const users = {};
   for (const u of USERS) {
-    const id = await ensureUser(u.email);
+    const { id, created, inCredsFile } = await ensureUser(u.email);
+    if (!created && !inCredsFile) {
+      const has = await q("select 1 from public.memberships where user_id = $1 and tenant_id = $2 and role = $3", [id, tenants[u.tenant], u.role]);
+      if (!has.length)
+        throw new Error(
+          `ABORTADO: ${u.email} já existia e não foi criado por este script (não tem o vínculo ${u.role} esperado ` +
+            "nem está no arquivo local de credenciais). Nenhum vínculo foi gravado para essa conta."
+        );
+    }
     users[u.email] = id;
     await q(
       `insert into public.memberships (user_id, tenant_id, role)

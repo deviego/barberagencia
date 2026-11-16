@@ -104,8 +104,8 @@ node scripts/bootstrap-staging.mjs
 unset PGPASS_STAGING STAGING_DATABASE_URL
 ```
 > Por que uma passada, na ordem: o jeito antigo (2 passadas) aplicava sem erro, mas gerava um banco diferente da
-> produção (`auth_tenant_id` sem o "Atuar como" do MASTER e `authenticated` sem EXECUTE em 3 funções). Detalhes em
-> `docs/spikes/2026-11-ci-supabase-efemero.md`, que ainda não está na `staging` (por enquanto só na branch `spike/ci-supabase-efemero`).
+> produção (`auth_tenant_id` sem o "Atuar como" do MASTER e `authenticated` sem EXECUTE em 3 funções:
+> `blocked_ranges`, `place_order` e `set_order_status`). A consulta de conferência acima verifica exatamente isso.
 
 ## Passo 3 — Branch `staging` (já criada)
 A branch `staging` já existe no repositório. Toda mudança para testar:
@@ -144,9 +144,9 @@ No projeto da Vercel (Settings):
 ---
 
 ## Migrations de banco no fluxo
-**Regra:** todo PR que cria um `supabase/schema-NN-*.sql` inclui, no mesmo PR, a linha dele em
-`supabase/ci-order.txt`, na posição em que será aplicado. Sem a linha, o manifesto é recusado
-(`node --test scripts/lib/`, bootstrap e `scripts/ci/apply-schema.mjs` param).
+**Regra:** todo PR que cria um `supabase/schema-NN-*.sql` acrescenta a linha dele ao `supabase/ci-order.txt`,
+na ordem em que entra em produção. Sem a linha, o manifesto é recusado: `node --test scripts/lib/` (que roda
+no CI), o bootstrap e o `scripts/ci/apply-schema.mjs` param.
 
 Quando uma mudança tem `supabase/schema-NN.sql`:
 1. Aplique **primeiro no staging**: `node dbadmin.mjs supabase/schema-NN.sql` com o

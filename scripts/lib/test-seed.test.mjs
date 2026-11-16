@@ -14,8 +14,8 @@ function fakeDb() {
     const s = sql.replace(/\s+/g, " ").trim();
     log.push(s);
     let m;
-    if ((m = s.match(/^select (?:id|1) from public\.(\w+) where (\w+) = \$1(?: and (\w+) = \$2)?$/))) {
-      return rows(m[1]).filter((r) => r[m[2]] === params[0] && (!m[3] || r[m[3]] === params[1]));
+    if ((m = s.match(/^select (?:id|1) from public\.(\w+) where (\w+) = \$1(?: and (\w+) = \$2)?(?: and (\w+) = \$3)?$/))) {
+      return rows(m[1]).filter((r) => r[m[2]] === params[0] && (!m[3] || r[m[3]] === params[1]) && (!m[4] || r[m[4]] === params[2]));
     }
     if ((m = s.match(/^insert into public\.(\w+) \(([^)]+)\) (values|select) /))) {
       const cols = m[2].split(",").map((c) => c.trim());
@@ -32,7 +32,7 @@ function fakeDb() {
   };
   return { q, tables, log };
 }
-const ensureUser = async (email) => `user:${email}`;
+const ensureUser = async (email) => ({ id: `user:${email}`, created: true });
 
 test("só INSERT e SELECT: nenhum delete, update, truncate, drop ou alter", async () => {
   const db = fakeDb();
@@ -84,7 +84,7 @@ test("distribuidor ativo: 2 produtos e a Barbearia Teste na carteira; os outros 
 test("usuários: todos @example.test, um vínculo cada, no papel e na barbearia certos", async () => {
   const db = fakeDb();
   const asked = [];
-  const { tenants, users } = await runSeed({ q: db.q, ensureUser: async (e) => (asked.push(e), `user:${e}`) });
+  const { tenants, users } = await runSeed({ q: db.q, ensureUser: async (e) => (asked.push(e), { id: `user:${e}`, created: true }) });
   assert.deepEqual(asked, USERS.map((u) => u.email));
   for (const e of asked) assert.match(e, /@example\.test$/);
   assert.equal(db.tables.memberships.length, USERS.length);
@@ -136,4 +136,42 @@ test("guarda: recusa banco sem schema, com barbearia real ou com usuário real; 
   await assertOnlyTestData(good.q);
   for (const [sql] of good.seen) assert.match(sql, /^select /);
   assert.deepEqual(good.seen[1][1][0].sort(), Object.values(TENANTS).map((t) => t.subdomain).sort());
+});
+
+test("conta que já existia: sem vínculo e fora do arquivo de credenciais → aborta, nenhum vínculo para ela", async () => {
+  for (const alvo of ["master@example.test", "dist.ativo@example.test"]) {
+    const db = fakeDb();
+    const ensure = async (email) => ({ id: `user:${email}`, created: email !== alvo, inCredsFile: false });
+    await assert.rejects(runSeed({ q: db.q, ensureUser: ensure }), (e) => e.message.includes("ABORTADO") && e.message.includes(alvo));
+    assert.equal((db.tables.memberships ?? []).filter((m) => m.user_id === `user:${alvo}`).length, 0);
+    assert.equal((db.tables.memberships ?? []).some((m) => m.role === "MASTER" && alvo === "master@example.test"), false);
+  }
+});
+
+test("conta que já existia com o vínculo em OUTRA barbearia ou com OUTRO papel → aborta", async () => {
+  const alvo = "master@example.test";
+  for (const errado of [{ tenant: "barbearia", role: "MASTER" }, { tenant: "plataforma", role: "CLIENT" }]) {
+    const db = fakeDb();
+    const first = await runSeed({ q: db.q, ensureUser }); // cria tudo
+    const m = db.tables.memberships.find((x) => x.user_id === `user:${alvo}`);
+    m.tenant_id = first.tenants[errado.tenant];
+    m.role = errado.role;
+    const before = JSON.stringify(db.tables.memberships);
+    const ensure = async (email) => ({ id: `user:${email}`, created: false, inCredsFile: email !== alvo });
+    await assert.rejects(runSeed({ q: db.q, ensureUser: ensure }), /ABORTADO/);
+    assert.equal(JSON.stringify(db.tables.memberships), before);
+  }
+});
+
+test("conta que já existia é reaproveitada se já tem o vínculo esperado ou se está no arquivo de credenciais", async () => {
+  const db = fakeDb();
+  await runSeed({ q: db.q, ensureUser });
+  const before = JSON.stringify(db.tables);
+  // já tem o vínculo esperado, fora do arquivo
+  await runSeed({ q: db.q, ensureUser: async (email) => ({ id: `user:${email}`, created: false, inCredsFile: false }) });
+  assert.equal(JSON.stringify(db.tables), before);
+  // no arquivo, ainda sem vínculo (rodada anterior parou antes de gravar): completa o vínculo
+  const db2 = fakeDb();
+  await runSeed({ q: db2.q, ensureUser: async (email) => ({ id: `user:${email}`, created: false, inCredsFile: true }) });
+  assert.equal(db2.tables.memberships.length, USERS.length);
 });
