@@ -1,6 +1,7 @@
 "use server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { isUnitAdmin } from "@/lib/rbac";
 
 interface WaStatus {
   ok: boolean;
@@ -16,7 +17,7 @@ async function gateway(path: string, init?: RequestInit): Promise<{ res?: Respon
   const token = process.env.WA_SERVICE_TOKEN;
   if (!base || !token) return { error: "Gateway de WhatsApp não configurado (WA_SERVICE_URL)." };
   const user = await getSessionUser();
-  if (!user?.tenantId) return { error: "Sem tenant" };
+  if (!user?.tenantId || !user.role || !isUnitAdmin(user.role)) return { error: "Sem permissão" };
   try {
     const res = await fetch(`${base}/sessions/${user.tenantId}${path}`, {
       ...init,
