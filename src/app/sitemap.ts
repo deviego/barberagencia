@@ -6,6 +6,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const updated = new Date(`${CONTENT_UPDATED}T00:00:00-03:00`);
   return [
     { url: `${SITE_URL}/`, lastModified: updated, changeFrequency: "weekly", priority: 1 },
+    { url: `${SITE_URL}/distribuidoras`, lastModified: new Date("2026-11-10T00:00:00-03:00"), changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/documentacao`, lastModified: updated, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/llms.txt`, lastModified: updated, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/termos`, changeFrequency: "yearly", priority: 0.2 },

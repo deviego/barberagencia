@@ -4,11 +4,14 @@ import { KpiCard } from "@/components/kpi-card";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL } from "@/lib/utils";
 import { getFinance } from "@/features/admin/data";
+import { getDistributorAccess } from "@/features/distributor/guard";
 
 const METHOD_LABEL: Record<string, string> = { PIX: "PIX", CARD_CREDIT: "Cartão", CARD_DEBIT: "Cartão", CASH: "Dinheiro", PLAN: "Plano" };
 
 /** Extrato do distribuidor — reusa `financial_entries` (RLS escopa ao tenant). */
 export default async function DistributorExtratoPage() {
+  // O layout não é fronteira: a página também confere o acesso antes de buscar dados.
+  if (!(await getDistributorAccess()).ok) return null;
   const fin = await getFinance();
 
   let acc = 0;

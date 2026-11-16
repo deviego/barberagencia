@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { PLAN_SCREEN_HREF } from "@/features/plan/links";
 import { MessageTemplatesList } from "@/features/admin/components/message-templates-list";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getUnitSettings } from "@/features/admin/data";
@@ -16,7 +18,9 @@ export async function MensagensSection() {
         </div>
         <h2 className="text-h4 font-semibold text-text">Mensagens indisponíveis</h2>
         <p className="text-body text-text-2">Os modelos de mensagem estão disponíveis a partir do seu plano.</p>
-        <Button>Ver planos</Button>
+        <Link href={PLAN_SCREEN_HREF} className={buttonVariants()}>
+          Ver planos
+        </Link>
       </div>
     );
   }

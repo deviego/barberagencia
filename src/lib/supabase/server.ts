@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { AREA_HEADER, STAFF, areaFromKey } from "./area";
+import { supabasePublicEnv } from "./env";
 import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 
@@ -20,9 +21,10 @@ export async function createSupabaseServerClient() {
   const actRaw = cookieStore.get(ACT_COOKIE)?.value;
   const actHeader = isUuid(actRaw) ? { "x-act-tenant": actRaw! } : undefined;
 
+  const { url, anonKey } = supabasePublicEnv();
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       global: actHeader ? { headers: actHeader } : undefined,
       cookieOptions: { name: area.name, path: area.path, sameSite: "lax", secure: true },

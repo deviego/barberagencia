@@ -7,6 +7,7 @@ import { getRequestOrigin } from "@/lib/http";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { isMaster } from "@/lib/rbac";
+import { waGatewayEnv } from "@/server/wa-env";
 import { ACT_COOKIE, isUuid } from "@/lib/auth/acting";
 import { REF_COOKIE } from "@/lib/partners/ref";
 import { writeDefaultBillingTerms } from "@/features/billing/terms";
@@ -15,9 +16,8 @@ import { writeDefaultBillingTerms } from "@/features/billing/terms";
 export async function sendReportNow(ym?: string) {
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
-  const base = process.env.WA_SERVICE_URL;
-  const token = process.env.WA_SERVICE_TOKEN;
-  if (!base || !token) return { ok: false as const, error: "Gateway não configurado (WA_SERVICE_URL/TOKEN)." };
+  const { url: base, token } = waGatewayEnv() ?? {};
+  if (!base || !token) return { ok: false as const, error: "Gateway de WhatsApp não configurado neste ambiente." };
   try {
     const url = `${base.replace(/\/$/, "")}/report/run${ym ? `?ym=${encodeURIComponent(ym)}` : ""}`;
     const res = await fetch(url, { method: "POST", headers: { "x-wa-token": token }, signal: AbortSignal.timeout(60000) });
@@ -33,9 +33,8 @@ export async function sendReportNow(ym?: string) {
 export async function sendBarbershopReport(tenantId: string, from?: string, to?: string) {
   const user = await getSessionUser();
   if (!user?.role || !isMaster(user.role)) return { ok: false as const, error: "Acesso negado." };
-  const base = process.env.WA_SERVICE_URL;
-  const token = process.env.WA_SERVICE_TOKEN;
-  if (!base || !token) return { ok: false as const, error: "Gateway não configurado (WA_SERVICE_URL/TOKEN)." };
+  const { url: base, token } = waGatewayEnv() ?? {};
+  if (!base || !token) return { ok: false as const, error: "Gateway de WhatsApp não configurado neste ambiente." };
   try {
     const res = await fetch(`${base.replace(/\/$/, "")}/report/send`, {
       method: "POST",
