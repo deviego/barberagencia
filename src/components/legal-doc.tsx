@@ -1,4 +1,4 @@
-import { LEGAL_CONTACT, type LegalDocument } from "@/lib/legal/content";
+import type { LegalDocument } from "@/lib/legal/content";
 
 export function LegalDoc({ doc }: { doc: LegalDocument }) {
   return (
@@ -8,7 +8,7 @@ export function LegalDoc({ doc }: { doc: LegalDocument }) {
         <h1 className="mt-1 font-display text-h1 uppercase leading-none text-text">{doc.title}</h1>
         <p className="mt-3 text-body text-text-2">{doc.intro}</p>
         <p className="mt-2 text-caption text-text-muted">
-          Última atualização: {LEGAL_CONTACT.updatedAt}
+          Última atualização: {doc.updatedAt}
         </p>
       </header>
 

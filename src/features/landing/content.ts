@@ -11,6 +11,7 @@ export function salesWaLink(message: string) {
 export const WA_MESSAGES = {
   start: "Olá! Quero contratar a Barber Agência. Pode me ajudar?",
   specialist: "Olá! Gostaria de falar com um especialista sobre a Barber Agência.",
+  distributor: "Olá! Tenho uma distribuidora e quero conhecer a Barber Agência.",
   demo: (v: { name: string; phone: string; email: string }) =>
     `Olá! Quero uma demonstração da Barber Agência.\n\n` +
     `Barbearia: ${v.name || "-"}\nWhatsApp: ${v.phone || "-"}\nE-mail: ${v.email || "-"}`,
@@ -258,6 +259,7 @@ export const FOOTER_COLS: { title: string; links: { label: string; href: string 
       { label: "Benefícios", href: "#beneficios" },
       { label: "App do cliente", href: "#cliente" },
       { label: "Planos", href: "#planos" },
+      { label: "Para distribuidoras", href: "/distribuidoras" },
       { label: "Entrar", href: "/admin/login" },
     ],
   },
@@ -278,6 +280,9 @@ export const FOOTER_COLS: { title: string; links: { label: string; href: string 
     ],
   },
 ];
+
+/** Página /distribuidoras (link fora das âncoras da home). */
+export const DISTRIBUTOR_NAV_LINK = { label: "Para distribuidoras", href: "/distribuidoras" };
 
 export const NAV_LINKS: { label: string; href: string }[] = [
   { label: "Produto", href: "#produto" },

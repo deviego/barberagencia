@@ -1,5 +1,6 @@
 import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-table";
 import { getMyCustomers } from "@/features/distributor/data";
+import { getDistributorAccess } from "@/features/distributor/guard";
 
 const columns: CrudColumn[] = [
   { key: "trade_name", label: "Barbearia" },
@@ -12,6 +13,8 @@ const columns: CrudColumn[] = [
 
 /** Carteira de clientes (barbearias) do distribuidor. */
 export default async function DistributorClientesPage() {
+  // O layout não é fronteira: a página também confere o acesso antes de buscar dados.
+  if (!(await getDistributorAccess()).ok) return null;
   const rows = await getMyCustomers();
   return (
     <CrudTable

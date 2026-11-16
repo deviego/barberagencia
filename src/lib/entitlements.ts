@@ -195,12 +195,9 @@ export const LIMIT_LABEL: Record<NumericLimitKey, string> = {
 
 /** Recursos exibidos ao usuário (subconjunto amigável) + rótulos. */
 export const DISPLAY_FEATURES: { key: FeatureKey; label: string }[] = [
-  { key: "marketing.basic", label: "Campanhas de marketing" },
-  { key: "queue", label: "Fila (senha por QR/totem)" },
-  { key: "whatsapp.chatbot", label: "Atendimento com bot IA" },
-  { key: "recovery.abandoned", label: "Recuperação de cadastros" },
-  { key: "products.display", label: "Display virtual de produtos" },
-  { key: "invoice.nfe", label: "Emissão de nota fiscal" },
-  { key: "sales.direct", label: "Venda direta pela plataforma" },
-  { key: "payments.gateway", label: "Gateway de pagamento (API/Webhooks)" },
+  // Só recursos que existem de verdade (barber-agencia-base/references/provas.md).
+  // Bot IA, campanhas, NF-e, API/gateway, rede, recuperação de cadastros e venda direta
+  // não existem: as chaves continuam em FeatureKey, mas não aparecem para o usuário.
+  { key: "queue", label: "Fila (senha por QR/totem e painel na TV)" },
+  { key: "products.display", label: "Vitrine de produtos no app do cliente" },
 ];

@@ -1,5 +1,6 @@
 import { CrudTable, type CrudColumn } from "@/features/admin/components/crud-table";
 import { getProducts } from "@/features/admin/data";
+import { getDistributorAccess } from "@/features/distributor/guard";
 
 const columns: CrudColumn[] = [
   { key: "image_url", label: "Foto", format: "image" },
@@ -12,6 +13,8 @@ const columns: CrudColumn[] = [
 
 /** Catálogo de produtos do distribuidor (mesma tabela `products`, escopada por RLS ao tenant). */
 export default async function DistributorProdutosPage() {
+  // O layout não é fronteira: a página também confere o acesso antes de buscar dados.
+  if (!(await getDistributorAccess()).ok) return null;
   const rows = await getProducts();
   return (
     <CrudTable

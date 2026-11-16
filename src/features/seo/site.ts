@@ -81,6 +81,32 @@ export const LANDING_SEO_METADATA: Metadata = {
   },
 };
 
+/** /distribuidoras: sem preço e sem "transportadora" (decisões D1/D2 do Diego em aberto). */
+export const DISTRIBUTOR_TITLE = "Sistema para distribuidoras de produtos para barbearia | Barber Agência";
+export const DISTRIBUTOR_META_DESCRIPTION =
+  "Sistema para distribuidoras e revendedores de produtos para barbearia: carteira de clientes, catálogo com estoque, pedidos com status e extrato.";
+
+export const DISTRIBUTOR_SEO_METADATA: Metadata = {
+  title: DISTRIBUTOR_TITLE,
+  description: DISTRIBUTOR_META_DESCRIPTION,
+  alternates: { canonical: `${SITE_URL}/distribuidoras` },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    url: `${SITE_URL}/distribuidoras`,
+    siteName: SITE_NAME,
+    title: "Barber Agência para distribuidoras — clientes, catálogo e pedidos num lugar só",
+    description: DISTRIBUTOR_META_DESCRIPTION,
+    images: [{ url: OG_IMAGE_URL, alt: "Painel da Barber Agência" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Barber Agência para distribuidoras",
+    description: DISTRIBUTOR_META_DESCRIPTION,
+    images: [OG_IMAGE_URL],
+  },
+};
+
 export function brl(v: number) {
   return `R$ ${v.toFixed(2).replace(".", ",")}`;
 }

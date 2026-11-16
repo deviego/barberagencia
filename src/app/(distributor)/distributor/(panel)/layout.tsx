@@ -2,17 +2,34 @@ import { redirect } from "next/navigation";
 import { DistributorSidebar } from "@/components/nav/distributor-sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Badge } from "@/components/ui/badge";
-import { getSessionUser } from "@/lib/auth/session";
-import { isUnitAdmin } from "@/lib/rbac";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
+import { getDistributorAccess } from "@/features/distributor/guard";
+import { getTenantContract } from "@/features/contract/data";
+import { buildContractView, contractToData } from "@/features/contract/view";
+import { DistributorContractGate, DistributorInactive, DistributorSuspended } from "@/features/distributor/components/distributor-blocked";
 
 export default async function DistributorLayout({ children }: { children: React.ReactNode }) {
-  const user = await getSessionUser();
-  if (!user || !user.role || !isUnitAdmin(user.role)) redirect("/distributor/login");
+  const access = await getDistributorAccess();
+  if (!access.ok) {
+    if (access.reason === "UNAUTHENTICATED") redirect("/distributor/login");
+    // Só distribuidores usam este painel; barbearia vai para o /admin.
+    if (access.reason === "NOT_DISTRIBUTOR") redirect("/admin");
+    // Suspenso: nenhuma informação do painel.
+    if (access.reason === "SUSPENDED") return <DistributorSuspended />;
+    // Contrato assinado, mas a conta ainda não está ativa (ex.: pagamento pendente, onboarding).
+    if (access.reason === "INACTIVE") return <DistributorInactive />;
+    // Contrato pendente: só a tela do contrato (o resto do painel fica fechado até assinar).
+    const [tenant, contract] = await Promise.all([getCurrentTenant(), getTenantContract()]);
+    return (
+      <DistributorContractGate
+        tenantName={tenant.name}
+        view={buildContractView(contract)}
+        initial={{ ...contractToData(contract), tradeName: contract?.trade_name ?? tenant.name }}
+      />
+    );
+  }
 
   const tenant = await getCurrentTenant();
-  // Só distribuidores usam este painel; barbearia vai para o /admin.
-  if (tenant.kind !== "DISTRIBUTOR") redirect("/admin");
 
   return (
     <div className="flex min-h-screen">
