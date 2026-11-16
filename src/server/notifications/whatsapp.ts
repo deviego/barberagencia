@@ -1,4 +1,5 @@
 import "server-only";
+import { waGatewayEnv } from "@/server/wa-env";
 
 /**
  * Envia WhatsApp pelo gateway próprio (Baileys/Render), pelo número da própria
@@ -10,8 +11,7 @@ export async function sendWhatsApp(
   message: string,
   tenantId?: string | null
 ): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
-  const base = process.env.WA_SERVICE_URL;
-  const token = process.env.WA_SERVICE_TOKEN;
+  const { url: base, token } = waGatewayEnv() ?? {};
   if (!base || !token || !tenantId || !phone) return { ok: false, skipped: true };
   try {
     const res = await fetch(`${base}/sessions/${tenantId}/send`, {

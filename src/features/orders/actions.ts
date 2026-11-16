@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatBRL } from "@/lib/utils";
+import { waGatewayEnv } from "@/server/wa-env";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getSupplierAvailability, requireActiveDistributor } from "@/features/distributor/guard";
 import { requireBarbershopAdmin, requireOrderParticipantAdmin } from "./guards";
@@ -18,8 +19,7 @@ const STATUS_MSG: Record<string, string> = {
 
 /** Envia WhatsApp pela sessão do distribuidor (best-effort; ignora se não configurado/conectado). */
 async function notify(senderTenantId: string, phone: string | null, message: string) {
-  const base = process.env.WA_SERVICE_URL;
-  const token = process.env.WA_SERVICE_TOKEN;
+  const { url: base, token } = waGatewayEnv() ?? {};
   if (!base || !token || !phone) return;
   try {
     await fetch(`${base}/sessions/${senderTenantId}/send`, {

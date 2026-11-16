@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { AREA_HEADER, STAFF, areaFromKey, areaKeyFor, type AreaKey } from "@/lib/supabase/area";
+import { supabasePublicEnv } from "@/lib/supabase/env";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { REF_COOKIE, normalizeRefCode } from "@/lib/partners/ref";
 
@@ -92,9 +93,10 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set(AREA_HEADER, areaKey);
   let response = NextResponse.next({ request: { headers: requestHeaders } });
 
+  const { url, anonKey } = supabasePublicEnv();
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookieOptions: { name: area.name, path: area.path, sameSite: "lax", secure: true },
       cookies: {
