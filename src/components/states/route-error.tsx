@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect } from "react";
+import { startTransition, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, RotateCcw } from "lucide-react";
@@ -10,9 +10,14 @@ import { cn } from "@/lib/utils";
 export interface RouteErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
-  /** Para onde o link "voltar" leva (início da área). */
-  homeHref: string;
+  /** Para onde o link "voltar" leva (início da área). Sem ele, fica só "Tentar de novo". */
+  homeHref?: string;
   homeLabel?: string;
+  /**
+   * Tenta de novo sozinho a cada N segundos (telas sem ninguém para tocar, como o painel da TV).
+   * Sem ele, só o botão tenta de novo.
+   */
+  autoRetrySeconds?: number;
   /** Ocupa a tela toda (páginas sem shell, como o link público). */
   fullScreen?: boolean;
 }
@@ -26,6 +31,7 @@ export function RouteError({
   reset,
   homeHref,
   homeLabel = "Voltar ao início",
+  autoRetrySeconds,
   fullScreen = false,
 }: RouteErrorProps) {
   const router = useRouter();
@@ -35,11 +41,38 @@ export function RouteError({
 
   // reset() sozinho só re-renderiza o boundary no cliente; erro de Server Component
   // precisa buscar o payload RSC de novo (router.refresh) para sair da tela de erro.
-  const retry = () =>
-    startTransition(() => {
-      router.refresh();
-      reset();
-    });
+  const retry = useCallback(
+    () =>
+      startTransition(() => {
+        router.refresh();
+        reset();
+      }),
+    [router, reset]
+  );
+
+  useEffect(() => {
+    if (!autoRetrySeconds) return;
+    const everyMs = autoRetrySeconds * 1000;
+    let pending: AbortController | null = null;
+    const timer = setInterval(async () => {
+      // Uma checagem por volta: a anterior, se ainda estiver pendurada, é cancelada aqui.
+      pending?.abort();
+      const check = new AbortController();
+      pending = check;
+      try {
+        // Só tenta de novo com o servidor respondendo: se o refresh falhar na rede, o Next
+        // recarrega a página inteira e a tela cairia no erro do navegador, de onde não volta.
+        const res = await fetch(window.location.href, { method: "HEAD", cache: "no-store", signal: check.signal });
+        if (res.ok) retry();
+      } catch {
+        // Sem rede, servidor fora do ar ou checagem cancelada: espera a próxima volta.
+      }
+    }, everyMs);
+    return () => {
+      clearInterval(timer);
+      pending?.abort();
+    };
+  }, [autoRetrySeconds, retry]);
 
   return (
     <div
@@ -62,10 +95,15 @@ export function RouteError({
             <RotateCcw size={16} aria-hidden />
             Tentar de novo
           </Button>
-          <Link href={homeHref} className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "w-full")}>
-            {homeLabel}
-          </Link>
+          {homeHref && (
+            <Link href={homeHref} className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "w-full")}>
+              {homeLabel}
+            </Link>
+          )}
         </div>
+        {autoRetrySeconds ? (
+          <p className="mt-4 text-caption text-text-muted">Esta tela tenta de novo sozinha a cada poucos segundos.</p>
+        ) : null}
         {error.digest && (
           <p className="mt-6 text-caption text-text-muted">Código: {error.digest}</p>
         )}
