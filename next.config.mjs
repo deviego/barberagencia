@@ -1,3 +1,5 @@
+import { assertPreviewEnv } from "./scripts/check-preview-env.mjs";
+
 // Content-Security-Policy compatível com o app:
 // - script inline do tema + hidratação do Next → 'unsafe-inline' (e 'unsafe-eval' p/ dev)
 // - next/font é self-hosted (sem fonts.googleapis); estilos inline (Tailwind/styled-jsx)
@@ -24,11 +26,19 @@ const SECURITY_HEADERS = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+// Preview do Vercel: sem o ambiente de homologação completo o build quebra aqui
+// (em vez de subir e falhar só em runtime). Fora do preview não confere nada.
+assertPreviewEnv(process.env);
+
 // Host exato do nosso projeto Supabase (sem curinga *.supabase.co, que deixaria o
 // Image Optimizer buscar imagens de qualquer projeto Supabase de terceiros).
-// Fail closed: sem NEXT_PUBLIC_SUPABASE_URL válida, nenhum padrão remoto é liberado.
+// Fail closed: sem URL válida do projeto do ambiente, nenhum padrão remoto é liberado.
+// Preview usa só o projeto de homologação (mesma regra de src/lib/supabase/env.ts).
 function supabaseImagePatterns() {
-  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const raw =
+    process.env.VERCEL_ENV === "preview"
+      ? process.env.NEXT_PUBLIC_STAGING_SUPABASE_URL
+      : process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!raw) return [];
   try {
     const { protocol, hostname, port } = new URL(raw);
@@ -43,6 +53,9 @@ function supabaseImagePatterns() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Cópia de VERCEL_ENV gravada no bundle: é por ela que o navegador sabe o ambiente
+  // (src/lib/supabase/env.ts). Não depende do prefixo automático do Vercel.
+  env: { NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "" },
   // Buscadores e crawlers de IA recebem title/description/canonical/OG no <head> (sem streaming de metadata).
   // A lista padrão do Next não inclui GPTBot, ClaudeBot, PerplexityBot etc.
   htmlLimitedBots:

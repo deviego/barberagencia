@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Lock, Check, Gauge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { UpgradeButton } from "./upgrade-button";
@@ -12,6 +13,9 @@ import {
   type NumericLimitKey,
 } from "@/lib/entitlements";
 import type { SaasPlanKey } from "@/lib/tenant/types";
+
+/** Âncora da seção; o endereço completo fica em PLAN_SCREEN_HREF (features/plan/links.ts). */
+const SECTION_ID = "meu-plano";
 
 export type PlanUsageView = {
   plan: SaasPlanKey;
@@ -49,8 +53,21 @@ export function PlanUsage({ view }: { view: PlanUsageView }) {
   const locked = DISPLAY_FEATURES.filter((f) => !view.features[f.key]);
   const included = DISPLAY_FEATURES.filter((f) => view.features[f.key]);
 
+  // "Ver planos" abre /admin/config#meu-plano, mas esta seção entra na página depois do
+  // carregamento, quando o navegador já procurou a âncora. Então a rolagem é feita aqui.
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (window.location.hash !== `#${SECTION_ID}`) return;
+    sectionRef.current?.scrollIntoView({ block: "start" });
+  }, []);
+
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="meu-plano">
+    <section
+      ref={sectionRef}
+      id={SECTION_ID}
+      // scroll-mt: o cabeçalho do painel é fixo no topo e cobriria o título da seção.
+      className="flex scroll-mt-20 flex-col gap-4 rounded-lg border border-border bg-surface p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Gauge size={16} className="text-text-muted" />
