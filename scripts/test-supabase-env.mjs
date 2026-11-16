@@ -66,6 +66,17 @@ function stagingForbidden(env) {
   });
 }
 
+/** Roda fn sem imprimir os console.error esperados (recusas registradas pelo resolvedor do gateway). */
+function quiet(fn) {
+  const original = console.error;
+  console.error = () => {};
+  try {
+    return fn();
+  } finally {
+    console.error = original;
+  }
+}
+
 let n = 0;
 function test(name, fn) {
   fn();
@@ -182,10 +193,27 @@ test("WhatsApp segue a decisão do Supabase: onde o Supabase recusa, fica deslig
     { ...WA, ...STG_WA }, // sem Supabase configurado
     { ...all, ...PROD_HOST }, // sem VERCEL_ENV, apontando para produção, fora do modo de desenvolvimento
   ];
-  for (const env of cases) {
-    assert.throws(() => resolveSupabasePublicEnv(env), SupabaseEnvError);
-    assert.equal(resolveWaGatewayEnv(env), null);
+  const logged = [];
+  const original = console.error;
+  console.error = (...args) => logged.push(args.join(" "));
+  try {
+    for (const env of cases) {
+      assert.throws(() => resolveSupabasePublicEnv(env), SupabaseEnvError);
+      assert.equal(resolveWaGatewayEnv(env), null);
+    }
+    // gateway só não configurado (ambiente aceito): não registra nada
+    assert.equal(resolveWaGatewayEnv({ ...onVercel("production"), ...PROD }), null);
+  } finally {
+    console.error = original;
   }
+  // um registro por recusa, com o motivo e sem nenhum valor
+  assert.equal(logged.length, cases.length);
+  const values = [...Object.values(PROD), ...Object.values(STG), ...Object.values(WA), ...Object.values(STG_WA), PROD_HOST.NEXT_PUBLIC_SUPABASE_URL, PRODUCTION_SUPABASE_HOST];
+  for (const line of logged) {
+    assert.match(line, /^\[wa-env\] gateway de WhatsApp desligado: \S/);
+    for (const v of values) assert.ok(!line.includes(v), line);
+  }
+  assert.ok(logged.some((l) => l.includes("discordam")) && logged.some((l) => l.includes("VERCEL_ENV não é production")));
 });
 
 test("projeto de produção só com VERCEL_ENV=production ou em modo de desenvolvimento", () => {
@@ -202,7 +230,7 @@ test("projeto de produção só com VERCEL_ENV=production ou em modo de desenvol
     for (const extra of [{}, { NODE_ENV: "production" }, { NODE_ENV: "test" }, onVercel("development"), { VERCEL_ENV: "outro" }]) {
       refuses(() => resolveSupabasePublicEnv({ ...base, ...extra }), /VERCEL_ENV não é production/);
       refuses(() => resolveSupabaseAdminEnv({ ...base, ...extra }), /VERCEL_ENV não é production/);
-      assert.equal(resolveWaGatewayEnv({ ...base, ...extra }), null);
+      assert.equal(quiet(() => resolveWaGatewayEnv({ ...base, ...extra })), null);
       assert.throws(() => check.assertPreviewEnv({ ...base, ...extra }), /VERCEL_ENV não é production/);
     }
     assert.doesNotThrow(() => check.assertPreviewEnv({ ...base, VERCEL: "1", VERCEL_ENV: "production", NODE_ENV: "production" }));

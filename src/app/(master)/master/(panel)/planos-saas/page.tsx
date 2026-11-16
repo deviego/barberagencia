@@ -1,100 +1,10 @@
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PLANS as PLANS_UI, PLAN_TABLE } from "@/features/landing/content";
 
-const PLANS_UI = [
-  {
-    name: "Personal",
-    monthly: "R$ 69,90",
-    fullPrice: "R$ 129,90",
-    discountBadge: "Fim de ano",
-    monthlyNote: "por mês nos 2 primeiros meses · depois R$ 129,90/mês",
-    desc: "Para continuar a organizar a sua barbearia. Aqui você controla o seu negócio em todas as camadas.",
-    highlight: false,
-    features: [
-      { ok: true, text: "Plataforma personalizada para o administrador (1 admin por CNPJ)" },
-      { ok: true, text: "Inscrições para até 20 clientes mensalistas" },
-      { ok: true, text: "Cadastro de até 3 profissionais" },
-      { ok: true, text: "Relatórios de vendas" },
-      { ok: true, text: "300 agendamentos/mês (~10/dia) com alertas WhatsApp/e-mail/SMS" },
-      { ok: true, text: "Atendimento humanizado" },
-      { ok: false, text: "Atendimento por chat com auxílio de bot IA" },
-      { ok: false, text: "Recuperação de cadastros abandonados" },
-      { ok: false, text: "Display virtual para produtos" },
-      { ok: false, text: "Campanhas via e-mkt + integração de redes sociais" },
-      { ok: false, text: "Fila de atendimento com senha por QR/totem" },
-      { ok: false, text: "Emissão de nota fiscal via plataforma" },
-      { ok: false, text: "Serviços de venda direta via plataforma" },
-      { ok: false, text: "Gateway de pagamento via API / Webhooks" },
-    ],
-  },
-  {
-    name: "Essencial",
-    monthly: "R$ 89,90",
-    fullPrice: "R$ 189,90",
-    discountBadge: "Fim de ano",
-    monthlyNote: "por mês nos 2 primeiros meses · depois R$ 189,90/mês",
-    desc: "Excelente para quem precisa eliminar gargalos de forma eficaz. Gerencie o negócio com inteligência e versatilidade.",
-    highlight: true,
-    badge: "Mais popular",
-    features: [
-      { ok: true, text: "Plataforma personalizada para o administrador (3 admins por CNPJ)" },
-      { ok: true, text: "Inscrições para até 90 clientes mensalistas" },
-      { ok: true, text: "Cadastro de até 5 profissionais" },
-      { ok: true, text: "Relatórios de vendas" },
-      { ok: true, text: "1.500 agendamentos/mês (~50/dia) com alertas WhatsApp/e-mail/SMS" },
-      { ok: true, text: "Atendimento humanizado + auxílio de bot IA" },
-      { ok: true, text: "Recuperação de cadastros abandonados" },
-      { ok: true, text: "Display virtual para produtos personalizados" },
-      { ok: true, text: "Campanhas via e-mkt + integração de redes sociais" },
-      { ok: true, text: "Fila de atendimento com senha por QR/totem" },
-      { ok: false, text: "Emissão de nota fiscal via plataforma" },
-      { ok: false, text: "Serviços de venda direta via plataforma" },
-      { ok: false, text: "Gateway de pagamento via API / Webhooks" },
-    ],
-  },
-  {
-    name: "Advance",
-    monthly: "a partir de R$ 249,90",
-    monthlyNote: "por mês",
-    desc: "Para quem busca o equilíbrio entre sofisticação no atendimento e controle total da operação. Eleve o padrão enquanto a tecnologia cuida do resto.",
-    highlight: false,
-    features: [
-      { ok: true, text: "Plataforma personalizada para o administrador (4 admins por CNPJ)" },
-      { ok: true, text: "Inscrições ILIMITADAS para clientes mensalistas" },
-      { ok: true, text: "Cadastro de até 8 profissionais" },
-      { ok: true, text: "Relatórios de vendas" },
-      { ok: true, text: "3.000 agendamentos/mês (~100/dia) com alertas WhatsApp/e-mail/SMS" },
-      { ok: true, text: "Atendimento humanizado + auxílio de bot IA" },
-      { ok: true, text: "Recuperação de cadastros abandonados" },
-      { ok: true, text: "Display virtual para produtos personalizados" },
-      { ok: true, text: "Campanhas via e-mkt + integração de redes sociais" },
-      { ok: true, text: "Fila de atendimento com senha por QR/totem" },
-      { ok: true, text: "Emissão de nota fiscal via plataforma" },
-      { ok: true, text: "Serviços de venda direta via plataforma" },
-      { ok: true, text: "Gateway de pagamento via API / Webhooks" },
-    ],
-  },
-];
-
-const PLAN_TABLE = [
-  { label: "Administradores por CNPJ", a: "1", b: "3", c: "4" },
-  { label: "Clientes mensalistas", a: "20", b: "90", c: "Ilimitados" },
-  { label: "Profissionais", a: "3", b: "5", c: "8" },
-  { label: "Relatórios de vendas", a: "Sim", b: "Sim", c: "Sim" },
-  { label: "Agendamentos por mês", a: "300", b: "1.500", c: "3.000" },
-  { label: "Alertas WhatsApp / e-mail / SMS", a: "Sim", b: "Sim", c: "Sim" },
-  { label: "Atendimento humanizado", a: "Sim", b: "Sim", c: "Sim" },
-  { label: "Chat com bot IA", a: "—", b: "Sim", c: "Sim" },
-  { label: "Recuperação de cadastros", a: "—", b: "Sim", c: "Sim" },
-  { label: "Display virtual de produtos", a: "—", b: "Sim", c: "Sim" },
-  { label: "Campanhas e-mkt + redes sociais", a: "—", b: "Sim", c: "Sim" },
-  { label: "Fila (senha por QR/totem)", a: "—", b: "Sim", c: "Sim" },
-  { label: "Nota fiscal via plataforma", a: "—", b: "—", c: "Sim" },
-  { label: "Venda direta via plataforma", a: "—", b: "—", c: "Sim" },
-  { label: "Gateway (API) / Webhooks", a: "—", b: "—", c: "Sim" },
-  { label: "Mensalidade", a: "R$ 69,90*", b: "R$ 89,90*", c: "a partir de R$ 249,90" },
-  { label: "Mensalidade a partir do 3º mês", a: "R$ 129,90", b: "R$ 189,90", c: "a partir de R$ 249,90" },
-];
+// Mesma tabela da landing (fonte única): só o que existe de verdade, por plano.
+// Ver barber-agencia-base/references/planos-e-precos.md e provas.md.
+const POPULAR_BADGE = "Mais popular";
 
 export default function PlanosSaasPage() {
   return (
@@ -116,29 +26,29 @@ export default function PlanosSaasPage() {
               pl.highlight ? "border-2 border-accent" : "border border-border"
             )}
           >
-            {pl.highlight && pl.badge && (
+            {pl.highlight && (
               <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-pill bg-accent px-3.5 py-1 text-[11px] font-bold text-text-inverse">
-                {pl.badge}
+                {POPULAR_BADGE}
               </span>
             )}
             <div className="flex items-center justify-between gap-3">
               <div className="font-display text-[26px] font-extrabold uppercase leading-none text-text">
                 {pl.name}
               </div>
-              {"discountBadge" in pl && pl.discountBadge && (
+              {pl.discountBadge && (
                 <span className="whitespace-nowrap rounded-md bg-accent px-2.5 py-1 font-display text-[18px] font-black leading-none text-text-inverse">
                   {pl.discountBadge}
                 </span>
               )}
             </div>
             <div>
-              {"fullPrice" in pl && pl.fullPrice && (
+              {pl.fullPrice && (
                 <div className="text-body font-semibold text-text-muted line-through">{pl.fullPrice}</div>
               )}
               <div className="font-display text-[34px] font-black leading-none text-accent">
-                {pl.monthly}
+                {pl.price}
               </div>
-              <div className="mt-1 text-caption text-text-muted">{pl.monthlyNote}</div>
+              <div className="mt-1 text-caption text-text-muted">{pl.cycle}</div>
             </div>
             <p className="text-caption text-text-2">{pl.desc}</p>
             <div className="h-px bg-border-subtle" />
