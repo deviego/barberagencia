@@ -33,6 +33,9 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
               >
                 Tentar de novo
               </button>
+              {/* Link comum de propósito: esta tela substitui o layout raiz e o router pode não
+                  estar disponível, então a navegação precisa recarregar a página inteira. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a href="/" className="flex h-12 w-full items-center justify-center rounded-md text-text-2">
                 Ir para o início
               </a>
