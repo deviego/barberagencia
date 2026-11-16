@@ -21,8 +21,8 @@ export default async function MarketingPlacePage({
       <h1 className="text-h3 font-bold text-text">Marketing Place</h1>
       {locked ? (
         <LockedFeature
-          title="Campanhas de marketing"
-          description="Crie campanhas e dispare mensagens para os seus clientes."
+          title="Marketing Place"
+          description="Modelos de mensagem prontos para falar com os seus clientes pelo WhatsApp."
           currentPlan={eff.plan}
           needPlan={minPlanForFeature("marketing.basic")}
         />

@@ -23,7 +23,7 @@ export async function MarketingSection() {
           <Lock size={24} className="text-accent" />
         </div>
         <h2 className="text-h4 font-semibold text-text">Marketing indisponível</h2>
-        <p className="text-body text-text-2">Campanhas estão disponíveis a partir do plano Essencial.</p>
+        <p className="text-body text-text-2">Esta área está disponível a partir do plano Essencial.</p>
         <Button>Ver planos</Button>
       </div>
     );
@@ -33,6 +33,9 @@ export async function MarketingSection() {
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-body text-text-2">
+        A campanha fica registrada aqui para você se organizar. A plataforma não dispara mensagens em massa.
+      </p>
       <MarketingForm canSegmented={!eff.gated || hasEntitlement(eff.plan, "marketing.segmented")} />
 
       <div className="overflow-x-auto rounded-lg border border-border">
