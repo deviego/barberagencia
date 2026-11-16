@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { isPublicStorageUrl } from "@/lib/storage/public-url";
 import { getRequestOrigin } from "@/lib/http";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
+import { isUnitAdmin } from "@/lib/rbac";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getClientDetail } from "./data";
 import { sendEmail } from "@/server/notifications/resend";
@@ -264,7 +267,23 @@ export async function createCampaign(values: { name: string; segment: string; me
 }
 
 /** Salva o branding (white-label) da unidade. */
+// Logo: vazio/null (remove) ou URL pública do nosso Storage — o mesmo que o LogoMark aceita.
+const logoUrlSchema = z
+  .string()
+  .trim()
+  .nullable()
+  .transform((v) => (v ? v : null))
+  .refine((v) => v === null || isPublicStorageUrl(v), {
+    message: "Envie a logo pelo botão de upload. Links de outros sites não são aceitos.",
+  });
+
 export async function saveBranding(values: { accent?: string; instagram?: string; logoUrl?: string | null }) {
+  let logoUrl: string | null | undefined;
+  if (values.logoUrl !== undefined) {
+    const parsed = logoUrlSchema.safeParse(values.logoUrl);
+    if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message };
+    logoUrl = parsed.data;
+  }
   const supabase = await createSupabaseServerClient();
   const user = await getSessionUser();
   if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
@@ -272,7 +291,7 @@ export async function saveBranding(values: { accent?: string; instagram?: string
   const patch: Record<string, unknown> = {};
   if (values.accent !== undefined) patch.accent = values.accent ?? null;
   if (values.instagram !== undefined) patch.instagram = values.instagram ?? null;
-  if (values.logoUrl !== undefined) patch.logo_url = values.logoUrl;
+  if (logoUrl !== undefined) patch.logo_url = logoUrl;
   if (Object.keys(patch).length === 0) return { ok: true as const };
   const { error } = await supabase.from("branding").update(patch).eq("tenant_id", user.tenantId);
   if (error) return { ok: false as const, error: error.message };
@@ -939,7 +958,7 @@ export async function deletePlan(id: string) {
  *  WhatsApp da própria barbearia (via gateway) e registra a solicitação. */
 export async function requestFinancialReport() {
   const user = await getSessionUser();
-  if (!user?.tenantId) return { ok: false as const, error: "Sem tenant" };
+  if (!user?.tenantId || !user.role || !isUnitAdmin(user.role)) return { ok: false as const, error: "Sem permissão" };
   const { url: base, token } = waGatewayEnv() ?? {};
   if (!base || !token) return { ok: false as const, error: "WhatsApp da barbearia não configurado. Conecte em Configurações." };
 
@@ -980,7 +999,7 @@ export async function requestFinancialReport() {
       ? "O WhatsApp da barbearia não está conectado. Conecte em Configurações e tente de novo."
       : /sem telefone|phone/.test(error ?? "")
         ? "A barbearia não tem telefone cadastrado (Configurações)."
-        : error ?? "Falha ao solicitar o relatório.";
+        : "Não foi possível solicitar o relatório agora. Tente de novo mais tarde.";
     return { ok: false as const, error: friendly };
   }
   return { ok: true as const, phone };
