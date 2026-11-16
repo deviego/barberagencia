@@ -24,6 +24,22 @@ const SECURITY_HEADERS = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+// Host exato do nosso projeto Supabase (sem curinga *.supabase.co, que deixaria o
+// Image Optimizer buscar imagens de qualquer projeto Supabase de terceiros).
+// Fail closed: sem NEXT_PUBLIC_SUPABASE_URL válida, nenhum padrão remoto é liberado.
+function supabaseImagePatterns() {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!raw) return [];
+  try {
+    const { protocol, hostname, port } = new URL(raw);
+    if (protocol !== "https:" && protocol !== "http:") return [];
+    // Só URLs públicas do Storage (getPublicUrl → /storage/v1/object/public/<bucket>/<key>).
+    return [{ protocol: protocol.slice(0, -1), hostname, port, pathname: "/storage/v1/object/public/**" }];
+  } catch {
+    return [];
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -33,7 +49,7 @@ const nextConfig = {
     /Googlebot|Google-InspectionTool|Google-Extended|Bingbot|BingPreview|Applebot|DuckDuckBot|YandexBot|Baiduspider|GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-User|Claude-SearchBot|anthropic-ai|PerplexityBot|Perplexity-User|CCBot|Amazonbot|Bytespider|meta-externalagent|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|TelegramBot/i,
   images: {
     // Logos/branding e avatares vêm do Supabase Storage (URLs públicas).
-    remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],
+    remotePatterns: supabaseImagePatterns(),
   },
   experimental: {
     // Server Actions are enabled by default in Next 15
