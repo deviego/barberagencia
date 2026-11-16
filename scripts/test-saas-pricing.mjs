@@ -1,0 +1,186 @@
+// Teste da função de preço por competência (Epic 01 · S1). Sem runner: `npm run test:saas-pricing`.
+// Node 22.18+ importa .ts direto (type stripping). Dados fictícios.
+import assert from "node:assert/strict";
+import {
+  suggestPayment,
+  buildLedger,
+  checkAmountAgainstSuggestion,
+  shouldReplaceTermsOnPlanChange,
+  ymSaoPaulo,
+  planChangeDecision,
+  manualTermsWarning,
+} from "../src/lib/billing/saas-pricing.ts";
+
+const NOW = "2026-11-07T12:00:00Z";
+const PERSONAL = { promoPriceBrl: 69.9, promoMonths: 2, fullPriceBrl: 129.9 };
+const ESSENCIAL = { promoPriceBrl: 89.9, promoMonths: 2, fullPriceBrl: 189.9 };
+const ADVANCE = { promoPriceBrl: null, promoMonths: 0, fullPriceBrl: 249.9 };
+
+const pay = (from, to, amount, opts = {}) => ({
+  amountBrl: amount,
+  paidAt: opts.paidAt ?? `2026-11-0${from}T12:00:00Z`,
+  paidUntil: opts.paidUntil ?? null,
+  competenciaFrom: from,
+  competenciaTo: to,
+  expectedBrl: opts.expected ?? amount,
+  partial: opts.partial ?? false,
+});
+
+let ok = 0;
+function t(name, fn) {
+  fn();
+  ok++;
+  console.log(`OK  ${name}`);
+}
+
+t("sem pagamento: 1ª mensalidade sugere promoção, selo até a competência 12/2026", () => {
+  const s = suggestPayment(PERSONAL, [], 1, NOW);
+  assert.equal(s.kind, "NEW");
+  assert.equal(s.amountBrl, 69.9);
+  assert.equal(s.firstCharge, true);
+  assert.equal(s.label, "11/2026");
+  assert.equal(s.promoUntilLabel, "12/2026");
+});
+
+t("1 competência paga → 2ª ainda é promoção", () => {
+  const s = suggestPayment(PERSONAL, [pay(1, 1, 69.9)], 1, NOW);
+  assert.equal(s.amountBrl, 69.9);
+  assert.equal(s.competenciaFrom, 2);
+  assert.equal(s.firstCharge, false);
+  assert.equal(s.promoUntilLabel, "12/2026");
+});
+
+t("2 competências pagas → 3ª é preço cheio, sem selo", () => {
+  const s = suggestPayment(PERSONAL, [pay(1, 1, 69.9), pay(2, 2, 69.9)], 1, NOW);
+  assert.equal(s.amountBrl, 129.9);
+  assert.equal(s.competenciaFrom, 3);
+  assert.equal(s.promoUntilLabel, null);
+  assert.equal(s.breakdown, null);
+});
+
+t("1ª mensalidade em duas partes conta como 1 competência; a próxima ainda é promoção", () => {
+  const rows = [
+    pay(1, 1, 34.95, { partial: true, expected: 69.9, paidAt: "2026-11-01T12:00:00Z" }),
+    pay(1, 1, 34.95, { partial: true, expected: 69.9, paidAt: "2026-11-15T12:00:00Z" }),
+  ];
+  assert.equal(buildLedger(PERSONAL, rows, NOW).lastCompetencia, 1);
+  const s = suggestPayment(PERSONAL, rows, 1, NOW);
+  assert.equal(s.kind, "NEW");
+  assert.equal(s.competenciaFrom, 2);
+  assert.equal(s.amountBrl, 69.9);
+});
+
+t("parte faltando: sugere o restante da competência, não uma mensalidade nova", () => {
+  const rows = [pay(1, 1, 34.95, { partial: true, expected: 69.9 })];
+  const s = suggestPayment(PERSONAL, rows, 1, NOW);
+  assert.equal(s.kind, "REMAINING");
+  assert.equal(s.amountBrl, 34.95);
+  assert.equal(s.text, "Falta R$ 34,95 da competência 11/2026");
+});
+
+t("vários meses cruzando a virada: 69,90 + 129,90 + 129,90 = 329,70 (a story diz 329,60: erro de soma), com divisão na nota", () => {
+  const s = suggestPayment(PERSONAL, [pay(1, 1, 69.9)], 3, NOW);
+  assert.equal(s.amountBrl, 329.7);
+  assert.equal(s.competenciaFrom, 2);
+  assert.equal(s.competenciaTo, 4);
+  assert.equal(s.breakdown, "1× R$ 69,90 (promoção) + 2× R$ 129,90");
+});
+
+t("Essencial: mesma regra com 89,90 → 189,90", () => {
+  assert.equal(suggestPayment(ESSENCIAL, [], 1, NOW).amountBrl, 89.9);
+  assert.equal(suggestPayment(ESSENCIAL, [pay(1, 2, 179.8)], 1, NOW).amountBrl, 189.9);
+  assert.equal(suggestPayment(ESSENCIAL, [pay(1, 1, 89.9)], 3, NOW).amountBrl, 469.7);
+});
+
+t("Advance: sempre 249,90, sem selo", () => {
+  const s = suggestPayment(ADVANCE, [], 1, NOW);
+  assert.equal(s.amountBrl, 249.9);
+  assert.equal(s.promoUntilLabel, null);
+  assert.equal(suggestPayment(ADVANCE, [pay(1, 5, 1249.5)], 2, NOW).amountBrl, 499.8);
+});
+
+t("condições gravadas ≠ tabela: segue o gravado (ex.: 59,90 × 3 → 119,90)", () => {
+  const custom = { promoPriceBrl: 59.9, promoMonths: 3, fullPriceBrl: 119.9 };
+  assert.equal(suggestPayment(custom, [pay(1, 2, 119.8)], 1, NOW).amountBrl, 59.9);
+  assert.equal(suggestPayment(custom, [pay(1, 3, 179.7)], 1, NOW).amountBrl, 119.9);
+});
+
+t("pagamentos legados (sem competência) contam pelos meses que o paid_until andou", () => {
+  const legacy = [
+    { amountBrl: 69.9, paidAt: "2026-09-05T12:00:00Z", paidUntil: "2026-10-05T12:00:00Z", competenciaFrom: null, competenciaTo: null, expectedBrl: null, partial: false },
+    { amountBrl: 139.8, paidAt: "2026-10-04T12:00:00Z", paidUntil: "2026-12-05T12:00:00Z", competenciaFrom: null, competenciaTo: null, expectedBrl: null, partial: false },
+  ];
+  const l = buildLedger(PERSONAL, legacy, NOW);
+  assert.equal(l.lastCompetencia, 3);
+  const s = suggestPayment(PERSONAL, legacy, 1, NOW);
+  assert.equal(s.amountBrl, 129.9);
+  assert.equal(s.label, "12/2026");
+});
+
+t("competência aberta: valor acima do restante é recusado (restante + próxima num PIX só)", () => {
+  const rows = [pay(1, 1, 34.95, { partial: true, expected: 69.9 })];
+  const s = suggestPayment(PERSONAL, rows, 1, NOW);
+  assert.equal(s.kind, "REMAINING");
+  const err = checkAmountAgainstSuggestion(s, 104.85);
+  assert.match(err, /^Registre o restante e a próxima mensalidade separados/);
+  assert.equal(checkAmountAgainstSuggestion(s, 34.95), null); // exato
+  assert.equal(checkAmountAgainstSuggestion(s, 34.96), null); // tolerância de 1 centavo
+  assert.notEqual(checkAmountAgainstSuggestion(s, 34.97), null);
+  assert.equal(checkAmountAgainstSuggestion(s, 20), null); // menos que o restante: ainda parcial
+  // modo NEW não limita (vários meses / valor combinado)
+  assert.equal(checkAmountAgainstSuggestion(suggestPayment(PERSONAL, [], 1, NOW), 500), null);
+});
+
+t("troca para o mesmo plano mantém condições MANUAL; troca real substitui", () => {
+  assert.equal(shouldReplaceTermsOnPlanChange("personal", "personal"), false);
+  assert.equal(shouldReplaceTermsOnPlanChange("personal", "essencial"), true);
+  assert.equal(shouldReplaceTermsOnPlanChange("essencial", "personal"), true);
+  assert.equal(shouldReplaceTermsOnPlanChange(null, "advance"), true); // plano desconhecido → grava a tabela
+});
+
+t("rótulo no fuso de São Paulo: 30/11 22:30 BRT é competência 11/2026", () => {
+  const paidAt = "2026-12-01T01:30:00Z"; // = 30/11/2026 22:30 em São Paulo (UTC-3)
+  assert.deepEqual(ymSaoPaulo(paidAt), { year: 2026, month: 11 });
+  const rows = [{ ...pay(1, 1, 69.9), paidAt }];
+  const s = suggestPayment(PERSONAL, rows, 1, NOW);
+  assert.equal(s.label, "12/2026"); // a 2ª competência; a 1ª foi 11/2026
+  assert.equal(suggestPayment(PERSONAL, [], 1, paidAt).label, "11/2026");
+  assert.equal(suggestPayment(PERSONAL, [], 1, paidAt).promoUntilLabel, "12/2026");
+});
+
+t("troca de plano na competência 1: a 2ª sai pela promo do NOVO plano, a 3ª cheia (janela não reinicia)", () => {
+  // 1ª competência paga no Personal (69,90); troca real para Essencial → condições = tabela do Essencial.
+  const rows = [pay(1, 1, 69.9)];
+  const s2 = suggestPayment(ESSENCIAL, rows, 1, NOW);
+  assert.equal(s2.competenciaFrom, 2);
+  assert.equal(s2.amountBrl, 89.9);
+  assert.equal(s2.promoUntilLabel, "12/2026");
+  const s3 = suggestPayment(ESSENCIAL, [...rows, pay(2, 2, 89.9)], 1, NOW);
+  assert.equal(s3.competenciaFrom, 3);
+  assert.equal(s3.amountBrl, 189.9);
+  // upgrade no 4º mês não ganha promoção de novo
+  assert.equal(suggestPayment(ESSENCIAL, [pay(1, 3, 339.7)], 1, NOW).amountBrl, 189.9);
+});
+
+t("condição MANUAL + troca real exige confirmação; sem MANUAL ou com confirmação substitui", () => {
+  const d = (o) => planChangeDecision({ oldPlanRaw: "personal", newPlan: "essencial", termsSource: "MANUAL", confirmed: false, ...o });
+  assert.equal(d({}), "NEEDS_CONFIRMATION");
+  assert.equal(d({ confirmed: true }), "REPLACE");
+  assert.equal(d({ termsSource: "TABLE" }), "REPLACE");
+  assert.equal(d({ termsSource: "BACKFILL" }), "REPLACE");
+  assert.equal(d({ termsSource: null }), "REPLACE");
+  assert.equal(d({ newPlan: "personal" }), "KEEP"); // mesmo plano: MANUAL fica, sem perguntar
+});
+
+t("texto da confirmação da condição especial", () => {
+  assert.equal(
+    manualTermsWarning({ promoPriceBrl: 59.9, promoMonths: 3, fullPriceBrl: 119.9 }),
+    "Esta barbearia tem condição especial (R$\u00a059,90 por 3 mensalidades, depois R$\u00a0119,90). Ao trocar de plano, ela será substituída pela tabela do novo plano."
+  );
+  assert.equal(
+    manualTermsWarning({ promoPriceBrl: null, promoMonths: 0, fullPriceBrl: 99.9 }),
+    "Esta barbearia tem condição especial (R$\u00a099,90/mês). Ao trocar de plano, ela será substituída pela tabela do novo plano."
+  );
+});
+
+console.log(`\n${ok} casos OK`);
