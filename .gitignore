@@ -48,5 +48,5 @@ tsconfig.tsbuildinfo
 marketing/remotion/node_modules/
 marketing/remotion/out/
 
-# credenciais dos usuários de teste do staging (geradas por scripts/staging-first-load.sh)
+# credenciais dos usuários de teste do staging (geradas por scripts/staging-test-seed.sh)
 /.staging-test-users*.json
