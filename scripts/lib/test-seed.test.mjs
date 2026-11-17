@@ -58,6 +58,12 @@ test("cria as 2 barbearias-base e os 3 distribuidores (ativo, pendente, suspenso
   assert.equal(bySub["distribuidor-pendente"].status, "ACTIVE");
   assert.equal(bySub["distribuidor-suspenso"].status, "SUSPENDED");
   assert.equal(bySub["barbearia-teste"].kind, undefined); // usa o padrão do banco (barbearia)
+  assert.equal(bySub["barbearia-teste"].queue_enabled, true);
+  for (const s of ["plataforma-teste", "distribuidor-ativo", "distribuidor-pendente", "distribuidor-suspenso"])
+    assert.equal(bySub[s].queue_enabled, undefined);
+  const settingsOf = (key) => db.tables.tenant_settings.find((x) => x.tenant_id === out.tenants[key]);
+  assert.equal(settingsOf("barbearia").queue_mode, "BOTH");
+  for (const k of ["plataforma", "distAtivo", "distPendente", "distSuspenso"]) assert.equal(settingsOf(k).queue_mode, undefined);
 
   const contract = (key) => db.tables.tenant_contracts.find((c) => c.tenant_id === out.tenants[key]);
   assert.equal(contract("distAtivo").status, "SIGNED");
@@ -174,4 +180,21 @@ test("conta que já existia é reaproveitada se já tem o vínculo esperado ou s
   const db2 = fakeDb();
   await runSeed({ q: db2.q, ensureUser: async (email) => ({ id: `user:${email}`, created: false, inCredsFile: true }) });
   assert.equal(db2.tables.memberships.length, USERS.length);
+});
+
+test("barbearia que JÁ existia: não ganha fila nem modo BOTH; linha de configurações existente fica como está", async () => {
+  // sem linha de configurações: recebe só a linha padrão
+  const db = fakeDb();
+  db.tables.tenants = [{ id: "pre-b", name: "Barbearia Teste", subdomain: "barbearia-teste" }];
+  await runSeed({ q: db.q, ensureUser });
+  assert.equal(db.tables.tenants.find((x) => x.id === "pre-b").queue_enabled, undefined);
+  assert.equal(db.tables.tenant_settings.find((x) => x.tenant_id === "pre-b").queue_mode, undefined);
+  // com linha em APP: continua APP, sem update
+  const db2 = fakeDb();
+  db2.tables.tenants = [{ id: "pre-b", name: "Barbearia Teste", subdomain: "barbearia-teste" }];
+  db2.tables.tenant_settings = [{ id: "s1", tenant_id: "pre-b", queue_mode: "APP" }];
+  await runSeed({ q: db2.q, ensureUser });
+  const rows = db2.tables.tenant_settings.filter((x) => x.tenant_id === "pre-b");
+  assert.deepEqual(rows, [{ id: "s1", tenant_id: "pre-b", queue_mode: "APP" }]);
+  for (const s of db2.log) assert.doesNotMatch(s, /\bupdate\b/i);
 });

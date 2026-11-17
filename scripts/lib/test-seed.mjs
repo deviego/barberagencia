@@ -9,7 +9,8 @@
 
 export const TENANTS = {
   plataforma: { name: "Barber Agência (Plataforma Teste)", subdomain: "plataforma-teste", contract: "SIGNED" },
-  barbearia: { name: "Barbearia Teste", subdomain: "barbearia-teste", contract: "SIGNED" },
+  // Fila ligada e modo AMBOS (totem + app): sem isso o totem fica "indisponível" (o padrão do banco é APP).
+  barbearia: { name: "Barbearia Teste", subdomain: "barbearia-teste", contract: "SIGNED", extra: { queue_enabled: true }, settings: { queue_mode: "BOTH" } },
   distAtivo: { name: "Distribuidor Ativo Teste", subdomain: "distribuidor-ativo", contract: "SIGNED", extra: { kind: "DISTRIBUTOR", saas_plan: "distribuidor", status: "ACTIVE" } },
   distPendente: { name: "Distribuidor Pendente Teste", subdomain: "distribuidor-pendente", contract: "PENDING", extra: { kind: "DISTRIBUTOR", saas_plan: "distribuidor", status: "ACTIVE" } },
   distSuspenso: { name: "Distribuidor Suspenso Teste", subdomain: "distribuidor-suspenso", contract: "SIGNED", extra: { kind: "DISTRIBUTOR", saas_plan: "distribuidor", status: "SUSPENDED" } },
@@ -48,6 +49,7 @@ export async function runSeed({ q, ensureUser }) {
   const tenants = {};
   for (const [key, t] of Object.entries(TENANTS)) {
     const found = await q("select id from public.tenants where subdomain = $1", [t.subdomain]);
+    const isNew = !found[0];
     if (found[0]) {
       tenants[key] = found[0].id;
     } else {
@@ -61,7 +63,14 @@ export async function runSeed({ q, ensureUser }) {
     }
     const id = tenants[key];
     await q("insert into public.branding (tenant_id) values ($1) on conflict do nothing", [id]);
-    await q("insert into public.tenant_settings (tenant_id) values ($1) on conflict do nothing", [id]);
+    // Configurações próprias (ex.: modo da fila) só para tenant criado nesta rodada; tenant que já existia
+    // recebe, no máximo, a linha padrão que faltar. Linha existente nunca é alterada.
+    const settings = isNew ? { tenant_id: id, ...t.settings } : { tenant_id: id };
+    const sCols = Object.keys(settings);
+    await q(
+      `insert into public.tenant_settings (${sCols.join(", ")}) values (${sCols.map((_, i) => `$${i + 1}`).join(", ")}) on conflict do nothing`,
+      sCols.map((c) => settings[c])
+    );
     const signed = t.contract === "SIGNED";
     await q(
       `insert into public.tenant_contracts (tenant_id, status, signed_at, signed_name, legal_name, trade_name)
