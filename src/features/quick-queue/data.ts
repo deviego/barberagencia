@@ -9,6 +9,8 @@ import {
   quickQueueViewer,
   type QuickQueueTenantState,
 } from "./rules";
+import { hashDeviceToken, readDeviceToken } from "./device";
+import { deviceHasActiveTicket } from "./ticket";
 import type { QuickQueueBrand, QuickQueueEntry, QuickQueueRoute } from "./types";
 
 /*
@@ -127,9 +129,21 @@ export async function getQuickQueueEntry(slug: string): Promise<QuickQueueEntry>
   const status = quickQueueStatus(state, new Date());
   if (status !== "OPEN" || !state) return { status: status === "OPEN" ? "NOT_FOUND" : status, viewer: "VISITOR" };
 
-  const [brand, clientTenantIds] = await Promise.all([loadQuickQueueBrand(state.id), loadSessionClientTenantIds()]);
-  // HAS_TICKET depende da credencial do aparelho (#99); até lá só VISITOR ou CLIENT.
-  return { status: "OPEN", brand, viewer: quickQueueViewer(clientTenantIds, state.id) };
+  const [brand, clientTenantIds, hasTicket] = await Promise.all([
+    loadQuickQueueBrand(state.id),
+    loadSessionClientTenantIds(),
+    deviceTicketOpen(state.id),
+  ]);
+  // HAS_TICKET: este aparelho tem senha ativa hoje (credencial do cookie) → "Minha senha" (#98).
+  return { status: "OPEN", brand, viewer: hasTicket ? "HAS_TICKET" : quickQueueViewer(clientTenantIds, state.id) };
+}
+
+/** Senha ativa hoje criada neste aparelho? Falha de leitura = não (a tela começa pelo telefone). */
+async function deviceTicketOpen(tenantId: string): Promise<boolean> {
+  const token = await readDeviceToken();
+  const admin = adminOrNull();
+  if (!token || !admin) return false;
+  return deviceHasActiveTicket(admin, tenantId, hashDeviceToken(token));
 }
 
 /** Despachante de /b/<slug>/fila: LEGACY = exatamente o fluxo de hoje. */

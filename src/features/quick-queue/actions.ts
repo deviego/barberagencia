@@ -9,7 +9,9 @@ import {
   QUICK_QUEUE_IDENTIFY_LIMITS,
   QUICK_QUEUE_JOIN_LIMITS,
   QUICK_QUEUE_PENDING_MINUTES,
+  QUICK_QUEUE_STATUS_LIMITS,
 } from "./limits";
+import { cancelDeviceTicket, resolveDevice } from "./ticket";
 import { deviceHasClient, loadQuickQueueOptions as readOptions } from "./options";
 import {
   IdentifyPhoneInput,
@@ -21,10 +23,12 @@ import {
 import {
   QUICK_QUEUE_IDENTIFY_MESSAGES as MSG,
   QUICK_QUEUE_JOIN_MESSAGES as JOIN_MSG,
+  QUICK_QUEUE_TICKET_MESSAGES as TICKET_MSG,
   QUICK_QUEUE_LIMIT_MESSAGES as LIMIT_MSG,
   type IdentifyPhoneResult,
   type JoinQuickQueueInput,
   type JoinQuickQueueResult,
+  type LeaveQuickQueueResult,
   type QuickQueueOptionsResult,
   type QuickQueueActionError,
   type RegisterNameResult,
@@ -272,6 +276,55 @@ export async function joinQuickQueue(slug: string, input: JoinQuickQueueInput): 
       return { ok: false, code: "SERVICE_CHANGED", error: JOIN_MSG.serviceChanged, options };
     }
     default:
+      return generic;
+  }
+}
+
+/**
+ * "Sair da fila" (#98). Só a senha deste aparelho (credencial do cookie), só em espera e ainda
+ * não chamada. Repetir depois de cancelada responde ok sem efeito novo.
+ */
+export async function leaveQuickQueue(slug: string): Promise<LeaveQuickQueueResult> {
+  const generic: LeaveQuickQueueResult = { ok: false, code: "GENERIC", error: TICKET_MSG.failed };
+  const parsed = LoadQuickQueueOptionsInput.safeParse({ slug });
+  if (!parsed.success) return generic;
+
+  let tenantId: string;
+  try {
+    ({ tenantId } = await requireQuickQueueOpen(parsed.data.slug));
+  } catch (e) {
+    return e instanceof QuickQueueClosedError ? { ok: false, code: "CLOSED", error: e.message } : generic;
+  }
+
+  // Sem credencial (ou credencial de outro aparelho/barbearia): a mesma resposta de "não há
+  // senha em espera", sem dizer o motivo.
+  const notWaiting: LeaveQuickQueueResult = { ok: false, code: "NOT_WAITING", error: TICKET_MSG.failed };
+  const token = await readDeviceToken();
+  if (!token) return notWaiting;
+
+  const admin = createSupabaseAdminClient();
+  const deviceId = await resolveDevice(admin, tenantId, hashDeviceToken(token));
+  if (deviceId === "error") return generic;
+  if (!deviceId) return notWaiting;
+
+  const SL = QUICK_QUEUE_STATUS_LIMITS;
+  const { data: allowed, error: limitError } = await admin.rpc("rate_limit_hit", {
+    p_scope: "qq_leave",
+    p_key: deviceId,
+    p_window_seconds: SL.leaveWindowSeconds,
+    p_limit: SL.leavePerDevice,
+  });
+  if (limitError) return generic;
+  if (allowed === false) return { ok: false, code: "LIMIT", error: LIMIT_MSG.tooMany };
+
+  switch (await cancelDeviceTicket(admin, tenantId, deviceId)) {
+    case "cancelled":
+    case "already":
+      return { ok: true };
+    case "not_waiting":
+      return notWaiting;
+    default:
+      console.error("[quick-queue] saída da fila indisponível");
       return generic;
   }
 }

@@ -161,6 +161,84 @@ export const QUICK_QUEUE_JOIN_MESSAGES = {
 } as const;
 
 /*
+ * #98 — tela "Minha senha".
+ *   GET /b/<slug>/fila/rapida/status → QuickQueueStatusResponse (JSON). A tela consulta a cada
+ *       QUICK_QUEUE_STATUS_POLL.everyMs com a aba visível; pausa em segundo plano.
+ *   leaveQuickQueue(slug)            → LeaveQuickQueueResult (server action, em ./actions.ts)
+ * O endereço é o mesmo para todos e não leva identificador de senha: quem dá acesso é a
+ * credencial do aparelho (cookie HttpOnly) que criou a senha. A resposta traz só a senha deste
+ * aparelho, a senha em atendimento e a contagem na frente: nada de nome, telefone ou serviço.
+ */
+
+/**
+ * Estado da minha senha (só a de hoje, criada neste aparelho):
+ *   WAITING   em espera, com gente na frente (ahead > 0)
+ *   NEXT      em espera e ninguém na frente: "Você é o próximo"
+ *   CALLED    chamada ou em atendimento: "É a sua vez!"
+ *   DONE      atendimento concluído
+ *   SKIPPED   pulada ou removida pela barbearia no painel
+ *   CANCELLED cancelada pelo cliente em "Sair da fila" (queue_entries.left_by_client, schema-54)
+ * DONE, SKIPPED e CANCELLED são finais: mostrar o texto e "Pegar nova senha".
+ */
+export type QuickQueueTicketState = "WAITING" | "NEXT" | "CALLED" | "DONE" | "SKIPPED" | "CANCELLED";
+
+export type QuickQueueMyTicket = {
+  /** Número da senha deste aparelho. */
+  number: number;
+  state: QuickQueueTicketState;
+  /** Senha chamada por último na barbearia hoje; null se ninguém foi chamado ainda. */
+  nowServing: number | null;
+  /** Quantas senhas em espera estão na frente (0 em NEXT, CALLED e nos finais). */
+  ahead: number;
+};
+
+/**
+ * ticket null: este aparelho não tem senha hoje (resposta igual para qualquer aparelho sem senha).
+ * LIMIT: consultas em série acima do limite (HTTP 429; 1 consulta a cada 2 s por aparelho):
+ *   esperar 2 s e tentar de novo, sem aviso de erro. Acontece também logo depois de entrar na fila.
+ * Aparelho com 2 senhas ativas (pai e filho): vem a de número menor ainda ativa.
+ * CLOSED: fila indisponível nesta barbearia. GENERIC: falha; tratar como sem conexão.
+ */
+export type QuickQueueStatusResponse =
+  | { ok: true; ticket: QuickQueueMyTicket | null }
+  | { ok: false; code: "LIMIT" | "CLOSED" | "GENERIC" };
+
+/**
+ * "Sair da fila". Só cancela senha em espera (WAITING/NEXT) criada neste aparelho.
+ * Repetir o pedido depois de cancelada responde ok de novo, sem efeito novo.
+ * NOT_WAITING: a senha já foi chamada, atendida ou não existe: atualizar o estado pela consulta.
+ */
+export type LeaveQuickQueueResult =
+  | { ok: true }
+  | { ok: false; code: "NOT_WAITING" | "LIMIT" | "CLOSED" | "GENERIC"; error: string };
+
+/** Ritmo da consulta (decisão do Alicerce na #98). */
+export const QUICK_QUEUE_STATUS_POLL = {
+  everyMs: 5_000,
+  /** Sem conexão: 5 s, 10 s, 20 s, até 30 s; volta a everyMs quando conectar. */
+  backoffMs: [5_000, 10_000, 20_000, 30_000],
+} as const;
+
+/** Textos fixos da #98. {senha} e {n} são trocados pela tela. */
+export const QUICK_QUEUE_TICKET_MESSAGES = {
+  title: "Sua senha",
+  nowServing: "Atendendo agora: {senha}",
+  ahead: "{n} na sua frente",
+  next: "Você é o próximo",
+  called: "É a sua vez!",
+  leave: "Sair da fila",
+  leaveConfirm: "Sair da fila? Você perde a sua vez.",
+  leaveYes: "Sair",
+  leaveNo: "Ficar na fila",
+  done: "Atendimento concluído. Valeu!",
+  skipped: "Sua senha foi pulada. Fale no balcão ou pegue outra.",
+  cancelled: "Sua senha foi cancelada.",
+  newTicket: "Pegar nova senha",
+  offline: "Sem conexão. Tentando de novo…",
+  failed: "Não deu certo. Tente de novo.",
+} as const;
+
+/*
  * #99 — travas. Avisos neutros: nunca dizem de quem é o telefone, o número da senha nem a
  * posição. joinQuickQueue devolve code "LIMIT" com um destes textos em `error`.
  */
