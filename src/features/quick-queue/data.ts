@@ -6,6 +6,7 @@ import {
   isQuickQueueSlug,
   quickQueueRoute,
   quickQueueStatus,
+  quickQueueTicketAccess,
   quickQueueViewer,
   type QuickQueueTenantState,
 } from "./rules";
@@ -126,8 +127,16 @@ export async function loadSessionClientTenantIds(): Promise<string[]> {
  */
 export async function getQuickQueueEntry(slug: string): Promise<QuickQueueEntry> {
   const state = await loadQuickQueueTenantState(slug);
-  const status = quickQueueStatus(state, new Date());
-  if (status !== "OPEN" || !state) return { status: status === "OPEN" ? "NOT_FOUND" : status, viewer: "VISITOR" };
+  const now = new Date();
+  const status = quickQueueStatus(state, now);
+  if (status !== "OPEN" || !state) {
+    // Fila rápida desligada (ou fechada) com senha ativa criada neste aparelho: a senha continua
+    // valendo e a página abre direto em "Minha senha" (#102). Ninguém mais passa daqui.
+    if (state && quickQueueTicketAccess(state, now) && (await deviceTicketOpen(state.id))) {
+      return { status: "OPEN", brand: await loadQuickQueueBrand(state.id), viewer: "HAS_TICKET" };
+    }
+    return { status: status === "OPEN" ? "NOT_FOUND" : status, viewer: "VISITOR" };
+  }
 
   const [brand, clientTenantIds, hasTicket] = await Promise.all([
     loadQuickQueueBrand(state.id),

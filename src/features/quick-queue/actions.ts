@@ -2,7 +2,7 @@
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { phoneKey } from "@/lib/phone";
-import { requireQuickQueueOpen, QuickQueueClosedError } from "./guard";
+import { requireQuickQueueOpen, requireQuickQueueTicketAccess, QuickQueueClosedError } from "./guard";
 import { hashDeviceToken, newDeviceToken, readDeviceToken, writeDeviceToken } from "./device";
 import {
   QUICK_QUEUE_DEVICE_TTL_DAYS,
@@ -282,7 +282,8 @@ export async function joinQuickQueue(slug: string, input: JoinQuickQueueInput): 
 
 /**
  * "Sair da fila" (#98). Só a senha deste aparelho (credencial do cookie), só em espera e ainda
- * não chamada. Repetir depois de cancelada responde ok sem efeito novo.
+ * não chamada. Repetir depois de cancelada responde ok sem efeito novo. Guard da senha já
+ * criada (#102): continua valendo com a fila rápida desligada.
  */
 export async function leaveQuickQueue(slug: string): Promise<LeaveQuickQueueResult> {
   const generic: LeaveQuickQueueResult = { ok: false, code: "GENERIC", error: TICKET_MSG.failed };
@@ -291,7 +292,7 @@ export async function leaveQuickQueue(slug: string): Promise<LeaveQuickQueueResu
 
   let tenantId: string;
   try {
-    ({ tenantId } = await requireQuickQueueOpen(parsed.data.slug));
+    ({ tenantId } = await requireQuickQueueTicketAccess(parsed.data.slug));
   } catch (e) {
     return e instanceof QuickQueueClosedError ? { ok: false, code: "CLOSED", error: e.message } : generic;
   }

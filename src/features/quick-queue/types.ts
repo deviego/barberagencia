@@ -31,6 +31,8 @@ export type QuickQueueBrand = {
 /**
  * Retorno de getQuickQueueEntry(slug). A marca só vem com OPEN; fora disso a resposta não
  * traz dado nenhum da barbearia e o viewer é sempre VISITOR.
+ * Exceção (#102): fila rápida desligada ou fechada com senha ativa criada neste aparelho vem
+ * como OPEN + HAS_TICKET, para a página abrir só "Minha senha" (entrar segue recusado).
  */
 export type QuickQueueEntry =
   | { status: "OPEN"; brand: QuickQueueBrand; viewer: QuickQueueViewer }

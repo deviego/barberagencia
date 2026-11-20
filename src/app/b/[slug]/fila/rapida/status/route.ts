@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireQuickQueueOpen, QuickQueueClosedError } from "@/features/quick-queue/guard";
+import { requireQuickQueueTicketAccess, QuickQueueClosedError } from "@/features/quick-queue/guard";
 import { hashDeviceToken, readDeviceToken } from "@/features/quick-queue/device";
 import { quickQueueMyTicket } from "@/features/quick-queue/ticket-rules";
 import { claimStatusSlot, loadDeviceTicket, loadSnapshot } from "@/features/quick-queue/ticket";
@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
  * credencial do aparelho (cookie HttpOnly, caminho /b/<slug>/fila). A resposta traz só a senha
  * deste aparelho, a senha em atendimento e a contagem na frente.
  * Limite: 1 consulta a cada 2 s por aparelho (429 + LIMIT); retrato da fila guardado por 2 s.
+ * Guard da senha já criada (#102): continua respondendo com a fila rápida desligada.
  */
 export async function GET(_request: Request, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
@@ -21,7 +22,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ slug: stri
 
   let tenantId: string;
   try {
-    ({ tenantId } = await requireQuickQueueOpen(slug));
+    ({ tenantId } = await requireQuickQueueTicketAccess(slug));
   } catch (e) {
     return json({ ok: false, code: e instanceof QuickQueueClosedError ? "CLOSED" : "GENERIC" });
   }
