@@ -235,3 +235,28 @@ export const QUICK_QUEUE_TICKET_MESSAGES = {
   offline: "Sem conexão. Tentando de novo…",
   failed: "Não deu certo. Tente de novo.",
 } as const;
+
+/*
+ * #99 — travas. Avisos neutros: nunca dizem de quem é o telefone, o número da senha nem a
+ * posição. joinQuickQueue devolve code "LIMIT" com um destes textos em `error`.
+ */
+export const QUICK_QUEUE_LIMIT_MESSAGES = {
+  /** Telefone com senha ativa tirada em outro aparelho, no totem ou no balcão. */
+  phoneBusy: "Este telefone já tem uma senha na fila. Fale no balcão.",
+  /** Aparelho com 2 senhas ativas nesta barbearia. */
+  deviceLimit: "Limite de senhas neste celular. Fale no balcão.",
+  /** Pedidos em série acima do limite. */
+  tooMany: "Muitas tentativas. Aguarde um pouco e tente de novo.",
+  /** Teto de senhas da fila rápida da barbearia atingido. */
+  tenantCap: "A fila pelo celular está cheia agora. Fale no balcão.",
+} as const;
+
+/** Contagem do dia de limites estourados (alerta ao dono no painel; leitura com RLS de admin). */
+export type QuickQueueLimitKind = "IDENTIFY" | "JOIN_RATE" | "PHONE_BUSY" | "DEVICE_ACTIVE" | "TENANT_ACTIVE";
+export type QuickQueueLimitSummary = {
+  /** Soma do dia (America/Sao_Paulo). */
+  total: number;
+  byKind: Partial<Record<QuickQueueLimitKind, number>>;
+  /** true quando o teto de senhas da fila rápida foi atingido hoje: mostrar alerta com "Desligar". */
+  tenantCapHit: boolean;
+};
