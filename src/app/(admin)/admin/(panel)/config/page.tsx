@@ -22,7 +22,14 @@ import { LockedFeature } from "@/features/plan/components/locked-feature";
 import { waStatus } from "@/features/admin/whatsapp-actions";
 import { ClientQr } from "@/features/admin/components/client-qr";
 import { ConfigTabs } from "@/features/admin/components/config-tabs";
-import { quickQueueOnFor, showQueuePoster, showQueuePosterHint } from "@/features/admin/components/qr-posters/visibility";
+import {
+  quickQueueLimitAlert,
+  quickQueueOnFor,
+  showQueuePoster,
+  showQueuePosterHint,
+} from "@/features/admin/components/qr-posters/visibility";
+import { getQuickQueueLimitSummary } from "@/features/quick-queue/admin-data";
+import { QUICK_QUEUE_ALERT_MIN_TOTAL } from "@/features/quick-queue/types";
 import { loadQuickQueueTenantState } from "@/features/quick-queue/data";
 
 export default async function ConfigPage() {
@@ -90,6 +97,18 @@ export default async function ConfigPage() {
     }
   }
 
+  // Alerta ao dono (#145): resumo do dia só com a fila rápida ligada; erro de leitura = sem alerta.
+  let limitAlert: { kind: "CAP" | "HIGH"; total: number } | null = null;
+  if (showQuickQueueToggle && quickQueueEnabled) {
+    try {
+      const summary = await getQuickQueueLimitSummary(tenant.id);
+      const kind = quickQueueLimitAlert(summary, quickQueueEnabled, QUICK_QUEUE_ALERT_MIN_TOTAL);
+      if (kind && summary) limitAlert = { kind, total: summary.total };
+    } catch {
+      limitAlert = null;
+    }
+  }
+
   // Link + QR do totem: só com a fila ligada e o modo Totem ou Ambos (bloco "Totem — só no tablet").
   let totem: { url: string; qr: string } | null = null;
   if (queueCfg.enabled && (queueCfg.mode === "TOTEM" || queueCfg.mode === "BOTH")) {
@@ -135,7 +154,11 @@ export default async function ConfigPage() {
           "qr-fila": (
             <>
               {showQuickQueueToggle ? (
-                <QuickQueueToggle enabled={quickQueueEnabled} whatsappDisconnected={whatsappDisconnected} />
+                <QuickQueueToggle
+                  enabled={quickQueueEnabled}
+                  whatsappDisconnected={whatsappDisconnected}
+                  alert={limitAlert}
+                />
               ) : (
                 !queueInPlan && (
                   <LockedFeature

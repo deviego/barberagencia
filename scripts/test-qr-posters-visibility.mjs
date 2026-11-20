@@ -10,7 +10,7 @@ const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/
 const js = ts.transpileModule(readFileSync(file, "utf8"), {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-const { showQueuePoster, showQueuePosterHint, quickQueueOnFor } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
+const { showQueuePoster, showQueuePosterHint, quickQueueOnFor, quickQueueLimitAlert } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 
 let n = 0;
 function check(name, input, expected) {
@@ -68,5 +68,21 @@ qq("sem estado (undefined)", undefined, false);
 qq("string 'true'", { id: "t1", quickQueueEnabled: "true" }, false);
 assert.equal(quickQueueOnFor({ id: "", quickQueueEnabled: true }, ""), false, "chave: tenant vazio");
 n++;
+
+// Alerta ao dono (#145): teto ou total >= 20, só com a fila rápida ligada.
+function alert(name, summary, on, expected) {
+  assert.equal(quickQueueLimitAlert(summary, on, 20), expected, `alerta: ${name}`);
+  n++;
+}
+alert("teto atingido", { total: 3, tenantCapHit: true }, true, "CAP");
+alert("teto e total alto: texto do teto", { total: 50, tenantCapHit: true }, true, "CAP");
+alert("total 20", { total: 20, tenantCapHit: false }, true, "HIGH");
+alert("total 19", { total: 19, tenantCapHit: false }, true, null);
+alert("zero", { total: 0, tenantCapHit: false }, true, null);
+alert("fila rápida desligada", { total: 99, tenantCapHit: true }, false, null);
+alert("fila rápida desconhecida", { total: 99, tenantCapHit: true }, undefined, null);
+alert("sem resumo (erro)", null, true, null);
+alert("total inválido", { total: Number.NaN, tenantCapHit: false }, true, null);
+alert("total ausente", { tenantCapHit: false }, true, null);
 
 console.log(`ok: ${n} casos`);

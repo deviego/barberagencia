@@ -294,4 +294,20 @@ export const QUICK_QUEUE_ADMIN_MESSAGES = {
   plan: "A fila não faz parte do seu plano.",
   queueOff: "Ative a fila da barbearia antes de ligar a fila rápida.",
   failed: "Não deu certo. Tente de novo.",
+  /* Alerta ao dono (condição da Navalha; copy da Regua no #145, 20/11). Só o total, sem tipo. */
+  alertTitle: (n: number) => (n === 1 ? "A fila rápida barrou 1 tentativa hoje" : `A fila rápida barrou ${n} tentativas hoje`),
+  alertBodyCap:
+    "A fila pelo celular encheu e parou de aceitar senhas novas. Se achar que tem alguém abusando, desligue a fila rápida. O balcão e o totem continuam funcionando.",
+  alertBodyHigh:
+    "Pode ser só movimento, mas também pode ser alguém abusando. Se achar estranho, desligue a fila rápida. O balcão e o totem continuam funcionando.",
+  alertAction: "Desligar fila rápida",
+  confirmTitle: "Desligar a fila rápida?",
+  confirmBody:
+    "Os clientes param de pegar senha só com o telefone. Quem já está na fila continua, e o balcão e o totem não mudam. Você pode ligar de novo quando quiser.",
+  confirmYes: "Desligar",
+  confirmNo: "Voltar",
+  turnedOff: "Fila rápida desligada.",
 } as const;
+
+/** Total do dia de limites estourados a partir do qual o dono vê o alerta (valor final: #105). */
+export const QUICK_QUEUE_ALERT_MIN_TOTAL = 20;

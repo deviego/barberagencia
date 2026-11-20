@@ -35,3 +35,19 @@ export function quickQueueOnFor(
 ): boolean {
   return !!state && !!tenantId && state.id === tenantId && state.quickQueueEnabled === true;
 }
+
+/**
+ * Alerta ao dono (#145, condição da Navalha): só com a fila rápida ligada e, hoje, o teto de
+ * senhas atingido (tenantCapHit) ou o total de limites estourados >= minTotal. Sem resumo
+ * (erro de leitura) = sem alerta. "CAP" escolhe o texto do teto; "HIGH", o do total alto.
+ */
+export function quickQueueLimitAlert(
+  summary: { total?: number | null; tenantCapHit?: boolean | null } | null | undefined,
+  quickQueueEnabled: boolean | null | undefined,
+  minTotal: number,
+): "CAP" | "HIGH" | null {
+  if (quickQueueEnabled !== true || !summary) return null;
+  if (summary.tenantCapHit === true) return "CAP";
+  const total = typeof summary.total === "number" && Number.isFinite(summary.total) ? summary.total : 0;
+  return total >= minTotal ? "HIGH" : null;
+}
