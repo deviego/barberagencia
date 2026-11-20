@@ -47,3 +47,4 @@ schema-57-totem-key-rotation.sql
 schema-59-plan-switch-cancel-fixed.sql
 schema-60-retencao-registros-tecnicos.sql
 schema-61-quick-queue-ticket-owner.sql
+schema-64-quick-queue-identify-tenant-caps.sql

@@ -256,12 +256,30 @@ export const QUICK_QUEUE_LIMIT_MESSAGES = {
 } as const;
 
 /** Contagem do dia de limites estourados (alerta ao dono no painel; leitura com RLS de admin). */
-export type QuickQueueLimitKind = "IDENTIFY" | "JOIN_RATE" | "PHONE_BUSY" | "DEVICE_ACTIVE" | "TENANT_ACTIVE";
+export type QuickQueueLimitKind =
+  | "IDENTIFY"
+  | "JOIN_RATE"
+  | "PHONE_BUSY"
+  | "DEVICE_ACTIVE"
+  | "TENANT_ACTIVE"
+  // #148 (schema-64): tetos por barbearia da identificação.
+  | "IDENTIFY_TENANT"
+  | "NEW_DEVICES_TENANT"
+  | "NEW_CLIENTS_TENANT";
+
+/** Tipos que são TETO DA BARBEARIA: qualquer um deles hoje liga o alerta ao dono (tenantCapHit). */
+export const QUICK_QUEUE_TENANT_CAP_KINDS: readonly QuickQueueLimitKind[] = [
+  "TENANT_ACTIVE",
+  "IDENTIFY_TENANT",
+  "NEW_DEVICES_TENANT",
+  "NEW_CLIENTS_TENANT",
+];
 export type QuickQueueLimitSummary = {
   /** Soma do dia (America/Sao_Paulo). */
   total: number;
   byKind: Partial<Record<QuickQueueLimitKind, number>>;
-  /** true quando o teto de senhas da fila rápida foi atingido hoje: mostrar alerta com "Desligar". */
+  /** true quando algum teto da barbearia foi atingido hoje (senhas ativas da fila rápida,
+   * tentativas, credenciais novas ou contas novas): mostrar alerta com "Desligar". */
   tenantCapHit: boolean;
 };
 

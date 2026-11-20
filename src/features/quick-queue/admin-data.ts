@@ -1,6 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { QuickQueueAdminState, QuickQueueLimitKind, QuickQueueLimitSummary } from "./types";
+import { QUICK_QUEUE_TENANT_CAP_KINDS, type QuickQueueAdminState, type QuickQueueLimitKind, type QuickQueueLimitSummary } from "./types";
 
 /*
  * Alerta ao dono (#99): contagem do dia de limites estourados da fila rápida. Leitura com a
@@ -22,7 +22,7 @@ export async function getQuickQueueLimitSummary(tenantId: string): Promise<Quick
     byKind[r.kind] = r.hits;
     total += r.hits;
   }
-  return { total, byKind, tenantCapHit: (byKind.TENANT_ACTIVE ?? 0) > 0 };
+  return { total, byKind, tenantCapHit: QUICK_QUEUE_TENANT_CAP_KINDS.some((k) => (byKind[k] ?? 0) > 0) };
 }
 
 /**

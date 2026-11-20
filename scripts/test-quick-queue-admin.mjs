@@ -105,6 +105,7 @@ registerHooks({
 const { setQuickQueueEnabled } = await import("@/features/quick-queue/admin-actions");
 const { regenerateTotemToken } = await import("@/features/queue/totem-actions");
 const { QUICK_QUEUE_ADMIN_MESSAGES } = await import("@/features/quick-queue/types");
+const { getQuickQueueLimitSummary } = await import("@/features/quick-queue/admin-data");
 
 const A = "00000000-0000-4000-8000-00000000000a";
 const B = "00000000-0000-4000-8000-00000000000b";
@@ -233,6 +234,26 @@ await test("#148: registro falha e a reversão funciona: volta ao estado anterio
   }
   assert.equal(tenant(A).quick_queue_enabled, true);
   assert.ok(!logs.some((l) => l.includes("reversão do interruptor falhou")));
+});
+
+await test("#148: qualquer teto da barbearia (inclusive os da identificação) liga o alerta; limite pessoal não", async () => {
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  for (const [kind, cap] of [
+    ["TENANT_ACTIVE", true],
+    ["IDENTIFY_TENANT", true],
+    ["NEW_DEVICES_TENANT", true],
+    ["NEW_CLIENTS_TENANT", true],
+    ["IDENTIFY", false],
+    ["JOIN_RATE", false],
+    ["PHONE_BUSY", false],
+    ["DEVICE_ACTIVE", false],
+  ]) {
+    setDb();
+    db().tables.quick_queue_limit_daily = [{ tenant_id: A, day, kind, hits: 3 }];
+    const r = await getQuickQueueLimitSummary(A);
+    assert.equal(r.tenantCapHit, cap, kind);
+    assert.equal(r.total, 3);
+  }
 });
 
 // ---- #103: renovar a chave -------------------------------------------------------------------
