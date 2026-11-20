@@ -1,3 +1,5 @@
+import { isOverLimit } from "@/lib/rate-limit";
+
 /** Regras de anti-spam do formulário público de leads (puras, testáveis sem banco). */
 export const LEAD_RATE_LIMIT = {
   /** Máximo de envios aceitos do mesmo ip_hash dentro da janela. */
@@ -9,7 +11,10 @@ export const LEAD_RATE_LIMIT = {
 
 /** true = recusar. Recebe quantos leads JÁ foram gravados em cada janela. */
 export function isLeadRateLimited(counts: { ipRecent: number; globalLastHour: number }): boolean {
-  return counts.ipRecent >= LEAD_RATE_LIMIT.perIp || counts.globalLastHour >= LEAD_RATE_LIMIT.globalPerHour;
+  return (
+    isOverLimit(counts.ipRecent, { limit: LEAD_RATE_LIMIT.perIp }) ||
+    isOverLimit(counts.globalLastHour, { limit: LEAD_RATE_LIMIT.globalPerHour })
+  );
 }
 
 export const LEAD_STATUSES = ["NEW", "CONTACTED", "DISCARDED"] as const;
