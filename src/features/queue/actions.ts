@@ -49,64 +49,43 @@ export async function callQueue(id: string) {
   return { ok: true as const };
 }
 
-/** Admin: inicia o atendimento → cria a comanda (appointment + item) e marca IN_SERVICE. */
-export async function startQueue(id: string, opts?: { barberId?: string | null; serviceId?: string | null }) {
+/** Erros estáveis de start_queue_entry (schema-55) → texto para o painel. Nunca repassa o banco. */
+const START_ERRORS: [RegExp, string][] = [
+  [/QUEUE_FORBIDDEN/, "Sem permissão para atender esta senha."],
+  [/QUEUE_ENTRY_NOT_FOUND/, "Senha não encontrada."],
+  [/QUEUE_ENTRY_NOT_WAITING/, "Esta senha não está mais aguardando."],
+  [/QUEUE_SERVICE_NOT_IN_TENANT/, "Serviço inválido."],
+  [/QUEUE_BARBER_NOT_IN_TENANT/, "Barbeiro inválido."],
+  [/QUEUE_PLAN_NONE/, "O cliente não tem plano ativo."],
+  [/QUEUE_PLAN_FIXED/, "Plano fixo não usa a fila. Cobre avulso ou use \"Remover um corte\"."],
+  [/Sem saldo de cortes/, "O plano não tem corte disponível."],
+];
+
+/**
+ * Admin: inicia o atendimento → comanda + IN_SERVICE numa transação só (start_queue_entry,
+ * schema-55). usePlan = "Usar plano" confirmado na cadeira pela equipe: o corte sai do plano
+ * por saldo (mesmo caminho da agenda) e fica registrado quem confirmou e quando. Sem usePlan,
+ * a comanda é avulsa. Nenhuma senha desconta plano sozinha (#100).
+ */
+export async function startQueue(
+  id: string,
+  opts?: { barberId?: string | null; serviceId?: string | null; usePlan?: boolean }
+) {
   const supabase = await createSupabaseServerClient();
-  const { data: entry } = await supabase
-    .from("queue_entries")
-    .select("tenant_id, client_id, service_id, barber_id, status")
-    .eq("id", id)
-    .maybeSingle();
-  if (!entry) return { ok: false as const, error: "Senha não encontrada." };
-
-  const serviceId = opts?.serviceId ?? (entry.service_id as string | null);
-  const barberId = opts?.barberId ?? (entry.barber_id as string | null);
-  const now = new Date().toISOString();
-
-  // Cria a comanda (segue o fluxo de pedidos atual): appointment CONFIRMED + item do serviço.
-  const { data: appt, error: aerr } = await supabase
-    .from("appointments")
-    .insert({
-      tenant_id: entry.tenant_id,
-      client_id: entry.client_id,
-      barber_id: barberId,
-      service_id: serviceId,
-      start_at: now,
-      status: "CONFIRMED",
-      service_started_at: now,
-    })
-    .select("id")
-    .single();
-  if (aerr) return { ok: false as const, error: aerr.message };
-
-  if (serviceId) {
-    const { data: svc } = await supabase
-      .from("services")
-      .select("name, price_brl, duration_min")
-      .eq("id", serviceId)
-      .maybeSingle();
-    await supabase.from("appointment_items").insert({
-      appointment_id: appt.id,
-      tenant_id: entry.tenant_id,
-      kind: "service",
-      ref_id: serviceId,
-      name: (svc?.name as string) ?? "Serviço",
-      price_brl: (svc?.price_brl as number) ?? 0,
-      qty: 1,
-      duration_min: (svc?.duration_min as number) ?? 0,
-      covered_by_plan: false,
-    });
+  const { data, error } = await supabase.rpc("start_queue_entry", {
+    p_entry_id: id,
+    p_use_plan: opts?.usePlan === true,
+    p_barber_id: opts?.barberId ?? null,
+    p_service_id: opts?.serviceId ?? null,
+  });
+  if (error) {
+    const msg = START_ERRORS.find(([re]) => re.test(error.message))?.[1] ?? "Não foi possível iniciar. Tente de novo.";
+    return { ok: false as const, error: msg };
   }
-
-  const { error: uerr } = await supabase
-    .from("queue_entries")
-    .update({ status: "IN_SERVICE", appointment_id: appt.id, barber_id: barberId, service_id: serviceId, started_at: now, called_at: now })
-    .eq("id", id);
-  if (uerr) return { ok: false as const, error: uerr.message };
 
   revalidatePath("/admin/fila");
   revalidatePath("/admin/pedidos");
-  return { ok: true as const, appointmentId: appt.id as string };
+  return { ok: true as const, appointmentId: data as string };
 }
 
 /** Admin: conclui o atendimento da fila. */

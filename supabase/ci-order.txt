@@ -42,6 +42,7 @@ schema-51-quick-queue-settings.sql
 schema-52-quick-queue-clients.sql
 schema-53-quick-queue-join.sql
 schema-54-quick-queue-limits.sql
+schema-55-queue-plan-confirm.sql
 schema-59-plan-switch-cancel-fixed.sql
 schema-60-retencao-registros-tecnicos.sql
 schema-61-quick-queue-ticket-owner.sql
