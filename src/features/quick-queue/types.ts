@@ -77,6 +77,7 @@ export type RegisterNameResult = { ok: true; next: "SERVICE" } | (QuickQueueActi
 export const QUICK_QUEUE_IDENTIFY_MESSAGES = {
   invalidPhone: "Confira o telefone com DDD.",
   invalidName: "Digite seu nome.",
+  nameLettersOnly: "Use só letras no nome.",
   failed: "Não deu certo. Tente de novo.",
   limited: "Muitas tentativas. Aguarde alguns minutos e tente de novo.",
   restart: "Comece de novo pelo telefone.",
