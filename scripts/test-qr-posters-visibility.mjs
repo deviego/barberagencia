@@ -12,6 +12,13 @@ const js = ts.transpileModule(readFileSync(file, "utf8"), {
 }).outputText;
 const { showQueuePoster, showQueuePosterHint, quickQueueOnFor, quickQueueLimitAlert } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 
+// Passos do cartaz A (#127/#145): módulo puro, sem canvas.
+const copyFile = path.resolve(path.dirname(file), "copy.ts");
+const copyJs = ts.transpileModule(readFileSync(copyFile, "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const { queuePosterSteps } = await import(`data:text/javascript;base64,${Buffer.from(copyJs).toString("base64")}`);
+
 let n = 0;
 function check(name, input, expected) {
   assert.equal(showQueuePoster(input), expected, name);
@@ -84,5 +91,14 @@ alert("fila rápida desconhecida", { total: 99, tenantCapHit: true }, undefined,
 alert("sem resumo (erro)", null, true, null);
 alert("total inválido", { total: Number.NaN, tenantCapHit: false }, true, null);
 alert("total ausente", { tenantCapHit: false }, true, null);
+
+// Passo 2 do cartaz A: telefone com a fila rápida ligada; conta com login.
+assert.equal(queuePosterSteps("PHONE")[1], "Digite o seu telefone", "passo 2 PHONE");
+assert.equal(queuePosterSteps("LOGIN")[1], "Entre na sua conta ou faça o cadastro", "passo 2 LOGIN");
+assert.equal(queuePosterSteps("PHONE").length, 3, "3 passos");
+assert.equal(queuePosterSteps("PHONE")[0], queuePosterSteps("LOGIN")[0], "passo 1 igual");
+assert.equal(queuePosterSteps("PHONE")[2], queuePosterSteps("LOGIN")[2], "passo 3 igual");
+assert.equal(queuePosterSteps("OUTRO")[1], "Entre na sua conta ou faça o cadastro", "valor desconhecido = conta");
+n += 6;
 
 console.log(`ok: ${n} casos`);
