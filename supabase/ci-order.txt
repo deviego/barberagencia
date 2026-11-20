@@ -40,4 +40,6 @@ schema-35-marketing-leads.sql
 schema-50-queue-totem-checks.sql
 schema-51-quick-queue-settings.sql
 schema-52-quick-queue-clients.sql
+schema-53-quick-queue-join.sql
 schema-59-plan-switch-cancel-fixed.sql
+schema-60-retencao-registros-tecnicos.sql
