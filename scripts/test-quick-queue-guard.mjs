@@ -338,8 +338,10 @@ await test('toda server action do módulo ("use server") passa pelo guard', () =
   for (const f of files) {
     const src = readFileSync(path.join(MOD, f), "utf8");
     if (!/^["']use server["']/m.test(src)) continue;
-    const exported = [...src.matchAll(/export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)\s*{([\s\S]*?)\n}/g)];
-    for (const [, name, , body] of exported) assert.match(body, /requireQuickQueueOpen\(/, `${f}: ${name}`);
+    // Aceita anotação de retorno ("): Promise<...> {"). Corpo = até a "}" sozinha na linha.
+    const exported = [...src.matchAll(/export\s+async\s+function\s+(\w+)\s*\([^)]*\)[^{]*{([\s\S]*?)\n}/g)];
+    assert.ok(exported.length > 0, `${f}: nenhuma ação encontrada para conferir`);
+    for (const [, name, body] of exported) assert.match(body, /requireQuickQueueOpen\(/, `${f}: ${name}`);
   }
 });
 
