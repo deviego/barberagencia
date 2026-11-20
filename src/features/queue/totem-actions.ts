@@ -253,8 +253,9 @@ export async function totemJoinQueue(
 
 /**
  * ADMIN (UNIT_ADMIN+/MASTER): renova a chave do totem (#103). A chave anterior deixa de valer na
- * hora em todas as funções do totem (todas passam por resolveTotemTenant). Registra quem e
- * quando (tenants.totem_key_rotated_*, schema-57) e o histórico em audit_log, sem a chave.
+ * hora em todas as funções do totem (todas passam por resolveTotemTenant). A chave fica só em
+ * totem_access_keys (schema-62). Registra quem e quando (tenants.totem_key_rotated_*,
+ * schema-57) e o histórico em audit_log, sem a chave.
  * Não mexe em senha nenhuma. A chave só volta para o painel do admin.
  */
 export async function regenerateTotemToken() {
@@ -263,17 +264,36 @@ export async function regenerateTotemToken() {
   const tenantId = user.tenantId;
   const admin = createSupabaseAdminClient();
   const token = randomBytes(32).toString("hex");
+  // 1) A chave fica só em totem_access_keys (exclusiva do servidor); a anterior deixa de valer
+  //    na hora (resolveTotemTenant lê dali).
   const { error } = await admin
-    .from("tenants")
-    .update({ totem_token: token, totem_key_rotated_at: new Date().toISOString(), totem_key_rotated_by: user.id })
-    .eq("id", tenantId);
+    .from("totem_access_keys")
+    .upsert({ tenant_id: tenantId, token, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" });
   if (error) return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
 
+  // 2) Quem e quando (#103). Depois da chave: a renovação só conta para ligar a fila rápida se a
+  //    chave mudou de fato. Se este registro falhar, o admin tenta de novo (renova outra vez).
+  const { error: rErr } = await admin
+    .from("tenants")
+    .update({ totem_key_rotated_at: new Date().toISOString(), totem_key_rotated_by: user.id })
+    .eq("id", tenantId);
+  if (rErr) {
+    console.error(`[totem] registro da renovação falhou (${rErr.code ?? "sem código"})`);
+    return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
+  }
+
+  // 3) Coluna antiga (até a schema-63) sem a chave. Sem a coluna: nada a fazer.
+  const { error: cErr } = await admin.from("tenants").update({ totem_token: null }).eq("id", tenantId);
+  if (cErr && cErr.code !== "42703" && cErr.code !== "PGRST204") {
+    console.error(`[totem] limpeza da chave antiga falhou (${cErr.code ?? "sem código"})`);
+  }
+
+  // 4) Histórico, sem a chave.
   const { error: aErr } = await admin.from("audit_log").insert({
     tenant_id: tenantId,
     user_id: user.id,
     action: "totem.key_rotated",
-    target: "tenants.totem_token",
+    target: "totem_access_keys.token",
     metadata: {},
   });
   if (aErr) console.error(`[totem] histórico da renovação indisponível (${aErr.code ?? "sem código"})`);

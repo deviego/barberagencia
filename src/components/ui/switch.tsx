@@ -3,26 +3,37 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
+/** Sem `checked`, o estado fica aqui dentro (como antes). Com `checked`, quem usa controla. */
 export function Switch({
   defaultChecked = false,
+  checked,
   onChange,
+  disabled = false,
+  ...aria
 }: {
   defaultChecked?: boolean;
+  checked?: boolean;
   onChange?: (v: boolean) => void;
+  disabled?: boolean;
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
 }) {
-  const [on, setOn] = useState(defaultChecked);
+  const [inner, setInner] = useState(defaultChecked);
+  const on = checked ?? inner;
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
+      disabled={disabled}
+      {...aria}
       onClick={() => {
         const v = !on;
-        setOn(v);
+        if (checked === undefined) setInner(v);
         onChange?.(v);
       }}
       className={cn(
-        "relative h-6 w-11 flex-shrink-0 rounded-pill border transition-colors",
+        "relative h-6 w-11 flex-shrink-0 rounded-pill border transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         on ? "border-accent bg-accent" : "border-border bg-inset"
       )}
     >

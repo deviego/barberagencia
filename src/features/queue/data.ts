@@ -279,11 +279,16 @@ export async function getQueueConfig(
   };
 }
 
-/** Token do totem do tenant (para montar o link nas Configurações). */
+/**
+ * Chave do totem da barbearia (para montar o link nas Configurações do admin). Fica só em
+ * totem_access_keys (schema-62), tabela exclusiva do servidor: nunca em tabela que a sessão
+ * do usuário lê. Quem chama já conferiu que é admin da barbearia.
+ */
 export async function getTotemToken(tenantId: string): Promise<string | null> {
   const admin = createSupabaseAdminClient();
-  const { data } = await admin.from("tenants").select("totem_token").eq("id", tenantId).maybeSingle();
-  return (data?.totem_token as string) ?? null;
+  const { data, error } = await admin.from("totem_access_keys").select("token").eq("tenant_id", tenantId).maybeSingle();
+  if (error) return null;
+  return (data?.token as string | undefined) ?? null;
 }
 
 export type TotemData = {
@@ -312,12 +317,11 @@ export type TotemTenant = {
 export async function resolveTotemTenant(slug: string, token: string): Promise<TotemTenant | null> {
   if (!slug || !token) return null;
   const admin = createSupabaseAdminClient();
-  const { data: t } = await admin
-    .from("tenants")
-    .select("id, name, queue_enabled, totem_token")
-    .eq("subdomain", slug)
-    .maybeSingle();
-  if (!t?.queue_enabled || !safeEqual(t?.totem_token as string | null, token)) return null;
+  const { data: t } = await admin.from("tenants").select("id, name, queue_enabled").eq("subdomain", slug).maybeSingle();
+  if (!t?.queue_enabled) return null;
+  // Chave só em totem_access_keys (schema-62). Erro na leitura = recusa (falha fechado).
+  const { data: k, error: kErr } = await admin.from("totem_access_keys").select("token").eq("tenant_id", t.id).maybeSingle();
+  if (kErr || !safeEqual((k?.token as string | undefined) ?? null, token)) return null;
 
   const { data: s } = await admin
     .from("tenant_settings")

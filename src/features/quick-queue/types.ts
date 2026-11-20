@@ -345,7 +345,11 @@ export const QUICK_QUEUE_ONBOARDING_MESSAGES = {
   ],
   rotate: "Renovar chave",
   later: "Fazer depois",
-  confirm: "O tablet do balcão vai precisar ser aberto de novo. Renovar?",
+  /** Confirmação da renovação (copy da PO, #157/#103). */
+  confirmTitle: "Renovar a chave do totem?",
+  confirm: "O totem do balcão para de funcionar até você abrir o novo acesso no tablet.",
+  confirmYes: "Renovar chave",
+  confirmNo: "Voltar",
   reminder: "Para ligar a fila rápida, renove a chave do totem.",
   oldAccess: "Este acesso não vale mais. Peça ajuda no balcão.",
 } as const;

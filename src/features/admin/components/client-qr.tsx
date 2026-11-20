@@ -15,12 +15,15 @@ import {
   type PosterModel,
   type QueueEntryMode,
 } from "./qr-posters/draw";
+import { QUICK_QUEUE_ADMIN_MESSAGES } from "@/features/quick-queue/types";
 
 type Props = {
   /** Link público do cliente: /b/<slug> (modelo B, Cadastro). */
   publicUrl: string;
   /** Link da fila do cliente: /b/<slug>/fila (modelo A). null = plano sem fila ou fila desligada. */
   queueUrl: string | null;
+  /** Fila no plano e ligada com a fila rápida desligada: avisa onde está o cartaz da fila (#102). */
+  queuePosterHint?: boolean;
   /** Como o cliente entra na fila hoje (muda o passo 2 do modelo A). */
   queueEntry: QueueEntryMode;
   slug: string;
@@ -101,7 +104,7 @@ function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): 
   );
 }
 
-export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, logoText, name, accent }: Props) {
+export function ClientQr({ publicUrl, queueUrl, queuePosterHint = false, queueEntry, slug, logoDataUrl, logoText, name, accent }: Props) {
   const previewRef = useRef<HTMLCanvasElement | null>(null);
   const [model, setModel] = useState<PosterModel>(queueUrl ? "QUEUE" : "SIGNUP");
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
@@ -237,11 +240,14 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="qr-cliente">
       <div className="flex items-center gap-2">
-        <div className="text-overline uppercase text-text-muted">QR code da barbearia</div>
         <QrCode size={16} className="text-text-muted" aria-hidden />
+        <h2 className="text-overline uppercase text-text-muted">QR para o cliente</h2>
       </div>
       <p className="text-caption text-text-2">
-        Cartaz pronto para imprimir em A4, com a sua logo. Cole na parede e o cliente aponta a câmera, sem pedir ajuda no balcão.
+        {canQueue
+          ? // Copy do #102: só com a fila do cliente disponível (o cartaz A leva para a fila).
+            "Imprima e deixe no balcão ou na parede. O cliente escaneia e pega a senha no celular."
+          : "Cartaz pronto para imprimir em A4, com a sua logo. Cole na parede e o cliente aponta a câmera, sem pedir ajuda no balcão."}
       </p>
 
       {canQueue && (
@@ -261,6 +267,12 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
             </button>
           ))}
         </div>
+      )}
+
+      {!canQueue && queuePosterHint && (
+        <p role="status" className="text-caption text-text-2">
+          {QUICK_QUEUE_ADMIN_MESSAGES.posterHint}
+        </p>
       )}
 
       {canQueue && modeChanged && activeModel === "QUEUE" && (
@@ -291,7 +303,7 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
             <FileText size={16} aria-hidden /> Baixar PDF
           </Button>
           <Button variant="outline" onClick={baixarQr} disabled={locked}>
-            <QrCode size={16} aria-hidden /> Baixar só o QR
+            <QrCode size={16} aria-hidden /> Baixar QR
           </Button>
           <Button variant="ghost" onClick={copy}>
             {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}

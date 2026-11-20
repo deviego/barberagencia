@@ -15,7 +15,9 @@ const U = A4_W / 794;
 
 export type PosterModel = "QUEUE" | "SIGNUP";
 /** Como o cliente entra na fila. Hoje só com login; a fila rápida ainda não está no ar. */
-export type QueueEntryMode = "LOGIN" | "PHONE";
+import { queuePosterSteps, type QueueEntryMode } from "./copy";
+
+export type { QueueEntryMode };
 
 export type PosterInput = {
   model: PosterModel;
@@ -90,8 +92,8 @@ function copyFor(input: PosterInput): { overline: string; title: [string, string
         { text: "acompanhe a sua vez", strong: true },
         { text: " sem ficar em pé esperando." },
       ],
-      // Passo 2 com conta: a fila sem conta (fila rápida) ainda não está no ar.
-      steps: ["Aponte a câmera do celular para o QR code", "Entre na sua conta ou faça o cadastro", "Pegue a senha e acompanhe a fila na tela"],
+      // Passo 2 conforme a entrada: telefone (fila rápida ligada) ou conta (#127, copy aprovada).
+      steps: queuePosterSteps(input.queueEntry),
     };
   }
   return {

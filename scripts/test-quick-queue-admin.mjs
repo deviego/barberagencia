@@ -26,7 +26,7 @@ function query(table) {
     if (q.op !== "select") {
       const k = table + ":" + q.op;
       d.calls[k] = (d.calls[k] ?? 0) + 1;
-      if (d.failAt?.[k]?.includes(d.calls[k])) return { data: null, error: { code: "XX001" } };
+      if (d.failAt?.[k]?.includes(d.calls[k])) return { data: null, error: { code: d.failCode ?? "XX001" } };
     }
     if (q.op === "update") {
       const hit = rows().filter((r) => match(r, q.filters));
@@ -132,12 +132,17 @@ function setDb({ role = "UNIT_ADMIN", tenantId = A, plan = "essencial", queue = 
         { tenant_id: B, trial_ends_at: PAST },
       ],
       audit_log: [],
+      totem_access_keys: [
+        { tenant_id: A, token: "tok-barbearia-a" },
+        { tenant_id: B, token: "tok-barbearia-b" },
+      ],
     },
   };
 }
 const db = () => globalThis.__adm;
 const tenant = (id) => db().tables.tenants.find((t) => t.id === id);
 const settings = (id) => db().tables.tenant_settings.find((s) => s.tenant_id === id);
+const key = (id) => db().tables.totem_access_keys.find((k) => k.tenant_id === id)?.token;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let passed = 0;
@@ -257,30 +262,52 @@ await test("#148: qualquer teto da barbearia (inclusive os da identificação) l
 });
 
 // ---- #103: renovar a chave -------------------------------------------------------------------
-await test("renovar: chave nova longa, anterior deixa de valer, registra quem e quando, sem a chave no registro", async () => {
+await test("renovar: chave nova longa só em totem_access_keys, anterior deixa de valer, registra quem e quando, sem a chave no registro", async () => {
   setDb();
-  const before = tenant(A).totem_token;
+  const before = key(A);
   const r = await regenerateTotemToken();
   assert.equal(r.ok, true);
   assert.match(r.token, /^[0-9a-f]{64}$/);
-  assert.notEqual(tenant(A).totem_token, before);
-  assert.equal(tenant(A).totem_token, r.token);
+  assert.notEqual(key(A), before);
+  assert.equal(key(A), r.token);
+  assert.equal(tenant(A).totem_token, null, "coluna antiga sem a chave");
   assert.equal(tenant(A).totem_key_rotated_by, ADMIN_A);
   assert.ok(tenant(A).totem_key_rotated_at);
   const log = db().tables.audit_log[0];
   assert.equal(log.action, "totem.key_rotated");
   assert.equal(log.user_id, ADMIN_A);
   assert.doesNotMatch(JSON.stringify(log), new RegExp(r.token));
-  assert.equal(tenant(B).totem_token, "tok-barbearia-b");
+  assert.equal(key(B), "tok-barbearia-b");
+});
+
+await test("renovar: se o registro de quem/quando falha, responde erro (o admin renova de novo)", async () => {
+  setDb({ failAt: { "tenants:update": [1] } });
+  const r = await regenerateTotemToken();
+  assert.equal(r.ok, false);
+  assert.equal(tenant(A).totem_key_rotated_at, null);
+});
+
+await test("renovar sem a coluna antiga (depois da schema-63): sem erro no log", async () => {
+  setDb({ failAt: { "tenants:update": [2] } }); // 2ª escrita em tenants = limpeza da coluna
+  globalThis.__adm.failCode = "PGRST204";
+  const logs = [];
+  const orig = console.error;
+  console.error = (...a) => logs.push(a.join(" "));
+  try {
+    assert.equal((await regenerateTotemToken()).ok, true);
+  } finally {
+    console.error = orig;
+  }
+  assert.ok(!logs.some((l) => l.includes("limpeza da chave antiga")));
 });
 
 await test("renovar mexe só em tenants da própria barbearia (nenhuma escrita em senha)", async () => {
   setDb();
   await regenerateTotemToken();
   const tables = new Set(db().writes.map((w) => w.table));
-  assert.deepEqual([...tables].sort(), ["audit_log", "tenants"]);
-  const upd = db().writes.find((w) => w.table === "tenants");
-  assert.deepEqual(upd.filters, { id: A });
+  assert.deepEqual([...tables].sort(), ["audit_log", "tenants", "totem_access_keys"]);
+  for (const w of db().writes.filter((w) => w.table === "tenants")) assert.deepEqual(w.filters, { id: A });
+  assert.equal(db().writes.find((w) => w.table === "totem_access_keys").values.tenant_id, A);
 });
 
 await test("cliente, sem sessão ou admin de outra barbearia: não renova nem liga a desta", async () => {
@@ -292,7 +319,7 @@ await test("cliente, sem sessão ou admin de outra barbearia: não renova nem li
   assert.equal((await setQuickQueueEnabled(true)).code, "FORBIDDEN");
   setDb({ tenantId: B }); // admin da B: só alcança a B
   await regenerateTotemToken();
-  assert.equal(tenant(A).totem_token, "tok-barbearia-a");
+  assert.equal(key(A), "tok-barbearia-a");
   assert.equal(tenant(A).totem_key_rotated_at, null);
 });
 
@@ -307,7 +334,7 @@ await test("a chave não aparece no registro, no QR do cliente nem na página p�
   const fn = actions.slice(actions.indexOf("export async function regenerateTotemToken"));
   const audit = fn.slice(fn.indexOf('from("audit_log")'), fn.indexOf("});", fn.indexOf('from("audit_log")')));
   // Único "token" permitido no registro é o nome da coluna em target; nunca o valor.
-  assert.doesNotMatch(audit.replace('"tenants.totem_token"', ""), /token/i);
+  assert.doesNotMatch(audit.replace('"totem_access_keys.token"', ""), /token/i);
   assert.match(audit, /metadata: \{\}/);
   assert.doesNotMatch(fn, /console\.[a-z]+\([^)]*token/);
 });
