@@ -29,11 +29,13 @@ type Props = {
   /** Iniciais da marca, usadas quando não há logo (ou ela não carrega). */
   logoText: string;
   name: string;
+  /** Cor da marca da barbearia; sem ela, o cartaz usa o dourado padrão. */
+  accent: string | null;
 };
 
 const ERROR = "Não deu certo. Tente de novo.";
 const PREVIEW_SCALE = 0.25; // 620 × 877 no canvas da pré-visualização
-const SEAL_SRC = "/barber-agencia-logo.jpeg";
+const SEAL_SRC = "/barber-agencia-selo.png";
 const MODE_KEY = (slug: string) => `bb-cartaz-fila-modo:${slug}`;
 
 const MODELS: { key: PosterModel; label: string }[] = [
@@ -57,8 +59,9 @@ async function loadFonts(): Promise<PosterInput["fonts"]> {
   const text = `${css.getPropertyValue("--font-inter").trim() || "Inter"}, system-ui, sans-serif`;
   try {
     await Promise.all([
-      document.fonts.load(`800 100px ${display}`),
+      document.fonts.load(`700 100px ${display}`),
       document.fonts.load(`400 40px ${text}`),
+      document.fonts.load(`600 40px ${text}`),
       document.fonts.load(`700 40px ${text}`),
     ]);
   } catch {
@@ -98,7 +101,7 @@ function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): 
   );
 }
 
-export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, logoText, name }: Props) {
+export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, logoText, name, accent }: Props) {
   const previewRef = useRef<HTMLCanvasElement | null>(null);
   const [model, setModel] = useState<PosterModel>(queueUrl ? "QUEUE" : "SIGNUP");
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
@@ -142,7 +145,7 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
   }, [canQueue, slug, queueEntry]);
 
   function input(): PosterInput {
-    return { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, queueEntry, fonts: fonts! };
+    return { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, accent, queueEntry, fonts: fonts! };
   }
 
   useEffect(() => {
@@ -151,11 +154,11 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     try {
-      drawPoster(ctx, { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, queueEntry, fonts }, PREVIEW_SCALE);
+      drawPoster(ctx, { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, accent, queueEntry, fonts }, PREVIEW_SCALE);
     } catch {
       setError(ERROR);
     }
-  }, [fonts, logo, seal, activeModel, url, name, logoText, queueEntry]);
+  }, [fonts, logo, seal, accent, activeModel, url, name, logoText, queueEntry]);
 
   async function run(task: () => Promise<void>) {
     if (busy) return;
@@ -275,7 +278,7 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
             height={Math.round(A4_H * PREVIEW_SCALE)}
             role="img"
             aria-label={`Pré-visualização do cartaz ${activeModel === "QUEUE" ? "Fila digital" : "Cadastro do cliente"}`}
-            className="h-auto w-full rounded-md border border-border bg-[#0B0A08] shadow-sm"
+            className="h-auto w-full rounded-md border border-border bg-black shadow-sm"
             style={{ aspectRatio: `${A4_W} / ${A4_H}` }}
           />
         </div>

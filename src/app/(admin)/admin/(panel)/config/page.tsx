@@ -102,6 +102,7 @@ export default async function ConfigPage() {
         logoDataUrl={logoData}
         logoText={tenant.branding.logoText}
         name={tenant.name}
+        accent={branding?.accent ?? tenant.branding.accent ?? null}
       />
 
       <WhatsAppConnect />

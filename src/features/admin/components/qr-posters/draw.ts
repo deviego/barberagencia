@@ -1,16 +1,20 @@
 import QRCode from "qrcode";
 
 /**
- * Cartazes de QR (#127): A4 retrato, fundo escuro com dourado. Tudo é desenhado no canvas em
- * coordenadas de impressão (2480 × 3508 px = A4 a 300 dpi); a pré-visualização usa o mesmo
- * desenho em escala menor. 1 mm = 11,81 px.
+ * Cartazes de QR (#127), iguais ao modelo aprovado: A4 retrato, fundo preto com brilho no topo,
+ * logo num círculo branco, título em Big Shoulders, QR numa caixa branca e 3 passos.
+ * Tudo é desenhado em coordenadas de impressão (2480 × 3508 px = A4 a 300 dpi). As medidas
+ * abaixo estão em "px do modelo" (página de 794 × 1123) e viram px de impressão por `U`.
+ * Onde o modelo usa a cor da marca, entra a cor da barbearia (`accent`).
  */
 export const A4_W = 2480;
 export const A4_H = 3508;
 const MM = A4_W / 210;
+/** 1 px do modelo (794 px de largura) em px de impressão. */
+const U = A4_W / 794;
 
 export type PosterModel = "QUEUE" | "SIGNUP";
-/** Como o cliente entra na fila: com login (hoje) ou pelo telefone (fila rápida, #123/#102). */
+/** Como o cliente entra na fila. Hoje só com login; a fila rápida ainda não está no ar. */
 export type QueueEntryMode = "LOGIN" | "PHONE";
 
 export type PosterInput = {
@@ -19,17 +23,51 @@ export type PosterInput = {
   name: string;
   initials: string;
   logo: HTMLImageElement | null;
-  /** Selo da Barber Agência para o rodapé (public/barber-agencia-logo.jpeg). null = anel "BA" desenhado. */
+  /** Selo redondo da Barber Agência para o rodapé (public/barber-agencia-selo.png). null = "BA" desenhado. */
   seal?: HTMLImageElement | null;
+  /** Cor da marca da barbearia (#RRGGBB). Sem cor válida, o dourado padrão. */
+  accent?: string | null;
   queueEntry: QueueEntryMode;
   fonts: { display: string; text: string };
 };
 
-const GOLD = "#D4B062";
-const GOLD_DIM = "rgba(212,176,98,0.55)";
-const WHITE = "#F5F2EA";
-const BG = "#0B0A08";
-const BOX = "#141210";
+/** Dourado padrão da plataforma: o mesmo do modelo. */
+export const DEFAULT_ACCENT = "#C9A24B";
+/** Dourado da Barber Agência no rodapé ("Tecnologia Barber Agência"): não muda com a barbearia. */
+const BA_GOLD = DEFAULT_ACCENT;
+const TEXT = "#F5F1E8";
+const TEXT_2 = "#B9B3A4";
+const BOX = "#121212";
+const BG = "#000000";
+
+type RGB = [number, number, number];
+
+function parseHex(hex: string | null | undefined): RGB | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? "").trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+const rgb = (c: RGB, a = 1) => (a === 1 ? `rgb(${c.map(clamp).join(",")})` : `rgba(${c.map(clamp).join(",")},${a})`);
+const shift = (c: RGB, d: RGB): RGB => [c[0] + d[0], c[1] + d[1], c[2] + d[2]];
+
+/**
+ * Paleta do cartaz a partir da cor da marca. Com o dourado padrão sai exatamente a do modelo:
+ * título #DDB85F, destaques e números #E8C873, brilho do topo #2A2210 → #0A0906 → preto.
+ */
+function palette(accent: string | null | undefined) {
+  const c = parseHex(accent) ?? (parseHex(DEFAULT_ACCENT) as RGB);
+  return {
+    accent: rgb(c),
+    line: rgb(c, 0.6),
+    title: rgb(shift(c, [20, 22, 20])),
+    light: rgb(shift(c, [31, 38, 40])),
+    glow0: rgb([c[0] * 0.21, c[1] * 0.21, c[2] * 0.21]),
+    glow1: rgb([c[0] * 0.05, c[1] * 0.05, c[2] * 0.05]),
+  };
+}
 
 /** Nenhum cartaz leva o acesso do totem (link, chave ou token). */
 export function assertPosterUrl(url: string): string {
@@ -52,11 +90,8 @@ function copyFor(input: PosterInput): { overline: string; title: [string, string
         { text: "acompanhe a sua vez", strong: true },
         { text: " sem ficar em pé esperando." },
       ],
-      steps: [
-        "Aponte a câmera do celular para o QR code",
-        input.queueEntry === "PHONE" ? "Digite o seu telefone" : "Entre na sua conta ou faça o cadastro",
-        "Pegue a senha e acompanhe a fila na tela",
-      ],
+      // Passo 2 com conta: a fila sem conta (fila rápida) ainda não está no ar.
+      steps: ["Aponte a câmera do celular para o QR code", "Entre na sua conta ou faça o cadastro", "Pegue a senha e acompanhe a fila na tela"],
     };
   }
   return {
@@ -64,30 +99,44 @@ function copyFor(input: PosterInput): { overline: string; title: [string, string
     title: ["FAÇA O SEU", "CADASTRO"],
     subtitle: [
       { text: "Cadastre-se na " },
-      { text: input.name, strong: true },
+      { text: input.name.trim(), strong: true },
       { text: " e agende o seu próximo corte pelo celular, quando quiser." },
     ],
-    steps: [
-      "Aponte a câmera do celular para o QR code",
-      'Toque em "Cadastrar" e preencha os seus dados',
-      "Escolha o serviço, o barbeiro e o horário",
-    ],
+    steps: ["Aponte a câmera do celular para o QR code", 'Toque em "Cadastrar" e preencha os seus dados', "Escolha o serviço, o barbeiro e o horário"],
   };
 }
 
-function font(weight: number, size: number, family: string) {
-  return `${weight} ${Math.round(size)}px ${family}`;
+/**
+ * Texto na escala do modelo: a fonte é pedida no tamanho do modelo (ex.: 18,66 px) e o desenho
+ * é ampliado para a impressão. O Inter muda de desenho conforme o tamanho pedido (eixo óptico);
+ * pedir 58 px direto daria o corte de título, mais estreito, e as linhas quebrariam em outro lugar.
+ */
+function fill(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(U, U);
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
 }
 
-/** Texto com espaçamento entre letras, centralizado em cx. */
+/** Largura do texto em px de impressão (a fonte está no tamanho do modelo). */
+function measure(ctx: CanvasRenderingContext2D, text: string) {
+  return ctx.measureText(text).width * U;
+}
+
+function font(weight: number, size: number, family: string) {
+  return `${weight} ${Math.round(size * 100) / 100}px ${family}`;
+}
+
+/** Texto com espaçamento entre letras (como o letter-spacing do CSS), centralizado em cx. */
 function spacedText(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number, spacing: number) {
   const chars = [...text];
-  const widths = chars.map((c) => ctx.measureText(c).width);
-  const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1);
+  const widths = chars.map((c) => measure(ctx, c));
+  const total = widths.reduce((a, b) => a + b, 0) + spacing * chars.length;
   let x = cx - total / 2;
   ctx.textAlign = "left";
   chars.forEach((c, i) => {
-    ctx.fillText(c, x, y);
+    fill(ctx, c, x, y);
     x += widths[i] + spacing;
   });
   ctx.textAlign = "center";
@@ -105,7 +154,7 @@ function wrapSegments(ctx: CanvasRenderingContext2D, segs: Seg[], maxW: number, 
   }
   const width = (w: Word) => {
     ctx.font = w.strong ? strong : normal;
-    return ctx.measureText(w.text).width;
+    return measure(ctx, w.text);
   };
   const lines: Word[][] = [];
   let line: Word[] = [];
@@ -131,7 +180,7 @@ function wrapSegments(ctx: CanvasRenderingContext2D, segs: Seg[], maxW: number, 
 function lineWidth(ctx: CanvasRenderingContext2D, line: Word[], normal: string, strong: string) {
   return line.reduce((sum, w) => {
     ctx.font = w.strong ? strong : normal;
-    return sum + ctx.measureText(w.text).width;
+    return sum + measure(ctx, w.text);
   }, 0);
 }
 
@@ -140,7 +189,7 @@ function wrapPlain(ctx: CanvasRenderingContext2D, text: string, maxW: number): s
   let line = "";
   for (const word of text.split(" ")) {
     const next = line ? `${line} ${word}` : word;
-    if (line && ctx.measureText(next).width > maxW) {
+    if (line && measure(ctx, next) > maxW) {
       out.push(line);
       line = word;
     } else line = next;
@@ -158,7 +207,8 @@ const QR_MAX_PX = 900; // 7,6 cm
  * 7,6 cm, o maior que couber em `avail`. Se nem 7 cm couber, 7 cm vence (o cartaz se ajusta).
  */
 export function qrLayout(url: string, avail: number) {
-  const qr = QRCode.create(url, { errorCorrectionLevel: "M" });
+  // Correção H, como no modelo (QR mais denso e que aguenta sujeira/dobra no papel).
+  const qr = QRCode.create(url, { errorCorrectionLevel: "H" });
   const n = qr.modules.size;
   const minCell = Math.ceil(QR_MIN_PX / n);
   const maxCell = Math.max(minCell, Math.floor(QR_MAX_PX / n));
@@ -178,209 +228,214 @@ function drawQr(ctx: CanvasRenderingContext2D, layout: ReturnType<typeof qrLayou
   }
 }
 
-/** Logo inteira (sem cortar nem distorcer) dentro do círculo dourado; sem logo, as iniciais. */
-function drawLogoCircle(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, input: PosterInput) {
-  ctx.save();
+/** Logo no círculo branco com borda da cor da marca, preenchendo o círculo (como no modelo). */
+function drawLogoCircle(ctx: CanvasRenderingContext2D, cx: number, cy: number, input: PosterInput, accent: string) {
+  const outer = 80 * U;
+  const border = 3 * U;
+  const inner = outer - border;
   ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = BOX;
+  ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+  ctx.fillStyle = "#FFFFFF";
   ctx.fill();
-  ctx.lineWidth = 14;
-  ctx.strokeStyle = GOLD;
-  ctx.stroke();
-  ctx.restore();
 
   if (input.logo && input.logo.width > 0) {
-    const side = r * Math.SQRT2 * 0.98; // quadrado inscrito: a logo cabe inteira
-    const k = Math.min(side / input.logo.width, side / input.logo.height);
+    const k = Math.max((inner * 2) / input.logo.width, (inner * 2) / input.logo.height);
     const w = input.logo.width * k;
     const h = input.logo.height * k;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cx, cy, r - 7, 0, Math.PI * 2);
+    ctx.arc(cx, cy, inner, 0, Math.PI * 2);
     ctx.clip();
     ctx.drawImage(input.logo, cx - w / 2, cy - h / 2, w, h);
     ctx.restore();
-    return;
+  } else {
+    const initials = (input.initials || "").trim().slice(0, 2).toUpperCase() || "BB";
+    ctx.fillStyle = BOX;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = font(700, (inner * 1.05) / U, input.fonts.display);
+    fill(ctx, initials, cx, cy + inner * 0.04);
+    ctx.textBaseline = "alphabetic";
   }
-  const initials = (input.initials || "").trim().slice(0, 2).toUpperCase() || "BB";
-  ctx.fillStyle = GOLD;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = font(800, r * 0.95, input.fonts.display);
-  ctx.fillText(initials, cx, cy + r * 0.04);
-  ctx.textBaseline = "alphabetic";
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, outer - border / 2, 0, Math.PI * 2);
+  ctx.lineWidth = border;
+  ctx.strokeStyle = accent;
+  ctx.stroke();
 }
 
 /** Desenha o cartaz inteiro. `scale` = tamanho do canvas / A4_W. */
 export function drawPoster(ctx: CanvasRenderingContext2D, input: PosterInput, scale = 1) {
   const { display, text } = input.fonts;
   const copy = copyFor(input);
-  const W = A4_W;
-  const cx = W / 2;
+  const pal = palette(input.accent);
+  const cx = A4_W / 2;
 
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
 
-  // Fundo escuro com brilho dourado no topo
+  // Fundo: preto com brilho da cor da marca no topo (elipse a partir do centro de cima).
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, A4_W, A4_H);
-  const glow = ctx.createRadialGradient(cx, 0, 0, cx, 0, A4_H * 0.55);
-  glow.addColorStop(0, "rgba(212,176,98,0.14)");
-  glow.addColorStop(1, "rgba(212,176,98,0)");
+  ctx.save();
+  ctx.scale(1, A4_H / A4_W);
+  const r = Math.hypot(A4_W / 2, A4_W); // canto mais distante, na escala da elipse
+  const glow = ctx.createRadialGradient(cx, 0, 0, cx, 0, r);
+  glow.addColorStop(0, pal.glow0);
+  glow.addColorStop(0.4, pal.glow1);
+  glow.addColorStop(0.72, BG);
   ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, A4_W, A4_H);
+  ctx.fillRect(0, 0, A4_W, A4_W);
+  ctx.restore();
 
-  // Borda dourada fina a 11 mm do papel (mínimo pedido: 10 mm)
-  const inset = Math.round(11 * MM);
-  ctx.strokeStyle = GOLD_DIM;
-  ctx.lineWidth = 5;
-  ctx.strokeRect(inset, inset, A4_W - inset * 2, A4_H - inset * 2);
-  const innerW = A4_W - inset * 2 - 2 * 110;
+  // Moldura fina a 30 px do papel (como no modelo).
+  ctx.strokeStyle = pal.line;
+  ctx.lineWidth = U;
+  ctx.strokeRect(30.5 * U, 30.5 * U, 733 * U, 1062 * U);
 
   // Logo
-  drawLogoCircle(ctx, cx, 450, 240, input);
+  drawLogoCircle(ctx, cx, 143.5 * U, input, pal.accent);
 
-  // Sobretítulo
-  ctx.textAlign = "center";
-  ctx.fillStyle = GOLD;
-  ctx.font = font(700, 44, text);
-  spacedText(ctx, copy.overline, cx, 800, 22);
+  // Sobretítulo (letter-spacing .42em)
+  ctx.fillStyle = pal.accent;
+  ctx.font = font(600, 13.33, text);
+  spacedText(ctx, copy.overline, cx, 259 * U, 13.33 * 0.42 * U);
 
-  // Título (2 linhas), diminui se precisar
-  let titleSize = 230;
-  ctx.font = font(800, titleSize, display);
-  while (titleSize > 120 && Math.max(...copy.title.map((t) => ctx.measureText(t).width)) > innerW) {
-    titleSize -= 6;
-    ctx.font = font(800, titleSize, display);
+  // Título em 2 linhas; só diminui se não couber (o texto é fixo, então não acontece).
+  let titleSize = 74.66;
+  ctx.font = font(700, titleSize, display);
+  const titleMax = 680 * U;
+  while (Math.max(...copy.title.map((t) => measure(ctx, t))) > titleMax) {
+    titleSize -= 1;
+    ctx.font = font(700, titleSize, display);
   }
-  ctx.fillText(copy.title[0], cx, 1060);
-  ctx.fillText(copy.title[1], cx, 1060 + titleSize * 0.95);
+  ctx.fillStyle = pal.title;
+  fill(ctx, copy.title[0], cx, 335 * U);
+  fill(ctx, copy.title[1], cx, 402 * U);
 
-  // Subtítulo com destaque dourado: diminui e quebra linha até caber em 3 linhas
-  const subTop = 1060 + titleSize * 0.95 + 150;
-  let subSize = 56;
+  // Subtítulo: até 2 linhas com destaque; nome muito longo diminui a letra e, no limite, vai a 3 linhas.
+  let subSize = 18.66;
   let lines: Word[][] = [];
   let normal = "";
   let strong = "";
-  for (; subSize >= 38; subSize -= 2) {
+  for (; subSize >= 15; subSize -= 0.5) {
     normal = font(400, subSize, text);
     strong = font(700, subSize, text);
-    lines = wrapSegments(ctx, copy.subtitle, Math.min(innerW - 120, 1700), normal, strong);
-    if (lines.length <= 3) break;
+    lines = wrapSegments(ctx, copy.subtitle, 545 * U, normal, strong);
+    if (lines.length <= 2) break;
   }
-  const subLead = subSize * 1.4;
+  if (lines.length > 3) lines = lines.slice(0, 3);
+  const subLead = 26 * U * (subSize / 18.66);
   lines.forEach((line, i) => {
-    const total = lineWidth(ctx, line, normal, strong);
-    let x = cx - total / 2;
+    let x = cx - lineWidth(ctx, line, normal, strong) / 2;
     ctx.textAlign = "left";
     for (const w of line) {
       ctx.font = w.strong ? strong : normal;
-      ctx.fillStyle = w.strong ? GOLD : WHITE;
-      ctx.fillText(w.text, x, subTop + i * subLead);
-      x += ctx.measureText(w.text).width;
+      ctx.fillStyle = w.strong ? pal.light : TEXT;
+      fill(ctx, w.text, x, 442 * U + i * subLead);
+      x += measure(ctx, w.text);
     }
   });
   ctx.textAlign = "center";
+  const subLast = 442 * U + (lines.length - 1) * subLead;
 
-  // De baixo para cima: rodapé fixo, passos logo acima dele, QR no espaço que sobra.
-  const footY = A4_H - inset - 190;
-  const sealR = 82;
-  const stepH = 330;
-  const stepY = footY - sealR - 80 - stepH;
-
-  // QR: caixa branca com moldura dourada e 50 px de margem branca. Caixa entre 927 e 1000 px:
-  // os módulos ficam entre 827 px (7 cm, o mínimo) e 900 px (7,6 cm).
-  const subBottom = subTop + (lines.length - 1) * subLead;
-  const space = stepY - 80 - (subBottom + 90);
-  const QR_PAD = 50; // margem branca em volta dos módulos
-  const qrL = qrLayout(input.url, space - QR_PAD * 2);
-  const box = qrL.side + QR_PAD * 2;
+  // QR: caixa branca de 318 px com borda de 4 px da cor da marca. Os módulos nunca ficam
+  // abaixo de 7 cm; a caixa só cresce se os módulos + margem branca não couberem nela.
+  const border = 4 * U;
+  const qrL = qrLayout(input.url, 0);
+  const pad = Math.max(qrL.cell * 2, (318 * U - border * 2 - qrL.side) / 2);
+  const box = qrL.side + (pad + border) * 2;
+  const boxY = Math.max(501 * U, subLast + 33 * U);
   const boxX = cx - box / 2;
-  const boxY = subBottom + 90 + Math.max(0, (space - box) / 2);
   ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(boxX, boxY, box, box);
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 14;
-  ctx.strokeRect(boxX - 7, boxY - 7, box + 14, box + 14);
-  drawQr(ctx, qrL, boxX + QR_PAD, boxY + QR_PAD);
+  ctx.strokeStyle = pal.accent;
+  ctx.lineWidth = border;
+  ctx.strokeRect(boxX + border / 2, boxY + border / 2, box - border, box - border);
+  drawQr(ctx, qrL, cx - qrL.side / 2, boxY + border + pad);
 
   // 3 passos
-  const gap = 60;
-  const stepsX = inset + 80;
-  const stepW = (A4_W - stepsX * 2 - gap * 2) / 3;
+  const stepY = Math.max(846 * U, boxY + box + 27 * U);
+  const stepH = 105 * U;
+  const gap = 19 * U;
+  const stepW = ((673 - 38) / 3) * U; // 3 colunas e 2 vãos de 19 em 673 px, como no modelo
+  const stepsX = cx - (stepW * 3 + gap * 2) / 2;
   copy.steps.forEach((s, i) => {
     const x = stepsX + i * (stepW + gap);
     ctx.fillStyle = BOX;
     ctx.fillRect(x, stepY, stepW, stepH);
-    ctx.strokeStyle = GOLD_DIM;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(x, stepY, stepW, stepH);
-    ctx.fillStyle = GOLD;
-    ctx.font = font(800, 104, display);
-    ctx.fillText(String(i + 1), x + stepW / 2, stepY + 125);
-    let size = 44;
+    ctx.strokeStyle = pal.line;
+    ctx.lineWidth = U;
+    ctx.strokeRect(x + U / 2, stepY + U / 2, stepW - U, stepH - U);
+    ctx.fillStyle = pal.light;
+    ctx.font = font(700, 29.33, display);
+    fill(ctx, String(i + 1), x + stepW / 2, stepY + 42 * U);
+    let size = 14;
     ctx.font = font(400, size, text);
-    let stepLines = wrapPlain(ctx, s, stepW - 70);
-    while (stepLines.length > 3 && size > 34) {
-      size -= 2;
+    const textMax = stepW - 28 * U; // borda + ~13 px de respiro de cada lado, como no modelo
+    let stepLines = wrapPlain(ctx, s, textMax);
+    while (stepLines.length > 2 && size > 12) {
+      size -= 0.5;
       ctx.font = font(400, size, text);
-      stepLines = wrapPlain(ctx, s, stepW - 70);
+      stepLines = wrapPlain(ctx, s, textMax);
     }
-    ctx.fillStyle = WHITE;
-    stepLines.forEach((l, j) => ctx.fillText(l, x + stepW / 2, stepY + 205 + j * size * 1.3));
+    ctx.fillStyle = TEXT;
+    stepLines.forEach((l, j) => fill(ctx, l, x + stepW / 2, stepY + 65 * U + j * 19 * U));
   });
 
-  // Rodapé: selo + Tecnologia Barber Agência · barberagencia.com
-  ctx.font = font(400, 40, text);
+  // Rodapé: selo + "Tecnologia Barber Agência" / barberagencia.com (cores da Barber Agência).
+  const sealR = 25 * U;
+  const footY = 1046.5 * U; // centro do selo
+  const fs = 12.66; // px do modelo (o texto é desenhado na escala do modelo)
+  ctx.font = font(400, fs, text);
   const l1a = "Tecnologia ";
   const l1b = "Barber Agência";
-  const w1a = ctx.measureText(l1a).width;
-  ctx.font = font(700, 40, text);
-  const w1b = ctx.measureText(l1b).width;
-  ctx.font = font(400, 38, text);
-  const w2 = ctx.measureText("barberagencia.com").width;
+  const w1a = measure(ctx, l1a);
+  ctx.font = font(700, fs, text);
+  const w1b = measure(ctx, l1b);
+  ctx.font = font(400, fs, text);
+  const w2 = measure(ctx, "barberagencia.com");
   const textW = Math.max(w1a + w1b, w2);
-  const groupW = sealR * 2 + 40 + textW;
+  const sealGap = 16.5 * U;
+  const groupW = sealR * 2 + sealGap + textW;
   const sealCx = cx - groupW / 2 + sealR;
   ctx.beginPath();
   ctx.arc(sealCx, footY, sealR, 0, Math.PI * 2);
   ctx.fillStyle = BG;
   ctx.fill();
   if (input.seal && input.seal.width > 0) {
-    // O arquivo é uma página retrato com o nome dourado no meio: recorta um quadrado em volta do nome.
-    const crop = Math.min(input.seal.width, input.seal.height) * 0.8;
-    const sx = (input.seal.width - crop) / 2;
-    const sy = input.seal.height * 0.49 - crop / 2;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(sealCx, footY, sealR - 3, 0, Math.PI * 2);
+    ctx.arc(sealCx, footY, sealR, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(input.seal, sx, sy, crop, crop, sealCx - sealR, footY - sealR, sealR * 2, sealR * 2);
+    ctx.drawImage(input.seal, sealCx - sealR, footY - sealR, sealR * 2, sealR * 2);
     ctx.restore();
   } else {
-    ctx.fillStyle = GOLD;
-    ctx.font = font(800, 78, display);
+    ctx.fillStyle = BA_GOLD;
+    ctx.font = font(700, (sealR * 0.95) / U, display);
     ctx.textBaseline = "middle";
-    ctx.fillText("BA", sealCx, footY + 4);
+    fill(ctx, "BA", sealCx, footY + sealR * 0.05);
     ctx.textBaseline = "alphabetic";
   }
   ctx.beginPath();
-  ctx.arc(sealCx, footY, sealR, 0, Math.PI * 2);
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = GOLD;
+  ctx.arc(sealCx, footY, sealR - U / 2, 0, Math.PI * 2);
+  ctx.lineWidth = U;
+  ctx.strokeStyle = BA_GOLD;
   ctx.stroke();
-  const tx = sealCx + sealR + 40;
+  const tx = sealCx + sealR + sealGap;
   ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(245,242,234,0.75)";
-  ctx.font = font(400, 40, text);
-  ctx.fillText(l1a, tx, footY - 8);
-  ctx.fillStyle = WHITE;
-  ctx.font = font(700, 40, text);
-  ctx.fillText(l1b, tx + w1a, footY - 8);
-  ctx.fillStyle = "rgba(245,242,234,0.75)";
-  ctx.font = font(400, 38, text);
-  ctx.fillText("barberagencia.com", tx, footY + 50);
+  ctx.fillStyle = TEXT_2;
+  ctx.font = font(400, fs, text);
+  fill(ctx, l1a, tx, 1042 * U);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = font(700, fs, text);
+  fill(ctx, l1b, tx + w1a, 1042 * U);
+  ctx.fillStyle = TEXT_2;
+  ctx.font = font(400, fs, text);
+  fill(ctx, "barberagencia.com", tx, 1060 * U);
   ctx.textAlign = "center";
 
   ctx.restore();
@@ -406,12 +461,12 @@ export function drawQrOnly(ctx: CanvasRenderingContext2D, url: string, size: num
     const k = Math.min(side / logo.width, side / logo.height);
     ctx.drawImage(logo, size / 2 - (logo.width * k) / 2, size / 2 - (logo.height * k) / 2, logo.width * k, logo.height * k);
   } else {
-    ctx.fillStyle = BG;
+    ctx.fillStyle = BOX;
     ctx.fillRect(x, x, side, side);
-    ctx.fillStyle = GOLD;
+    ctx.fillStyle = BA_GOLD;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = font(800, side * 0.55, fonts.display);
+    ctx.font = font(700, side * 0.55, fonts.display);
     ctx.fillText((initials || "BB").slice(0, 2).toUpperCase(), size / 2, size / 2 + side * 0.03);
   }
 }
