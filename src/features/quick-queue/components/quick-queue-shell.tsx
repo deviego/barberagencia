@@ -48,6 +48,7 @@ export function QuickQueueShell({
       </main>
 
       <footer className="relative flex flex-col items-center gap-2 px-4 pb-6">
+        {brand && <p className="text-center text-caption text-text-2">Usamos seu telefone só para a fila.</p>}
         <Link
           href="/privacidade"
           className="inline-flex min-h-11 items-center px-2 text-caption text-text-2 underline underline-offset-4 hover:text-accent"
