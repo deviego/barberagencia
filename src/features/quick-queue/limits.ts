@@ -24,3 +24,29 @@ export const QUICK_QUEUE_IDENTIFY_LIMITS = {
 export const QUICK_QUEUE_DEVICE_TTL_DAYS = 30;
 /** Quanto tempo o passo "nome" espera depois do telefone. */
 export const QUICK_QUEUE_PENDING_MINUTES = 10;
+
+/**
+ * Travas de "Entrar na fila" (#99). Conferidas DENTRO de quick_queue_join (schema-54), na mesma
+ * transação que cria a senha. O teto por barbearia é provisório (revisto com a #105).
+ */
+export const QUICK_QUEUE_JOIN_LIMITS = {
+  /** Janela da contagem de pedidos. */
+  windowSeconds: 10 * 60,
+  /** Pedidos de "Entrar na fila" por aparelho na janela. */
+  perDevice: 10,
+  /** Senhas ativas ao mesmo tempo por aparelho, por barbearia. */
+  activePerDevice: 2,
+  /** Senhas ativas da fila rápida por barbearia hoje (totem e balcão não contam). Provisório. */
+  tenantActiveCap: 40,
+} as const;
+
+/** Tela "Minha senha" (#98). */
+export const QUICK_QUEUE_STATUS_LIMITS = {
+  /** Uma consulta a cada 2 s por aparelho (a tela consulta a cada 5 s). */
+  minIntervalMs: 2_000,
+  /** Retrato da fila da barbearia guardado por 2 s. */
+  snapshotMs: 2_000,
+  /** "Sair da fila": pedidos por aparelho na janela. */
+  leavePerDevice: 10,
+  leaveWindowSeconds: 10 * 60,
+} as const;
