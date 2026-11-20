@@ -1,24 +1,27 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { identifyPhone, registerName } from "../actions";
-import { QUICK_QUEUE_IDENTIFY_MESSAGES, QUICK_QUEUE_JOIN_MESSAGES } from "../types";
+import { QUICK_QUEUE_IDENTIFY_MESSAGES } from "../types";
 import { PhoneStep } from "./phone-step";
 import { NameStep } from "./name-step";
 import { ServiceStep } from "./service-step";
+import { MyTicket } from "./my-ticket";
 
-type Step = "PHONE" | "NAME" | "SERVICE" | "JOINED";
+type Step = "PHONE" | "NAME" | "SERVICE" | "TICKET";
 
 /**
- * Jornada telefone → nome → serviço da fila rápida (#96, #97).
+ * Jornada telefone → nome → serviço → "Minha senha" da fila rápida (#96, #97, #98).
+ * Com senha ativa neste aparelho (viewer HAS_TICKET, decidido no servidor), abre direto em
+ * "Minha senha", sem digitar nada.
  * Todo mundo passa pelo telefone nesta fase, inclusive cliente logado (um caminho só).
  * O telefone e o nome ficam aqui, fora dos passos: erro, falha de conexão ou volta ao telefone
  * nunca apagam o que o cliente digitou. A tela manda só o slug e o texto digitado; quem é o
  * cliente é decidido no servidor (credencial do aparelho em cookie HttpOnly, gravado pela ação).
  */
-export function IdentifyFlow({ slug }: { slug: string }) {
-  const [step, setStep] = useState<Step>("PHONE");
+export function IdentifyFlow({ slug, hasTicket = false }: { slug: string; hasTicket?: boolean }) {
+  const [step, setStep] = useState<Step>(hasTicket ? "TICKET" : "PHONE");
+  const [justJoined, setJustJoined] = useState(false);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -95,22 +98,32 @@ export function IdentifyFlow({ slug }: { slug: string }) {
           setPhoneError(error);
           setStep("PHONE");
         }}
-        onJoined={() => setStep("JOINED")}
+        onJoined={() => {
+          setJustJoined(true);
+          setStep("TICKET");
+        }}
       />
     );
   }
 
-  if (step === "JOINED") {
-    // TODO(#98): aqui entra "Minha senha". O texto fica só para o leitor de tela (aria-live).
+  if (step === "TICKET") {
     return (
-      <div role="status" aria-live="polite" className="my-auto flex justify-center py-10">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-wash text-accent">
-          <CheckCircle2 className="h-7 w-7" aria-hidden />
-        </span>
-        <span className="sr-only">{QUICK_QUEUE_JOIN_MESSAGES.joined}</span>
-      </div>
+      <MyTicket
+        slug={slug}
+        justJoined={justJoined}
+        onNoTicket={() => {
+          setJustJoined(false);
+          setStep("PHONE");
+        }}
+        onNewTicket={() => {
+          // O aparelho já está identificado; se não estiver mais, a escolha volta ao telefone.
+          setJustJoined(false);
+          setStep("SERVICE");
+        }}
+      />
     );
   }
+
 
   return (
     <PhoneStep
