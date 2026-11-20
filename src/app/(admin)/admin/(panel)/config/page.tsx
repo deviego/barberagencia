@@ -8,7 +8,8 @@ import { getBranding, getUnitSettings } from "@/features/admin/data";
 import { getTenantContract } from "@/features/contract/data";
 import { buildContractView, contractToData } from "@/features/contract/view";
 import { ContractSection } from "@/features/contract/components/contract-section";
-import { getPlanUsage } from "@/lib/plan/effective";
+import { getEffectivePlan, getPlanUsage } from "@/lib/plan/effective";
+import { hasEntitlement } from "@/lib/entitlements";
 import { PlanUsage } from "@/features/plan/components/plan-usage";
 import QRCode from "qrcode";
 import { getRequestOrigin } from "@/lib/http";
@@ -18,21 +19,25 @@ import { TotemConfig } from "@/features/queue/components/totem-config";
 import { ClientQr } from "@/features/admin/components/client-qr";
 
 export default async function ConfigPage() {
-  const [tenant, branding, unit, contract, planUsage] = await Promise.all([
+  const [tenant, branding, unit, contract, planUsage, eff] = await Promise.all([
     getCurrentTenant(),
     getBranding(),
     getUnitSettings(),
     getTenantContract(),
     getPlanUsage(),
+    getEffectivePlan(),
   ]);
   const contractView = buildContractView(contract);
   const queueCfg = await getQueueConfig(tenant.id);
 
   const origin = await getRequestOrigin();
 
-  // QR público da barbearia (cartaz para a parede) — leva o cliente à página dele.
+  // Cartazes de QR (#127). Só links do cliente, montados com a origem + o slug desta barbearia:
+  // B (Cadastro) leva a /b/<slug>; A (Fila digital) leva a /b/<slug>/fila. Nunca o link do totem.
   const publicUrl = `${origin}/b/${tenant.subdomain}`;
-  const publicQr = await QRCode.toDataURL(publicUrl, { margin: 1, width: 600, errorCorrectionLevel: "H" });
+  // A: mesma regra da página da fila (plano com "queue" ou em teste) e a fila ligada.
+  const queueInPlan = !eff.gated || hasEntitlement(eff.plan, "queue");
+  const queueUrl = queueInPlan && queueCfg.enabled ? `${publicUrl}/fila` : null;
   // Logo embutida como data URL (evita canvas "tainted" ao exportar o PNG).
   const logoUrl = branding?.logo_url ?? tenant.branding.logoUrl ?? null;
   let logoData: string | null = null;
@@ -89,13 +94,13 @@ export default async function ConfigPage() {
 
       <ClientQr
         publicUrl={publicUrl}
+        queueUrl={queueUrl}
+        // TODO(#123/#102): "PHONE" quando a fila rápida estiver ligada nesta barbearia.
+        queueEntry="LOGIN"
         slug={tenant.subdomain}
-        qrDataUrl={publicQr}
         logoDataUrl={logoData}
         logoText={tenant.branding.logoText}
         name={tenant.name}
-        instagram={branding?.instagram ?? tenant.branding.instagram ?? null}
-        accent={branding?.accent ?? "#C9A24B"}
       />
 
       <WhatsAppConnect />
