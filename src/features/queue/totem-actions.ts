@@ -34,10 +34,13 @@ async function requireAdminTenant() {
 type TotemFail = { ok: false; error: string };
 const fail = (error: string): TotemFail => ({ ok: false, error });
 
+/** Alerta de sal ausente sai uma vez por instância do servidor, não a cada ação. */
+let saltWarned = false;
+
 /**
  * Limite de tentativas: por IP da hospedagem + barbearia e um teto por barbearia somando todas
  * as origens (nas três ações). Retorna o erro a devolver, ou null se liberado.
- *   - Sem RATE_LIMIT_IP_SALT: a camada por IP é pulada (com alerta); os tetos por barbearia valem.
+ *   - Sem RATE_LIMIT_IP_SALT: a camada por IP é pulada (alerta uma vez por instância); os tetos por barbearia valem.
  *   - Sem conseguir conferir no banco (ex.: schema-50 não aplicada): recusa.
  */
 async function totemRateLimit(action: "lookup" | "register" | "join", tenantId: string): Promise<TotemFail | null> {
@@ -46,8 +49,9 @@ async function totemRateLimit(action: "lookup" | "register" | "join", tenantId: 
     const res = await hitRateLimit(TOTEM_RATE_SCOPES[action], ipTenantKey(ipHash, tenantId), TOTEM_LIMITS[action]);
     if (res === "limited") return fail(TOTEM_ERRORS.rateLimited);
     if (res === "unavailable") return fail(TOTEM_ERRORS.unavailable);
-  } else {
-    console.error(`[totem] RATE_LIMIT_IP_SALT ausente ou curto; limite por IP pulado em ${action}`);
+  } else if (!saltWarned) {
+    saltWarned = true;
+    console.warn(`[totem] RATE_LIMIT_IP_SALT ausente ou curto; limite por IP pulado em ${action}`);
   }
 
   const cap = await hitRateLimit(TOTEM_RATE_SCOPES[`${action}Tenant`], tenantId, TOTEM_TENANT_CAPS[action]);
