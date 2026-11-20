@@ -254,9 +254,16 @@ export async function regenerateTotemToken() {
   const tenantId = await requireAdminTenant();
   if (!tenantId) return { ok: false as const, error: "Acesso negado." };
   const admin = createSupabaseAdminClient();
-  const token = randomBytes(24).toString("hex");
-  const { error } = await admin.from("tenants").update({ totem_token: token }).eq("id", tenantId);
+  const token = randomBytes(32).toString("hex");
+  // A chave fica só em totem_access_keys (schema-62, exclusiva do servidor); a anterior deixa de
+  // valer na hora (resolveTotemTenant lê dali).
+  const { error } = await admin
+    .from("totem_access_keys")
+    .upsert({ tenant_id: tenantId, token, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" });
   if (error) return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
+  // Enquanto a coluna antiga existir (até a schema-63), ela não guarda mais a chave.
+  const { error: cErr } = await admin.from("tenants").update({ totem_token: null }).eq("id", tenantId);
+  if (cErr && cErr.code !== "42703") console.error(`[totem] limpeza da chave antiga falhou (${cErr.code ?? "sem código"})`);
   return { ok: true as const, token };
 }
 
