@@ -49,3 +49,4 @@ schema-60-retencao-registros-tecnicos.sql
 schema-61-quick-queue-ticket-owner.sql
 schema-62-totem-access-keys.sql
 schema-63-tenants-drop-totem-token.sql
+schema-64-quick-queue-identify-tenant-caps.sql

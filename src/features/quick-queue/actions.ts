@@ -42,7 +42,27 @@ import {
  * Nada aqui devolve ou recebe identificador de cliente, e nenhum log leva telefone ou nome.
  */
 
-type IdentifyCode = "KNOWN" | "NEED_NAME" | "CREATED" | "NO_PENDING" | "LIMIT" | "INVALID" | "CLOSED";
+type IdentifyCode =
+  | "KNOWN"
+  | "NEED_NAME"
+  | "CREATED"
+  | "NO_PENDING"
+  | "LIMIT"
+  | "INVALID"
+  | "CLOSED"
+  // #148 (schema-64): tetos POR BARBEARIA com resultado próprio; para o cliente, o mesmo aviso.
+  | "TENANT_ATTEMPTS"
+  | "TENANT_NEW_DEVICES"
+  | "TENANT_NEW_CLIENTS";
+
+/** Resultado de limite → tipo na contagem do dia (os de barbearia ligam o alerta ao dono). */
+const IDENTIFY_LIMIT_KIND: Partial<Record<IdentifyCode, IdentifyLimitKind>> = {
+  LIMIT: "IDENTIFY",
+  TENANT_ATTEMPTS: "IDENTIFY_TENANT",
+  TENANT_NEW_DEVICES: "NEW_DEVICES_TENANT",
+  TENANT_NEW_CLIENTS: "NEW_CLIENTS_TENANT",
+};
+
 
 const L = QUICK_QUEUE_IDENTIFY_LIMITS;
 
@@ -76,14 +96,21 @@ async function callIdentify(
     return null;
   }
   const row = (Array.isArray(data) ? data[0] : data) as { result?: string; new_device?: boolean } | undefined;
-  if (row?.result === "LIMIT") await recordLimit(tenantId, "IDENTIFY");
+  const limitKind = IDENTIFY_LIMIT_KIND[row?.result as IdentifyCode];
+  if (limitKind) {
+    await recordLimit(tenantId, limitKind);
+    // Teto da barbearia: marcador fixo no log (sem dado de cliente), como no totem.
+    if (limitKind !== "IDENTIFY") console.error(`[quick-queue][teto-barbearia] identificação tenant=${tenantId}`);
+  }
   if (row?.new_device && fresh) await writeDeviceToken(slug, fresh);
   else if (current && row?.result !== "NO_PENDING") await writeDeviceToken(slug, current); // renova a validade
   return (row?.result as IdentifyCode | undefined) ?? null;
 }
 
 /** Soma 1 na contagem do dia (alerta ao dono). Falha aqui não muda a resposta ao cliente. */
-async function recordLimit(tenantId: string, kind: "IDENTIFY"): Promise<void> {
+type IdentifyLimitKind = "IDENTIFY" | "IDENTIFY_TENANT" | "NEW_DEVICES_TENANT" | "NEW_CLIENTS_TENANT";
+
+async function recordLimit(tenantId: string, kind: IdentifyLimitKind): Promise<void> {
   const { error } = await createSupabaseAdminClient().rpc("quick_queue_record_limit", { p_tenant_id: tenantId, p_kind: kind });
   if (error) console.error(`[quick-queue] registro de limite indisponível (${error.code ?? "sem código"})`);
 }
@@ -120,6 +147,9 @@ export async function identifyPhone(slug: string, phone: string): Promise<Identi
     case "NEED_NAME":
       return { ok: true, next: "NAME" };
     case "LIMIT":
+    case "TENANT_ATTEMPTS":
+    case "TENANT_NEW_DEVICES":
+    case "TENANT_NEW_CLIENTS":
       return fail(MSG.limited);
     case "INVALID":
       return fail(MSG.invalidPhone, "phone");
@@ -152,6 +182,9 @@ export async function registerName(slug: string, name: string): Promise<Register
     case "NO_PENDING":
       return { ok: false, error: MSG.restart, restart: true };
     case "LIMIT":
+    case "TENANT_ATTEMPTS":
+    case "TENANT_NEW_DEVICES":
+    case "TENANT_NEW_CLIENTS":
       return fail(MSG.limited);
     case "INVALID":
       return fail(MSG.invalidName, "name");

@@ -117,7 +117,12 @@ await test("marketing: ficha da fila rápida fica de fora; as outras seguem", as
   const { canReceiveMarketing } = await import("../src/lib/marketing-consent.ts");
   assert.equal(canReceiveMarketing({ signup_origin: "QUICK_QUEUE" }), false);
   assert.equal(canReceiveMarketing({ signup_origin: null }), true);
-  assert.equal(canReceiveMarketing({}), true);
+  // #148: campo ausente (não lido) = não pode.
+  assert.equal(canReceiveMarketing({}), false);
+  assert.equal(canReceiveMarketing(undefined), false);
+  const src = readFileSync(path.join(SRC, "lib/marketing-consent.ts"), "utf8");
+  assert.match(src, /signup_origin: string \| null;/, "campo obrigatório no tipo");
+  assert.doesNotMatch(src, /signup_origin\?:/);
 });
 
 console.log(`\n${passed} testes ok`);

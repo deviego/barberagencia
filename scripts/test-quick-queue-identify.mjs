@@ -217,6 +217,23 @@ await test("limite, chave inválida, fila desligada e erro do banco viram mensag
   assert.deepEqual(await identifyPhone("barbearia-teste", "21987650001"), { ok: false, error: MSG.failed });
 });
 
+await test("#148: tetos da barbearia dão o mesmo aviso ao cliente e entram na contagem com tipo próprio", async () => {
+  const cases = [
+    ["LIMIT", "IDENTIFY"],
+    ["TENANT_ATTEMPTS", "IDENTIFY_TENANT"],
+    ["TENANT_NEW_DEVICES", "NEW_DEVICES_TENANT"],
+    ["TENANT_NEW_CLIENTS", "NEW_CLIENTS_TENANT"],
+  ];
+  for (const [result, kind] of cases) {
+    let q = reset({ reply: (args) => ({ data: args?.p_kind ? null : [{ result, new_device: false }], error: null }) });
+    assert.deepEqual(await identifyPhone("barbearia-teste", "21987650001"), { ok: false, error: MSG.limited }, result);
+    const rec = q.rpcCalls.filter((c) => c.fn === "quick_queue_record_limit");
+    assert.deepEqual(rec.map((c) => c.args.p_kind), [kind], result);
+    q = reset({ cookie: "B".repeat(43), reply: (args) => ({ data: args?.p_kind ? null : [{ result, new_device: false }], error: null }) });
+    assert.deepEqual(await registerName("barbearia-teste", "Ana Teste"), { ok: false, error: MSG.limited }, result);
+  }
+});
+
 await test("guard: fila fechada ou leitura com erro recusam antes do banco", async () => {
   let q = reset({ guard: "closed" });
   assert.deepEqual(await identifyPhone("barbearia-teste", "21987650001"), {

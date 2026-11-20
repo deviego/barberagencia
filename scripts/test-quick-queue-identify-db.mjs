@@ -266,16 +266,17 @@ await test("limite por telefone conhecido: conta pelo cliente, mesmo trocando de
 await test("teto de credenciais novas por barbearia por hora", async () => {
   const t = await shop("lim-cred");
   for (let i = 0; i < 3; i++) await identify(t, newDevice(), { phone: `2198800000${i}` }, { devicesHour: 3 });
-  assert.equal(await identify(t, newDevice(), { phone: "21988000009" }, { devicesHour: 3 }), "LIMIT");
+  assert.equal(await identify(t, newDevice(), { phone: "21988000009" }, { devicesHour: 3 }), "TENANT_NEW_DEVICES"); // #148: resultado próprio (schema-64)
   // Aparelho que já tem credencial continua funcionando.
   const { rows } = await pool.query(`select token_hash from public.quick_queue_devices where tenant_id = $1 limit 1`, [t]);
-  assert.notEqual(await identify(t, { current: rows[0].token_hash }, { phone: "21988000008" }, { devicesHour: 3 }), "LIMIT");
+  const again = await identify(t, { current: rows[0].token_hash }, { phone: "21988000008" }, { devicesHour: 3 });
+  assert.ok(!["LIMIT", "TENANT_ATTEMPTS", "TENANT_NEW_DEVICES", "TENANT_NEW_CLIENTS"].includes(again), again);
 });
 
 await test("teto de tentativas por barbearia", async () => {
   const t = await shop("lim-ten");
   for (let i = 0; i < 4; i++) await identify(t, newDevice(), { phone: `2198700000${i}` }, { tenant: 4 });
-  assert.equal(await identify(t, newDevice(), { phone: "21987000009" }, { tenant: 4 }), "LIMIT");
+  assert.equal(await identify(t, newDevice(), { phone: "21987000009" }, { tenant: 4 }), "TENANT_ATTEMPTS"); // #148: resultado próprio (schema-64)
 });
 
 await test("teto de contas novas por barbearia por dia", async () => {
@@ -287,7 +288,7 @@ await test("teto de contas novas por barbearia por dia", async () => {
   }
   const d = newDevice();
   await identify(t, d, { phone: "21986000009" });
-  assert.equal(await identify(t, d, { name: "Hugo Teste" }, { clientsDay: 2 }), "LIMIT");
+  assert.equal(await identify(t, d, { name: "Hugo Teste" }, { clientsDay: 2 }), "TENANT_NEW_CLIENTS"); // #148: resultado próprio (schema-64)
 });
 
 await test("tentativas não guardam telefone; aparelho guarda só o resumo da credencial", async () => {

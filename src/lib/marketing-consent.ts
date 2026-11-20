@@ -12,9 +12,12 @@
  * esta função.
  */
 export type MarketingAudienceClient = {
-  signup_origin?: string | null;
+  /** Obrigatório: quem chama precisa ler clients.signup_origin (null = ficha de outra origem). */
+  signup_origin: string | null;
 };
 
+/** Campo ausente (não lido) = NÃO pode: na dúvida, ninguém recebe marketing (#148). */
 export function canReceiveMarketing(client: MarketingAudienceClient): boolean {
+  if (!client || client.signup_origin === undefined) return false;
   return client.signup_origin !== "QUICK_QUEUE";
 }

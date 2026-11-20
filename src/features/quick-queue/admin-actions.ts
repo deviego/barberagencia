@@ -95,8 +95,14 @@ export async function setQuickQueueEnabled(enabled: boolean): Promise<SetQuickQu
       metadata: { enabled: parsed.data, previous },
     });
     if (aErr) {
-      await admin.from("tenants").update({ quick_queue_enabled: previous }).eq("id", tenantId);
       console.error(`[quick-queue] registro do interruptor indisponível (${aErr.code ?? "sem código"})`);
+      const { error: rErr } = await admin.from("tenants").update({ quick_queue_enabled: previous }).eq("id", tenantId);
+      // #148: se nem a reversão funcionou, a chave ficou mudada sem registro: precisa aparecer no log.
+      if (rErr) {
+        console.error(
+          `[quick-queue] reversão do interruptor falhou; estado ficou ${parsed.data ? "ligado" : "desligado"} sem registro (${rErr.code ?? "sem código"}) tenant=${tenantId}`
+        );
+      }
       return { ok: false, code: "GENERIC", error: MSG.failed };
     }
   }
