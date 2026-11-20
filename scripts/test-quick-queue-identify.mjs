@@ -39,6 +39,10 @@ export async function requireQuickQueueOpen(slug) {
   if (q.guard === "closed") throw new QuickQueueClosedError();
   if (q.guard === "error") throw new Error("leitura indisponível");
   return { tenantId: "00000000-0000-4000-8000-0000000000aa" };
+}
+// "Sair da fila" usa o guard da senha já criada (#102); fora do escopo deste teste.
+export async function requireQuickQueueTicketAccess(slug) {
+  return requireQuickQueueOpen(slug);
 }`;
 const data = (src) => "data:text/javascript," + encodeURIComponent(src);
 

@@ -781,7 +781,32 @@ app.listen(PORT, () => {
   } else {
     log.info("relatório mensal inativo (defina APP_REPORT_URL, REPORT_TOKEN, REPORT_SENDER_SESSION, REPORT_RECIPIENTS)");
   }
+
+  // Retenção dos registros técnicos (#108): todo dia às 03:30 (America/Sao_Paulo).
+  // A função do banco (schema-60) apaga só registros técnicos com mais de 7 dias e zera o
+  // telefone pendente vencido dos aparelhos. O log leva só as contagens.
+  cron.schedule("30 3 * * *", () => runRetention().catch((e) => log.error({ err: e?.message }, "retenção falhou")), {
+    timezone: "America/Sao_Paulo",
+  });
+  log.info("cron de retenção dos registros técnicos ativo (todo dia, 03:30 BRT)");
 });
+
+async function runRetention() {
+  const { data, error } = await supabase.rpc("purge_technical_records");
+  if (error) {
+    log.error({ code: error.code ?? null }, "retenção indisponível");
+    return;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  log.info(
+    {
+      rateLimitEventsDeleted: row?.rate_limit_events_deleted ?? null,
+      identifyAttemptsDeleted: row?.identify_attempts_deleted ?? null,
+      pendingPhonesCleared: row?.pending_phones_cleared ?? null,
+    },
+    "retenção dos registros técnicos concluída"
+  );
+}
 
 // --- Keep-alive: o próprio serviço bate na sua URL pública a cada 10 min ---
 // O Render hiberna serviços free após 15 min SEM tráfego de entrada. Como este processo

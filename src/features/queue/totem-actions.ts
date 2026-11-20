@@ -229,12 +229,18 @@ export async function totemJoinQueue(
   ]);
   if (!serviceOk || !barberOk) return fail(TOTEM_ERRORS.invalidChoice);
 
-  const { data, error } = await admin.rpc("join_queue_totem", {
-    p_tenant_id: tenant.id,
-    p_client_id: clientId,
-    p_service_id: service,
-    p_barber_id: barber,
-  });
+  const call = () =>
+    admin.rpc("join_queue_totem", {
+      p_tenant_id: tenant.id,
+      p_client_id: clientId,
+      p_service_id: service,
+      p_barber_id: barber,
+    });
+  let { data, error } = await call();
+  // 23505: a fila pelo app (sem trava) gravou senha para o mesmo cliente no mesmo instante e a
+  // regra de 1 senha ativa por cliente (schema-54) segurou. A segunda chamada devolve a senha que
+  // ficou valendo (mesmo tratamento de joinQueue).
+  if (error?.code === "23505") ({ data, error } = await call());
   const row = Array.isArray(data) ? data[0] : data;
   if (error || typeof row?.ticket_number !== "number") {
     if (error) console.error(`[totem] senha falhou (${error.code ?? "sem código"})`);
