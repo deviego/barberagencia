@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { identifyPhone, registerName } from "../actions";
-import { QUICK_QUEUE_IDENTIFY_MESSAGES } from "../types";
+import { QUICK_QUEUE_IDENTIFY_MESSAGES, QUICK_QUEUE_JOIN_MESSAGES } from "../types";
 import { PhoneStep } from "./phone-step";
 import { NameStep } from "./name-step";
 import { ServiceStep } from "./service-step";
@@ -101,12 +101,13 @@ export function IdentifyFlow({ slug }: { slug: string }) {
   }
 
   if (step === "JOINED") {
-    // TODO(#98): aqui entra "Minha senha". Até a schema-53, joinQuickQueue nunca responde ok.
+    // TODO(#98): aqui entra "Minha senha". O texto fica só para o leitor de tela (aria-live).
     return (
-      <div role="status" className="my-auto flex justify-center py-10">
+      <div role="status" aria-live="polite" className="my-auto flex justify-center py-10">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-wash text-accent">
           <CheckCircle2 className="h-7 w-7" aria-hidden />
         </span>
+        <span className="sr-only">{QUICK_QUEUE_JOIN_MESSAGES.joined}</span>
       </div>
     );
   }

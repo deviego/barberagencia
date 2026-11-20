@@ -36,6 +36,8 @@ export function ServiceStep({
   // null = "Sem preferência" (padrão).
   const [barberId, setBarberId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // CLOSED: a fila fechou ou a fila rápida foi desligada. Fica só a mensagem, sem escolher nem entrar.
+  const [closed, setClosed] = useState(false);
   const [pending, startTransition] = useTransition();
   // Trava síncrona: dois toques no mesmo instante não criam dois pedidos.
   const inFlight = useRef(false);
@@ -67,7 +69,7 @@ export function ServiceStep({
   }
 
   function join() {
-    if (load.state !== "ready" || !serviceId || inFlight.current) return;
+    if (load.state !== "ready" || !serviceId || closed || inFlight.current) return;
     const service = load.options.services.find((s) => s.id === serviceId);
     if (!service) return;
     const barber = load.options.pickBarber ? barberId : null;
@@ -85,6 +87,7 @@ export function ServiceStep({
           return;
         }
         if (res.code === "SERVICE_CHANGED") replaceOptions(res.options);
+        if (res.code === "CLOSED") setClosed(true);
         setError(res.error);
       } catch {
         // Sem conexão: a escolha continua marcada para tentar de novo.
@@ -119,6 +122,18 @@ export function ServiceStep({
         <p role="alert" className="text-center text-body text-danger">
           {load.error}
         </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full"
+          onClick={() => {
+            setLoad({ state: "loading" });
+            void fetchOptions();
+          }}
+        >
+          {MSG.retry}
+        </Button>
       </div>
     );
   }
@@ -154,14 +169,14 @@ export function ServiceStep({
     >
       {title}
 
-      <fieldset className="flex flex-col gap-2" disabled={pending}>
+      <fieldset className="flex flex-col gap-2" disabled={pending || closed}>
         <legend className="sr-only">{MSG.title}</legend>
         {services.map((s) => {
           const checked = serviceId === s.id;
           return (
             <label
               key={s.id}
-              className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus ${
+              className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus ${
                 checked ? "border-accent bg-accent-wash" : "border-border bg-surface hover:border-text-muted"
               }`}
             >
@@ -192,7 +207,7 @@ export function ServiceStep({
       </fieldset>
 
       {showBarbers && (
-        <fieldset className="flex flex-col gap-2" disabled={pending}>
+        <fieldset className="flex flex-col gap-2" disabled={pending || closed}>
           <legend className="mb-2 text-caption font-semibold text-text-2">{MSG.barberLabel}</legend>
           <div className="flex flex-wrap gap-2">
             {[{ id: null, name: MSG.noPreference }, ...barbers].map((b) => {
@@ -200,7 +215,7 @@ export function ServiceStep({
               return (
                 <label
                   key={b.id ?? "none"}
-                  className={`inline-flex min-h-11 max-w-full cursor-pointer items-center rounded-pill border-2 px-4 text-body transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus ${
+                  className={`inline-flex min-h-11 max-w-full cursor-pointer items-center rounded-pill border-2 px-4 text-body transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus ${
                     checked ? "border-accent bg-accent-wash font-semibold text-accent" : "border-border text-text-2"
                   }`}
                 >
@@ -231,7 +246,7 @@ export function ServiceStep({
           size="lg"
           className="w-full"
           loading={pending}
-          disabled={!serviceId}
+          disabled={!serviceId || closed}
           aria-describedby={error ? errorId : undefined}
         >
           {MSG.join}
