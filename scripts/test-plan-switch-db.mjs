@@ -401,10 +401,59 @@ await test("cancelamento: visitante não executa a função", async () => {
   assert.equal(rows[0].ok, false);
 });
 
+const cancelFuture = (uid, cl) => asUser(uid, `select public.cancel_future_plan_appointments($1) n`, [cl]);
+
+await test("cancel_future_plan_appointments (regra única): mesmo alcance de antes, todas as reservas futuras de plano do cliente", async () => {
+  const s = await shop("cfpa");
+  const cl = await client(s.t, "Cliente Cancela Futuras Teste");
+  const uid = await admin(s.t, "cfpa");
+  await activateFixed(uid, cl, s.fixedA, 2, 600, s.barber);
+  const flexAntiga = await appt(s, cl, { plan: s.combo, fromPlan: true, at: inDays(5) });
+  const r = await cancelFuture(uid, cl);
+  assert.equal(r.rows[0].n, 5);
+  assert.equal(await futureActive(cl, s.fixedA), 0);
+  assert.equal(await statusOf(flexAntiga), "CANCELLED");
+});
+
+await test("cancel_future_plan_appointments: passadas, atendidas, debitadas, em atendimento, avulsas, outro cliente e outra barbearia não mudam", async () => {
+  const s = await shop("cfpa-keep");
+  const o = await shop("cfpa-other");
+  const cl = await client(s.t, "Cliente Futuras Mantem Teste");
+  const other = await client(s.t, "Outro Futuras Teste");
+  const clB = await client(o.t, "Cliente B Futuras Teste");
+  const uid = await admin(s.t, "cfpa-keep");
+  const uidB = await admin(o.t, "cfpa-other");
+  await activateFixed(uid, other, s.fixedA, 4, 660, s.barber);
+  await activateFixed(uidB, clB, o.fixedA, 4, 600, o.barber);
+  const keep = {
+    passada: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: inDays(-7) }),
+    atendida: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: inDays(-14), status: "DONE" }),
+    debitada: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: inDays(40), status: "CANCELLED", debited: true }),
+    emAtendimento: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: new Date(Date.now() + 60 * 1000), started: true }),
+    avulsa: await appt(s, cl, { at: inDays(3) }),
+  };
+  const before = Object.fromEntries(await Promise.all(Object.entries(keep).map(async ([k, id]) => [k, await statusOf(id)])));
+  await cancelFuture(uid, cl);
+  for (const [k, id] of Object.entries(keep)) assert.equal(await statusOf(id), before[k], k);
+  assert.equal(await futureActive(other, s.fixedA), 4);
+  assert.equal(await futureActive(clB, o.fixedA), 4);
+});
+
+await test("cancel_future_plan_appointments: admin de outra barbearia continua recusado", async () => {
+  const s = await shop("cfpa-x-a");
+  const o = await shop("cfpa-x-b");
+  const cl = await client(s.t, "Cliente Alvo Futuras Teste");
+  const uid = await admin(s.t, "cfpa-x-a");
+  const intruder = await admin(o.t, "cfpa-x-b");
+  await activateFixed(uid, cl, s.fixedA, 2, 600, s.barber);
+  await assert.rejects(cancelFuture(intruder, cl), /forbidden/);
+  assert.equal(await futureActive(cl, s.fixedA), 4);
+});
+
 await test("o helper interno não é executável por nenhum papel do app", async () => {
   for (const role of ["anon", "authenticated", "service_role"]) {
     const { rows } = await q(
-      `select has_function_privilege($1, 'public._cancel_replaced_fixed_reservations(uuid, uuid, uuid)', 'execute') ok`,
+      `select has_function_privilege($1, 'public._cancel_future_plan_reservations(uuid, uuid, uuid)', 'execute') ok`,
       [role]
     );
     assert.equal(rows[0].ok, false, role);

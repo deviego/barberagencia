@@ -13,10 +13,14 @@
 --   * cancel_client_plan (NOVA): cancela o plano ativo do cliente e, se for plano FIXO, as
 --     reservas futuras dele, na mesma transação. Usada ao aprovar o pedido de cancelamento do
 --     cliente (approvePlanRequest), que antes só mudava o status da assinatura.
---   * _cancel_replaced_fixed_reservations: helper interno, sem execução para nenhum papel do app.
+--   * cancel_future_plan_appointments: mesma assinatura e alcance, agora pela regra única
+--     (passa a filtrar pela barbearia e a deixar de fora reserva em atendimento).
+--   * _cancel_future_plan_reservations: a REGRA ÚNICA de quais reservas são canceladas; helper
+--     interno, sem execução para nenhum papel do app. Todos os caminhos acima passam por ele.
 --
 -- O que é cancelado (status → CANCELLED), e só isso:
---   reservas do MESMO cliente, da MESMA barbearia, do plano substituído, com
+--   reservas do MESMO cliente, da MESMA barbearia, do plano em questão (ou de qualquer plano,
+--   em cancel_future_plan_appointments), com
 --   consumed_from_plan = true, start_at > now(), status ativo (REQUESTED/CONFIRMED/ALT_OFFERED),
 --   plan_debited = false e atendimento não iniciado (service_started_at is null).
 -- Nunca muda: reservas passadas, atendidas (DONE), já canceladas, debitadas, em atendimento,
@@ -27,28 +31,32 @@
 -- Fora do alcance (registrado no PR): reservas de planos ainda mais antigos, deixadas na agenda
 -- por trocas feitas antes desta correção, NÃO são canceladas aqui.
 --
--- Guardas e grants: create or replace preserva a ACL das duas funções (schema-21/33). A guarda
+-- Guardas e grants: create or replace preserva a ACL das funções existentes (schema-21/33). A guarda
 -- is_admin_of_client (schema-33) continua igual.
 -- Rollback: reaplicar assign_combo e activate_fixed_plan de supabase/schema-33-rpc-tenant-scope.sql,
 --   voltar approvePlanRequest a gravar o status direto e
 --   drop function if exists public.cancel_client_plan(uuid);
---   drop function if exists public._cancel_replaced_fixed_reservations(uuid, uuid, uuid);
+--   drop function if exists public._cancel_future_plan_reservations(uuid, uuid, uuid);
 
--- ---- helper interno ----------------------------------------------------------------
-create or replace function public._cancel_replaced_fixed_reservations(
+-- ---- regra única: quais reservas do plano são canceladas -----------------------------
+-- Uma regra só para todos os caminhos que cancelam reservas de plano (troca de plano, pedido de
+-- cancelamento, "Cancelar plano" e troca de horário do fixo, via cancel_future_plan_appointments).
+-- p_plan_id null = reservas de qualquer plano daquele cliente (o comportamento de
+-- cancel_future_plan_appointments); com plano = só as daquele plano.
+create or replace function public._cancel_future_plan_reservations(
   p_tenant_id uuid, p_client_id uuid, p_plan_id uuid
 ) returns int
 language plpgsql security definer set search_path = public as $$
 declare n int;
 begin
-  if p_tenant_id is null or p_client_id is null or p_plan_id is null then
+  if p_tenant_id is null or p_client_id is null then
     return 0;
   end if;
   update public.appointments
      set status = 'CANCELLED'
    where tenant_id = p_tenant_id
      and client_id = p_client_id
-     and combo_plan_id = p_plan_id
+     and (p_plan_id is null or combo_plan_id = p_plan_id)
      and consumed_from_plan = true
      and start_at > now()
      and status in ('REQUESTED', 'CONFIRMED', 'ALT_OFFERED')
@@ -58,9 +66,22 @@ begin
   return n;
 end $$;
 
--- Só as funções abaixo (dono) chamam; nenhum papel do app executa direto.
-revoke all on function public._cancel_replaced_fixed_reservations(uuid, uuid, uuid)
+-- Só as funções deste arquivo (dono) chamam; nenhum papel do app executa direto.
+revoke all on function public._cancel_future_plan_reservations(uuid, uuid, uuid)
   from public, anon, authenticated, service_role;
+
+-- ---- cancel_future_plan_appointments (fonte: schema-33-rpc-tenant-scope.sql) ----------
+-- Mesma assinatura, mesma guarda e mesmo alcance (todas as reservas de plano do cliente),
+-- agora pela regra única. Diferença: passa a filtrar pela barbearia do cliente e a deixar de
+-- fora reserva já em atendimento. Usada por cancelClientSubscription e pela troca de horário.
+create or replace function public.cancel_future_plan_appointments(p_client_id uuid)
+returns int language plpgsql security definer set search_path = public as $$
+declare t_id uuid;
+begin
+  if not public.is_admin_of_client(p_client_id) then raise exception 'forbidden'; end if;
+  select tenant_id into t_id from public.clients where id = p_client_id;
+  return public._cancel_future_plan_reservations(t_id, p_client_id, null);
+end $$;
 
 -- ---- assign_combo (fonte: schema-33-rpc-tenant-scope.sql) ---------------------------
 create or replace function public.assign_combo(p_client_id uuid, p_combo_plan_id uuid) returns uuid
@@ -92,7 +113,7 @@ begin
     select booking_mode into v_old_mode from public.combo_plans where id = v_old_plan;
     v_keep_slot := v_new_mode = 'FIXED' and v_old_plan = p_combo_plan_id;
     if v_old_mode = 'FIXED' and not v_keep_slot then
-      perform public._cancel_replaced_fixed_reservations(t_id, p_client_id, v_old_plan);
+      perform public._cancel_future_plan_reservations(t_id, p_client_id, v_old_plan);
     end if;
 
     -- O horário fixo só continua se o plano é o mesmo e é fixo. Plano novo (combo ou outro
@@ -165,7 +186,7 @@ begin
       or v_old.fixed_barber_id is distinct from p_barber_id
       or v_old.fixed_service_id is distinct from v_service
     ) then
-      perform public._cancel_replaced_fixed_reservations(t_id, p_client_id, v_old.combo_plan_id);
+      perform public._cancel_future_plan_reservations(t_id, p_client_id, v_old.combo_plan_id);
     end if;
 
     update public.client_subscriptions
@@ -202,7 +223,7 @@ begin
 
   select booking_mode into v_mode from public.combo_plans where id = v_plan;
   if v_mode = 'FIXED' then
-    n := public._cancel_replaced_fixed_reservations(t_id, p_client_id, v_plan);
+    n := public._cancel_future_plan_reservations(t_id, p_client_id, v_plan);
   end if;
   return n;
 end $$;
