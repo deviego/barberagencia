@@ -16,9 +16,11 @@ import {
 import {
   QUICK_QUEUE_IDENTIFY_MESSAGES as MSG,
   QUICK_QUEUE_JOIN_MESSAGES as JOIN_MSG,
+  QUICK_QUEUE_TICKET_MESSAGES as TICKET_MSG,
   type IdentifyPhoneResult,
   type JoinQuickQueueInput,
   type JoinQuickQueueResult,
+  type LeaveQuickQueueResult,
   type QuickQueueOptionsResult,
   type QuickQueueActionError,
   type RegisterNameResult,
@@ -233,4 +235,20 @@ export async function joinQuickQueue(slug: string, input: JoinQuickQueueInput): 
     default:
       return generic;
   }
+}
+
+/**
+ * "Sair da fila" (#98). CONTRATO FECHADO; o cancelamento pela credencial do aparelho entra com o
+ * back da #98. Até lá passa pelo guard e responde GENERIC sem mudar nada.
+ */
+export async function leaveQuickQueue(slug: string): Promise<LeaveQuickQueueResult> {
+  const generic: LeaveQuickQueueResult = { ok: false, code: "GENERIC", error: TICKET_MSG.failed };
+  const parsed = LoadQuickQueueOptionsInput.safeParse({ slug });
+  if (!parsed.success) return generic;
+  try {
+    await requireQuickQueueOpen(parsed.data.slug);
+  } catch (e) {
+    return e instanceof QuickQueueClosedError ? { ok: false, code: "CLOSED", error: e.message } : generic;
+  }
+  return generic;
 }
