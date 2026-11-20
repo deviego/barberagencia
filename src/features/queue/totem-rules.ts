@@ -40,7 +40,8 @@ export const TOTEM_RATE_SCOPES = {
 } as const;
 
 export const TOTEM_ERRORS = {
-  invalidTotem: "Totem inválido.",
+  /** Chave do totem antiga, inválida ou fila desligada: neutro, sem nome da barbearia (#103). */
+  invalidTotem: "Este acesso não vale mais. Peça ajuda no balcão.",
   invalidPhone: "Telefone inválido.",
   invalidName: "Informe o nome.",
   invalidNameChars: "Digite o nome só com letras.",

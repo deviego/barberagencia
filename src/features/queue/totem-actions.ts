@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { randomUUID, randomBytes } from "crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
@@ -249,14 +251,34 @@ export async function totemJoinQueue(
   return { ok: true as const, ticket: row.ticket_number as number };
 }
 
-/** ADMIN (UNIT_ADMIN+/MASTER): regenera o token do totem (invalida o link antigo). */
+/**
+ * ADMIN (UNIT_ADMIN+/MASTER): renova a chave do totem (#103). A chave anterior deixa de valer na
+ * hora em todas as funções do totem (todas passam por resolveTotemTenant). Registra quem e
+ * quando (tenants.totem_key_rotated_*, schema-57) e o histórico em audit_log, sem a chave.
+ * Não mexe em senha nenhuma. A chave só volta para o painel do admin.
+ */
 export async function regenerateTotemToken() {
-  const tenantId = await requireAdminTenant();
-  if (!tenantId) return { ok: false as const, error: "Acesso negado." };
+  const user = await getSessionUser();
+  if (!user?.tenantId || !user.role || !isUnitAdmin(user.role)) return { ok: false as const, error: "Acesso negado." };
+  const tenantId = user.tenantId;
   const admin = createSupabaseAdminClient();
-  const token = randomBytes(24).toString("hex");
-  const { error } = await admin.from("tenants").update({ totem_token: token }).eq("id", tenantId);
+  const token = randomBytes(32).toString("hex");
+  const { error } = await admin
+    .from("tenants")
+    .update({ totem_token: token, totem_key_rotated_at: new Date().toISOString(), totem_key_rotated_by: user.id })
+    .eq("id", tenantId);
   if (error) return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
+
+  const { error: aErr } = await admin.from("audit_log").insert({
+    tenant_id: tenantId,
+    user_id: user.id,
+    action: "totem.key_rotated",
+    target: "tenants.totem_token",
+    metadata: {},
+  });
+  if (aErr) console.error(`[totem] histórico da renovação indisponível (${aErr.code ?? "sem código"})`);
+  revalidatePath("/admin/config");
+  revalidatePath("/admin/fila");
   return { ok: true as const, token };
 }
 

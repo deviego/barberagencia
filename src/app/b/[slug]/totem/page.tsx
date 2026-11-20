@@ -1,5 +1,6 @@
 import { getTotemData } from "@/features/queue/data";
 import { TotemKiosk } from "@/features/queue/components/totem-kiosk";
+import { TOTEM_ERRORS } from "@/features/queue/totem-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,8 @@ export default async function TotemPage({
       <div className="flex min-h-screen items-center justify-center bg-canvas px-6 text-center">
         <div>
           <h1 className="text-h4 font-bold text-text">Totem indisponível</h1>
-          <p className="mt-2 text-body text-text-2">Link inválido ou fila não ativada. Verifique o link do totem nas configurações.</p>
+          {/* Chave antiga (#103), link inválido ou fila desligada: aviso neutro, sem dado da barbearia. */}
+          <p className="mt-2 text-body text-text-2">{TOTEM_ERRORS.invalidTotem}</p>
         </div>
       </div>
     );
