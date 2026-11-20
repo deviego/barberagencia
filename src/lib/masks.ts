@@ -67,7 +67,9 @@ export function maskUF(value: string): string {
 export function maskPhoneBR(value: string): string {
   let d = value.replace(/\D/g, "");
   // remove código do país se colado junto (55...)
-  if (d.startsWith("55") && d.length > 11) d = d.slice(2);
+  // zero de discagem antes do DDD (021...): nenhum DDD começa com 0
+  d = d.replace(/^0+/, "");
+  if (d.startsWith("55") && d.length > 11) d = d.slice(2).replace(/^0+/, "");
   d = d.slice(0, 11);
   if (!d) return "";
 
