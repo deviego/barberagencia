@@ -35,9 +35,10 @@ export default async function ConfigPage() {
   // Cartazes de QR (#127). Só links do cliente, montados com a origem + o slug desta barbearia:
   // B (Cadastro) leva a /b/<slug>; A (Fila digital) leva a /b/<slug>/fila. Nunca o link do totem.
   const publicUrl = `${origin}/b/${tenant.subdomain}`;
-  // A: mesma regra da página da fila (plano com "queue" ou em teste) e a fila ligada.
+  // A: mesma regra da página da fila (plano com "queue" ou em teste), a fila ligada e o cliente
+  // podendo entrar pelo celular. No modo só totem, /b/<slug>/fila manda pegar a senha no totem.
   const queueInPlan = !eff.gated || hasEntitlement(eff.plan, "queue");
-  const queueUrl = queueInPlan && queueCfg.enabled ? `${publicUrl}/fila` : null;
+  const queueUrl = queueInPlan && queueCfg.enabled && queueCfg.mode !== "TOTEM" ? `${publicUrl}/fila` : null;
   // Logo embutida como data URL (evita canvas "tainted" ao exportar o PNG).
   const logoUrl = branding?.logo_url ?? tenant.branding.logoUrl ?? null;
   let logoData: string | null = null;

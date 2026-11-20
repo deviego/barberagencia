@@ -213,7 +213,14 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
     });
 
   function copy() {
-    navigator.clipboard?.writeText(url).then(
+    let safe: string;
+    try {
+      safe = assertPosterUrl(url); // a mesma guarda do totem dos cartazes
+    } catch {
+      setError(ERROR);
+      return;
+    }
+    navigator.clipboard?.writeText(safe).then(
       () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1600);

@@ -149,13 +149,27 @@ function wrapPlain(ctx: CanvasRenderingContext2D, text: string, maxW: number): s
   return out;
 }
 
-function drawQr(ctx: CanvasRenderingContext2D, url: string, x: number, y: number, size: number) {
+/** 7 cm a 300 dpi, arredondado para cima: o lado mínimo dos módulos do QR no cartaz. */
+export const QR_MIN_PX = Math.ceil(70 * MM);
+const QR_MAX_PX = 900; // 7,6 cm
+
+/**
+ * Tamanho do QR em pixels inteiros por módulo: o lado real (célula × módulos) fica entre 7 cm e
+ * 7,6 cm, o maior que couber em `avail`. Se nem 7 cm couber, 7 cm vence (o cartaz se ajusta).
+ */
+export function qrLayout(url: string, avail: number) {
   const qr = QRCode.create(url, { errorCorrectionLevel: "M" });
   const n = qr.modules.size;
-  const cell = Math.floor(size / n);
-  const real = cell * n;
-  const ox = Math.round(x + (size - real) / 2);
-  const oy = Math.round(y + (size - real) / 2);
+  const minCell = Math.ceil(QR_MIN_PX / n);
+  const maxCell = Math.max(minCell, Math.floor(QR_MAX_PX / n));
+  const cell = Math.min(maxCell, Math.max(minCell, Math.floor(avail / n)));
+  return { qr, n, cell, side: cell * n };
+}
+
+function drawQr(ctx: CanvasRenderingContext2D, layout: ReturnType<typeof qrLayout>, x: number, y: number) {
+  const { qr, n, cell } = layout;
+  const ox = Math.round(x);
+  const oy = Math.round(y);
   ctx.fillStyle = "#000000";
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
@@ -279,7 +293,9 @@ export function drawPoster(ctx: CanvasRenderingContext2D, input: PosterInput, sc
   // os módulos ficam entre 827 px (7 cm, o mínimo) e 900 px (7,6 cm).
   const subBottom = subTop + (lines.length - 1) * subLead;
   const space = stepY - 80 - (subBottom + 90);
-  const box = Math.max(927, Math.min(1000, space));
+  const QR_PAD = 50; // margem branca em volta dos módulos
+  const qrL = qrLayout(input.url, space - QR_PAD * 2);
+  const box = qrL.side + QR_PAD * 2;
   const boxX = cx - box / 2;
   const boxY = subBottom + 90 + Math.max(0, (space - box) / 2);
   ctx.fillStyle = "#FFFFFF";
@@ -287,7 +303,7 @@ export function drawPoster(ctx: CanvasRenderingContext2D, input: PosterInput, sc
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 14;
   ctx.strokeRect(boxX - 7, boxY - 7, box + 14, box + 14);
-  drawQr(ctx, input.url, boxX + 50, boxY + 50, box - 100);
+  drawQr(ctx, qrL, boxX + QR_PAD, boxY + QR_PAD);
 
   // 3 passos
   const gap = 60;
