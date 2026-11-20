@@ -22,7 +22,7 @@ export interface CurrentPlan {
   name: string;
   saldo: number;
   fixed: boolean;
-  /** Horários fixos marcados a partir de agora. Hoje a troca não os cancela (#131). */
+  /** Horários fixos marcados a partir de agora (a troca de plano os cancela). */
   futureFixed: number;
 }
 
@@ -30,12 +30,12 @@ const FAILED = "Não deu certo. Tente de novo.";
 
 function replaceWarning(clientName: string, current: CurrentPlan) {
   if (current.fixed && current.futureFixed > 0) {
-    // TODO(#131): hoje a troca NÃO cancela os horários fixos futuros. Quando a #131 entrar (cancelamento
-    // na troca), voltar para a copy da story: "...os {N} horários fixos marcados a partir de hoje serão
-    // cancelados e o saldo passa a ser o do plano novo."
     const n = current.futureFixed;
-    const slots = n === 1 ? "o horário fixo já marcado continua na agenda e precisa ser cancelado lá" : `os ${n} horários fixos já marcados continuam na agenda e precisam ser cancelados lá`;
-    return `${clientName} já tem o plano ${current.name}. Se trocar, o saldo passa a ser o do plano novo, mas ${slots}.`;
+    const slots =
+      n === 1
+        ? "o horário fixo já marcado deste plano será cancelado e o horário do barbeiro fica livre"
+        : `os ${n} horários fixos já marcados deste plano serão cancelados e o horário do barbeiro fica livre`;
+    return `${clientName} já tem o plano ${current.name}. Se trocar, ${slots}. Atendimentos já feitos não mudam, e o saldo passa a ser o do plano novo.`;
   }
   if (current.fixed) {
     return `${clientName} já tem o plano ${current.name}. Se trocar, o plano novo substitui o atual e o saldo passa a ser o do plano novo.`;
