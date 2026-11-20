@@ -10,8 +10,8 @@
 --     (dia, hora, barbeiro, serviço) muda, cancela as reservas futuras do plano/horário
 --     substituído antes de criar as do novo (ensure_fixed_reservations conta pelo plano, e as
 --     antigas ocupavam a conta e a agenda).
---   * cancel_client_plan (NOVA): cancela o plano ativo do cliente e, se for plano FIXO, as
---     reservas futuras dele, na mesma transação. Usada ao aprovar o pedido de cancelamento do
+--   * cancel_client_plan (NOVA): cancela o plano ativo do cliente e as reservas futuras de plano
+--     dele (fixo ou combo, igual ao "Cancelar plano" do painel), na mesma transação. Usada ao aprovar o pedido de cancelamento do
 --     cliente (approvePlanRequest), que antes só mudava o status da assinatura.
 --   * cancel_future_plan_appointments: mesma assinatura e alcance, agora pela regra única
 --     (passa a filtrar pela barbearia e a deixar de fora reserva em atendimento).
@@ -33,10 +33,13 @@
 --
 -- Guardas e grants: create or replace preserva a ACL das funções existentes (schema-21/33). A guarda
 -- is_admin_of_client (schema-33) continua igual.
--- Rollback: reaplicar assign_combo e activate_fixed_plan de supabase/schema-33-rpc-tenant-scope.sql,
---   voltar approvePlanRequest a gravar o status direto e
---   drop function if exists public.cancel_client_plan(uuid);
---   drop function if exists public._cancel_future_plan_reservations(uuid, uuid, uuid);
+-- Rollback, NESTA ORDEM (a cancel_future_plan_appointments nova depende do helper):
+--   1. voltar o código do approvePlanRequest (deixa de chamar cancel_client_plan);
+--   2. reaplicar assign_combo, activate_fixed_plan e cancel_future_plan_appointments de
+--      supabase/schema-33-rpc-tenant-scope.sql;
+--   3. drop function if exists public.cancel_client_plan(uuid);
+--   4. drop function if exists public._cancel_future_plan_reservations(uuid, uuid, uuid);
+--   Apagar o helper antes do passo 2 quebra "Cancelar plano" e "Trocar horário" do painel.
 
 -- ---- regra única: quais reservas do plano são canceladas -----------------------------
 -- Uma regra só para todos os caminhos que cancelam reservas de plano (troca de plano, pedido de
@@ -201,13 +204,13 @@ begin
 end $$;
 
 -- ---- cancel_client_plan (nova) ------------------------------------------------------
--- Cancela o plano ATIVO do cliente. Se o plano é fixo, as reservas futuras dele saem da agenda
--- na mesma transação (mesmas regras do helper). Devolve quantas reservas foram canceladas.
+-- Cancela o plano ATIVO do cliente e, na mesma transação, as reservas futuras de plano dele
+-- (mesmo alcance do "Cancelar plano" do painel, pela regra única). Devolve quantas foram canceladas.
 -- Sem plano ativo: não faz nada e devolve 0.
 create or replace function public.cancel_client_plan(p_client_id uuid) returns int
   language plpgsql security definer set search_path = public as $$
 declare
-  t_id uuid; v_sub_id uuid; v_plan uuid; v_mode text; n int := 0;
+  t_id uuid; v_sub_id uuid; v_plan uuid; n int := 0;
 begin
   if not public.is_admin_of_client(p_client_id) then raise exception 'forbidden'; end if;
   select tenant_id into t_id from public.clients where id = p_client_id;
@@ -221,10 +224,9 @@ begin
 
   update public.client_subscriptions set status = 'CANCELLED' where id = v_sub_id;
 
-  select booking_mode into v_mode from public.combo_plans where id = v_plan;
-  if v_mode = 'FIXED' then
-    n := public._cancel_future_plan_reservations(t_id, p_client_id, v_plan);
-  end if;
+  -- Mesmo alcance do "Cancelar plano" do painel (cancel_future_plan_appointments): todas as
+  -- reservas futuras de plano do cliente, fixo ou combo, pela regra única.
+  n := public._cancel_future_plan_reservations(t_id, p_client_id, null);
   return n;
 end $$;
 

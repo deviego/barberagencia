@@ -327,6 +327,7 @@ await test("cliente sem assinatura: assign_combo cria como antes", async () => {
 });
 
 const cancelPlan = (uid, cl) => asUser(uid, `select public.cancel_client_plan($1) n`, [cl]);
+const cancelFuture = (uid, cl) => asUser(uid, `select public.cancel_future_plan_appointments($1) n`, [cl]);
 
 await test("aprovar cancelamento de plano fixo: plano cancelado e reservas futuras do plano canceladas", async () => {
   const s = await shop("cancel");
@@ -364,16 +365,30 @@ await test("aprovar cancelamento: passadas, atendidas, debitadas, em atendimento
   assert.equal(await futureActive(clB, o.fixedA), 4);
 });
 
-await test("aprovar cancelamento de combo (flexível): plano cancelado, reservas não mudam", async () => {
+await test("aprovar cancelamento de combo: mesma regra do \"Cancelar plano\" do painel (reservas futuras de plano canceladas)", async () => {
   const s = await shop("cancel-flex");
+  const p = await shop("panel-flex");
+  // Pedido do cliente aprovado (cancel_client_plan).
   const cl = await client(s.t, "Cliente Cancela Combo Teste");
   const uid = await admin(s.t, "cancel-flex");
   await assignCombo(uid, cl, s.combo);
   const flex = await appt(s, cl, { plan: s.combo, fromPlan: true, at: inDays(2) });
+  const avulsa = await appt(s, cl, { at: inDays(4) });
   const r = await cancelPlan(uid, cl);
-  assert.equal(r.rows[0].n, 0);
+  assert.equal(r.rows[0].n, 1);
   assert.equal((await sub(cl)).status, "CANCELLED");
-  assert.equal(await statusOf(flex), "CONFIRMED");
+  assert.equal(await statusOf(flex), "CANCELLED");
+  assert.equal(await statusOf(avulsa), "CONFIRMED");
+  // Painel (cancelClientSubscription: status + cancel_future_plan_appointments): mesmo resultado.
+  const cl2 = await client(p.t, "Cliente Painel Combo Teste");
+  const uid2 = await admin(p.t, "panel-flex");
+  await assignCombo(uid2, cl2, p.combo);
+  const flex2 = await appt(p, cl2, { plan: p.combo, fromPlan: true, at: inDays(2) });
+  const avulsa2 = await appt(p, cl2, { at: inDays(4) });
+  await asUser(uid2, `update public.client_subscriptions set status = 'CANCELLED' where client_id = $1 and status = 'ACTIVE'`, [cl2]);
+  await cancelFuture(uid2, cl2);
+  assert.equal(await statusOf(flex2), "CANCELLED");
+  assert.equal(await statusOf(avulsa2), "CONFIRMED");
 });
 
 await test("aprovar cancelamento sem plano ativo: nada muda", async () => {
@@ -400,8 +415,6 @@ await test("cancelamento: visitante não executa a função", async () => {
   const { rows } = await q(`select has_function_privilege('anon', 'public.cancel_client_plan(uuid)', 'execute') ok`);
   assert.equal(rows[0].ok, false);
 });
-
-const cancelFuture = (uid, cl) => asUser(uid, `select public.cancel_future_plan_appointments($1) n`, [cl]);
 
 await test("cancel_future_plan_appointments (regra única): mesmo alcance de antes, todas as reservas futuras de plano do cliente", async () => {
   const s = await shop("cfpa");
