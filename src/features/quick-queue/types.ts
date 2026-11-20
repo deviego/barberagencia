@@ -294,4 +294,23 @@ export const QUICK_QUEUE_ADMIN_MESSAGES = {
   plan: "A fila não faz parte do seu plano.",
   queueOff: "Ative a fila da barbearia antes de ligar a fila rápida.",
   failed: "Não deu certo. Tente de novo.",
+  /*
+   * Alerta ao dono (#99/#145, copy da PO em 20/11). Aparece com tenantCapHit ou com o total do
+   * dia >= QUICK_QUEUE_ALERT_MIN_TOTAL, só com a fila no plano e a fila rápida ligada. Só o total,
+   * sem detalhe por tipo. Com tenantCapHit usa alertBodyCap; só com o total alto, alertBodyHigh.
+   */
+  alertTitle: (n: number) =>
+    n === 1 ? "A fila rápida barrou 1 tentativa hoje" : `A fila rápida barrou ${n} tentativas hoje`,
+  alertBodyCap:
+    "A fila pelo celular encheu e parou de aceitar senhas novas. Se achar que tem alguém abusando, desligue a fila rápida. O balcão e o totem continuam funcionando.",
+  alertBodyHigh:
+    "Pode ser só movimento, mas também pode ser alguém abusando. Se achar estranho, desligue a fila rápida. O balcão e o totem continuam funcionando.",
+  alertAction: "Desligar fila rápida",
+  confirmTitle: "Desligar a fila rápida?",
+  confirmBody:
+    "Os clientes param de pegar senha só com o telefone. Quem já está na fila continua, e o balcão e o totem não mudam. Você pode ligar de novo quando quiser.",
+  confirmYes: "Desligar",
+  confirmNo: "Voltar",
+  turnedOff: "Fila rápida desligada.",
 } as const;
+
