@@ -18,6 +18,30 @@ import { QUICK_QUEUE_ADMIN_MESSAGES as MSG, type SetQuickQueueEnabledResult } fr
 
 const Input = z.boolean();
 
+type Admin = ReturnType<typeof createSupabaseAdminClient>;
+
+/**
+ * A chave do totem foi renovada depois do início da adoção da fila rápida? Sem início registrado,
+ * registra agora (e a resposta é "não": a renovação tem de vir depois). "error" = leitura falhou.
+ */
+async function keyRotatedSinceAdoption(admin: Admin, tenantId: string): Promise<boolean | "error"> {
+  const [{ data: st, error: sErr }, { data: t, error: tErr }] = await Promise.all([
+    admin.from("tenant_settings").select("quick_queue_adoption_started_at").eq("tenant_id", tenantId).maybeSingle(),
+    admin.from("tenants").select("totem_key_rotated_at").eq("id", tenantId).maybeSingle(),
+  ]);
+  if (sErr || tErr) return "error";
+
+  const started = (st?.quick_queue_adoption_started_at as string | null | undefined) ?? null;
+  if (!started) {
+    const { error } = await admin
+      .from("tenant_settings")
+      .upsert({ tenant_id: tenantId, quick_queue_adoption_started_at: new Date().toISOString() }, { onConflict: "tenant_id" });
+    return error ? "error" : false;
+  }
+  const rotated = (t?.totem_key_rotated_at as string | null | undefined) ?? null;
+  return !!rotated && new Date(rotated).getTime() > new Date(started).getTime();
+}
+
 export async function setQuickQueueEnabled(enabled: boolean): Promise<SetQuickQueueEnabledResult> {
   const parsed = Input.safeParse(enabled);
   if (!parsed.success) return { ok: false, code: "GENERIC", error: MSG.failed };
@@ -49,6 +73,12 @@ export async function setQuickQueueEnabled(enabled: boolean): Promise<SetQuickQu
     }
     if (!planAllowsQueue(state, new Date())) return { ok: false, code: "PLAN", error: MSG.plan };
     if (!state.queueEnabled) return { ok: false, code: "QUEUE_OFF", error: MSG.queueOff };
+
+    // #103 (regra no servidor, todas as barbearias): ligar só com a chave do totem renovada
+    // DEPOIS do início da adoção. O primeiro pedido de ligar marca o início da adoção.
+    const rotation = await keyRotatedSinceAdoption(admin, tenantId);
+    if (rotation === "error") return { ok: false, code: "GENERIC", error: MSG.failed };
+    if (!rotation) return { ok: false, code: "ROTATE_FIRST", error: MSG.rotateFirst };
   }
 
   const previous = t.quick_queue_enabled === true;

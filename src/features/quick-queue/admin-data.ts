@@ -1,6 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { QuickQueueLimitKind, QuickQueueLimitSummary } from "./types";
+import type { QuickQueueAdminState, QuickQueueLimitKind, QuickQueueLimitSummary } from "./types";
 
 /*
  * Alerta ao dono (#99): contagem do dia de limites estourados da fila rápida. Leitura com a
@@ -23,4 +23,23 @@ export async function getQuickQueueLimitSummary(tenantId: string): Promise<Quick
     total += r.hits;
   }
   return { total, byKind, tenantCapHit: (byKind.TENANT_ACTIVE ?? 0) > 0 };
+}
+
+/**
+ * Estado do interruptor para o painel (#102/#103), lido com a sessão do admin (RLS de tenants e
+ * tenant_settings). Falha de leitura = desligada e sem lembrete (falha fechado).
+ */
+export async function getQuickQueueAdminState(tenantId: string): Promise<QuickQueueAdminState> {
+  const supabase = await createSupabaseServerClient();
+  const [{ data: t, error: tErr }, { data: st, error: sErr }] = await Promise.all([
+    supabase.from("tenants").select("quick_queue_enabled, totem_key_rotated_at").eq("id", tenantId).maybeSingle(),
+    supabase.from("tenant_settings").select("quick_queue_adoption_started_at").eq("tenant_id", tenantId).maybeSingle(),
+  ]);
+  if (tErr || sErr || !t) return { enabled: false, needsKeyRotation: false };
+  const started = (st?.quick_queue_adoption_started_at as string | null | undefined) ?? null;
+  const rotated = (t.totem_key_rotated_at as string | null | undefined) ?? null;
+  return {
+    enabled: t.quick_queue_enabled === true,
+    needsKeyRotation: !!started && !(rotated && new Date(rotated).getTime() > new Date(started).getTime()),
+  };
 }
