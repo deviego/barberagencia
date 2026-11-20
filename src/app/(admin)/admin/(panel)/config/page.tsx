@@ -17,6 +17,7 @@ import { getQueueConfig, getTotemToken } from "@/features/queue/data";
 import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
 import { TotemConfig } from "@/features/queue/components/totem-config";
 import { TotemTablet } from "@/features/queue/components/totem-tablet";
+import { regenerateTotemToken } from "@/features/queue/totem-actions";
 import { QuickQueueToggle } from "@/features/quick-queue/components/quick-queue-toggle";
 import { LockedFeature } from "@/features/plan/components/locked-feature";
 import { waStatus } from "@/features/admin/whatsapp-actions";
@@ -28,7 +29,7 @@ import {
   showQueuePoster,
   showQueuePosterHint,
 } from "@/features/admin/components/qr-posters/visibility";
-import { getQuickQueueLimitSummary } from "@/features/quick-queue/admin-data";
+import { getQuickQueueAdminState, getQuickQueueLimitSummary } from "@/features/quick-queue/admin-data";
 import { QUICK_QUEUE_ALERT_MIN_TOTAL } from "@/features/quick-queue/limits";
 import { loadQuickQueueTenantState } from "@/features/quick-queue/data";
 
@@ -97,6 +98,11 @@ export default async function ConfigPage() {
     }
   }
 
+  // Lembrete do #103 (chave do totem a renovar). Falha de leitura = sem lembrete (admin-data).
+  const needsKeyRotation = showQuickQueueToggle
+    ? (await getQuickQueueAdminState(tenant.id).catch(() => null))?.needsKeyRotation === true
+    : false;
+
   // Alerta ao dono (#145): resumo do dia só com a fila rápida ligada; erro de leitura = sem alerta.
   let limitAlert: { kind: "CAP" | "HIGH"; total: number } | null = null;
   if (showQuickQueueToggle && quickQueueEnabled) {
@@ -158,6 +164,8 @@ export default async function ConfigPage() {
                   enabled={quickQueueEnabled}
                   whatsappDisconnected={whatsappDisconnected}
                   alert={limitAlert}
+                  needsKeyRotation={needsKeyRotation}
+                  rotateKey={regenerateTotemToken}
                 />
               ) : (
                 !queueInPlan && (

@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, Copy, ExternalLink, RefreshCw, Tablet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmModal } from "@/components/ui/modal";
+import { QUICK_QUEUE_ONBOARDING_MESSAGES as ROTATE } from "@/features/quick-queue/types";
 import { regenerateTotemToken } from "../totem-actions";
 
 /**
@@ -16,6 +18,8 @@ export function TotemTablet({ totemUrl, qrDataUrl }: { totemUrl: string; qrDataU
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Renovar derruba o totem do balcão: mesma confirmação do "Renovar chave" (#103).
+  const [confirming, setConfirming] = useState(false);
 
   function regenerate() {
     setMsg(null);
@@ -66,13 +70,23 @@ export function TotemTablet({ totemUrl, qrDataUrl }: { totemUrl: string; qrDataU
             >
               Abrir totem <ExternalLink size={13} aria-hidden />
             </a>
-            <Button variant="outline" size="sm" onClick={regenerate} disabled={pending}>
-              <RefreshCw size={13} aria-hidden /> Regenerar link
+            <Button variant="outline" size="sm" onClick={() => setConfirming(true)} disabled={pending}>
+              <RefreshCw size={13} aria-hidden /> {ROTATE.rotate}
             </Button>
             {msg && <span className="text-caption text-text-muted">{msg}</span>}
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title={ROTATE.confirmTitle}
+        message={ROTATE.confirm}
+        confirmLabel={ROTATE.confirmYes}
+        cancelLabel={ROTATE.confirmNo}
+        onConfirm={regenerate}
+      />
     </section>
   );
 }

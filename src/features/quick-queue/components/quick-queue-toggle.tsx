@@ -7,6 +7,7 @@ import { ConfirmModal } from "@/components/ui/modal";
 import { Switch } from "@/components/ui/switch";
 import { setQuickQueueEnabled } from "../admin-actions";
 import { QUICK_QUEUE_ADMIN_MESSAGES as MSG } from "../types";
+import { QuickQueueOnboarding, QuickQueueRotateReminder, type RotateTotemKey } from "./quick-queue-onboarding";
 
 /**
  * Liga/desliga da fila rápida no painel (#102). Só aparece com a fila no plano e ligada.
@@ -15,15 +16,24 @@ import { QUICK_QUEUE_ADMIN_MESSAGES as MSG } from "../types";
  * Salva com setQuickQueueEnabled (a barbearia vem da sessão; vai só true/false). A ação revalida
  * /admin/config: o cartaz A aparece ou some na hora. Em erro, o interruptor volta ao estado salvo.
  * Alerta ao dono (condição da Navalha): no topo do bloco, com "Desligar fila rápida" e confirmação.
+ * #103: ligar responde ROTATE_FIRST enquanto a chave do totem não for renovada depois do início
+ * da adoção. A fila rápida segue desligada e aparece o passo a passo "Antes de começar"; com
+ * "Fazer depois", fica o lembrete (needsKeyRotation) até a chave ser renovada.
  */
 export function QuickQueueToggle({
   enabled,
   whatsappDisconnected,
   alert = null,
+  needsKeyRotation = false,
+  rotateKey,
 }: {
   enabled: boolean;
   /** Alerta do dia (quickQueueLimitAlert): CAP = teto atingido; HIGH = total alto; null = nada. */
   alert?: { kind: "CAP" | "HIGH"; total: number } | null;
+  /** Adoção começou e a chave do totem ainda não foi renovada (getQuickQueueAdminState). */
+  needsKeyRotation?: boolean;
+  /** Renovar a chave do totem (server action passada pela página: regenerateTotemToken). */
+  rotateKey: RotateTotemKey;
   /** true só quando o gateway respondeu e o WhatsApp não está conectado (sem resposta: sem aviso). */
   whatsappDisconnected: boolean;
 }) {
@@ -33,6 +43,11 @@ export function QuickQueueToggle({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // #103: passo a passo aberto, chave renovada nesta tela e lembrete pendente.
+  const [onboarding, setOnboarding] = useState(false);
+  const [rotatedNow, setRotatedNow] = useState(false);
+  const [needsRotation, setNeedsRotation] = useState(needsKeyRotation);
+  useEffect(() => setNeedsRotation(needsKeyRotation), [needsKeyRotation]);
   const [pending, startTransition] = useTransition();
   // Trava síncrona: dois toques seguidos não mandam dois pedidos.
   const inFlight = useRef(false);
@@ -52,6 +67,13 @@ export function QuickQueueToggle({
         if (res.ok) {
           setOn(res.enabled);
           if (!res.enabled) setNotice(MSG.turnedOff);
+          else setOnboarding(false);
+        } else if (res.code === "ROTATE_FIRST") {
+          // Segue desligada: o passo a passo explica o que fazer, sem texto de erro.
+          setOn(false);
+          setRotatedNow(false);
+          setNeedsRotation(true);
+          setOnboarding(true);
         } else {
           setOn(!next);
           setError(res.error);
@@ -109,6 +131,20 @@ export function QuickQueueToggle({
           aria-describedby={descId}
         />
       </div>
+
+      {onboarding && !on && (
+        <QuickQueueOnboarding
+          rotateKey={rotateKey}
+          rotated={rotatedNow}
+          onRotated={() => {
+            setRotatedNow(true);
+            setNeedsRotation(false);
+          }}
+          onLater={() => setOnboarding(false)}
+        />
+      )}
+
+      {needsRotation && !onboarding && <QuickQueueRotateReminder rotateKey={rotateKey} onRotated={() => setNeedsRotation(false)} />}
 
       {error && (
         <p role="alert" className="text-caption text-danger">
