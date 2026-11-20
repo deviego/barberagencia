@@ -37,7 +37,7 @@ Opções consideradas:
   nova conta no teto por hora da barbearia). **Não há limite por telefone nem por rede** nesta fase; qualquer
   limite novo entra pela #99 e é registrado aqui por emenda.
 
-## Exceções (emenda, sujeita à aprovação da segurança)
+## Exceções (emenda aprovada pela segurança em 2026-11-20)
 1. **Telefone pendente entre dois passos.** Quando o telefone é novo, a chave do telefone fica na linha do
    aparelho (`pending_phone_key`, `pending_until`) por no máximo **10 minutos**, só para que o passo do nome não
    precise receber o telefone de novo. É apagada quando o nome é registrado, quando o aparelho identifica outro
