@@ -5,10 +5,20 @@ import { phoneKey } from "@/lib/phone";
 import { requireQuickQueueOpen, QuickQueueClosedError } from "./guard";
 import { hashDeviceToken, newDeviceToken, readDeviceToken, writeDeviceToken } from "./device";
 import { QUICK_QUEUE_DEVICE_TTL_DAYS, QUICK_QUEUE_IDENTIFY_LIMITS, QUICK_QUEUE_PENDING_MINUTES } from "./limits";
-import { IdentifyPhoneInput, RegisterNameInput, quickQueueName } from "./schema";
+import { deviceHasClient, loadQuickQueueOptions as readOptions } from "./options";
+import {
+  IdentifyPhoneInput,
+  JoinQuickQueueInputSchema,
+  LoadQuickQueueOptionsInput,
+  RegisterNameInput,
+  quickQueueName,
+} from "./schema";
 import {
   QUICK_QUEUE_IDENTIFY_MESSAGES as MSG,
   type IdentifyPhoneResult,
+  type JoinQuickQueueInput,
+  type JoinQuickQueueResult,
+  type QuickQueueOptionsResult,
   type QuickQueueActionError,
   type RegisterNameResult,
 } from "./types";
@@ -132,4 +142,52 @@ export async function registerName(slug: string, name: string): Promise<Register
     default:
       return fail(MSG.failed);
   }
+}
+
+/*
+ * #97 — serviço com preço e entrada na fila.
+ * O cliente vem só da credencial do aparelho (cookie HttpOnly) ligada no passo do telefone.
+ */
+
+/** Opções da tela "O que vai ser hoje?". restart = voltar ao telefone. */
+export async function loadQuickQueueOptions(slug: string): Promise<QuickQueueOptionsResult> {
+  const parsed = LoadQuickQueueOptionsInput.safeParse({ slug });
+  if (!parsed.success) return fail(MSG.failed);
+
+  let tenantId: string;
+  try {
+    ({ tenantId } = await requireQuickQueueOpen(parsed.data.slug));
+  } catch (e) {
+    return guardFailure(e);
+  }
+
+  const token = await readDeviceToken();
+  if (!token) return { ok: false, error: MSG.restart, restart: true };
+  const bound = await deviceHasClient(tenantId, hashDeviceToken(token));
+  if (bound === null) return fail(MSG.failed);
+  if (!bound) return { ok: false, error: MSG.restart, restart: true };
+
+  const options = await readOptions(tenantId);
+  if (!options) {
+    console.error("[quick-queue] opções da fila indisponíveis");
+    return fail(MSG.failed);
+  }
+  return { ok: true, options };
+}
+
+/**
+ * "Entrar na fila". CONTRATO FECHADO; corpo entra com a schema-53 (RPC quick_queue_join).
+ * Até lá responde GENERIC sem criar nada.
+ */
+export async function joinQuickQueue(slug: string, input: JoinQuickQueueInput): Promise<JoinQuickQueueResult> {
+  const parsed = JoinQuickQueueInputSchema.safeParse({ slug, ...input });
+  if (!parsed.success) return { ok: false, code: "GENERIC", error: MSG.failed };
+  try {
+    await requireQuickQueueOpen(parsed.data.slug);
+  } catch (e) {
+    return e instanceof QuickQueueClosedError
+      ? { ok: false, code: "CLOSED", error: e.message }
+      : { ok: false, code: "GENERIC", error: MSG.failed };
+  }
+  return { ok: false, code: "GENERIC", error: MSG.failed };
 }
