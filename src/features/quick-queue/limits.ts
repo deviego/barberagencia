@@ -50,3 +50,9 @@ export const QUICK_QUEUE_STATUS_LIMITS = {
   leavePerDevice: 10,
   leaveWindowSeconds: 10 * 60,
 } as const;
+
+/**
+ * Alerta ao dono no painel (#145): total do dia de limites estourados a partir do qual o alerta
+ * aparece (além de tenantCapHit). Provisório: o valor final sai da linha de base da #105.
+ */
+export const QUICK_QUEUE_ALERT_MIN_TOTAL = 20;
