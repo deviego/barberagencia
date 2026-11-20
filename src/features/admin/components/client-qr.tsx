@@ -237,11 +237,14 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="qr-cliente">
       <div className="flex items-center gap-2">
-        <div className="text-overline uppercase text-text-muted">QR code da barbearia</div>
         <QrCode size={16} className="text-text-muted" aria-hidden />
+        <h2 className="text-overline uppercase text-text-muted">QR para o cliente</h2>
       </div>
       <p className="text-caption text-text-2">
-        Cartaz pronto para imprimir em A4, com a sua logo. Cole na parede e o cliente aponta a câmera, sem pedir ajuda no balcão.
+        {canQueue
+          ? // Copy do #102: só com a fila do cliente disponível (o cartaz A leva para a fila).
+            "Imprima e deixe no balcão ou na parede. O cliente escaneia e pega a senha no celular."
+          : "Cartaz pronto para imprimir em A4, com a sua logo. Cole na parede e o cliente aponta a câmera, sem pedir ajuda no balcão."}
       </p>
 
       {canQueue && (
@@ -291,7 +294,7 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
             <FileText size={16} aria-hidden /> Baixar PDF
           </Button>
           <Button variant="outline" onClick={baixarQr} disabled={locked}>
-            <QrCode size={16} aria-hidden /> Baixar só o QR
+            <QrCode size={16} aria-hidden /> Baixar QR
           </Button>
           <Button variant="ghost" onClick={copy}>
             {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
