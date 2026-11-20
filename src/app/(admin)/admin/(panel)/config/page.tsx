@@ -17,6 +17,8 @@ import { getQueueConfig, getTotemToken } from "@/features/queue/data";
 import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
 import { TotemConfig } from "@/features/queue/components/totem-config";
 import { ClientQr } from "@/features/admin/components/client-qr";
+import { showQueuePoster } from "@/features/admin/components/qr-posters/visibility";
+import { loadQuickQueueTenantState } from "@/features/quick-queue/data";
 
 export default async function ConfigPage() {
   const [tenant, branding, unit, contract, planUsage, eff] = await Promise.all([
@@ -35,10 +37,25 @@ export default async function ConfigPage() {
   // Cartazes de QR (#127). Só links do cliente, montados com a origem + o slug desta barbearia:
   // B (Cadastro) leva a /b/<slug>; A (Fila digital) leva a /b/<slug>/fila. Nunca o link do totem.
   const publicUrl = `${origin}/b/${tenant.subdomain}`;
-  // A: mesma regra da página da fila (plano com "queue" ou em teste), a fila ligada e o cliente
-  // podendo entrar pelo celular. No modo só totem, /b/<slug>/fila manda pegar a senha no totem.
+  // A: só com plano com "queue" (ou em teste) + fila ligada + fila rápida ligada nesta barbearia
+  // (regra em showQueuePoster). A chave vem da mesma leitura do #123, que falha fechado: sem a
+  // coluna da schema-51, com erro ou com outra barbearia no estado, vale false e o cartaz A some.
   const queueInPlan = !eff.gated || hasEntitlement(eff.plan, "queue");
-  const queueUrl = queueInPlan && queueCfg.enabled && queueCfg.mode !== "TOTEM" ? `${publicUrl}/fila` : null;
+  let quickQueueEnabled = false;
+  try {
+    const qq = await loadQuickQueueTenantState(tenant.subdomain);
+    quickQueueEnabled = qq?.id === tenant.id && qq.quickQueueEnabled === true;
+  } catch {
+    quickQueueEnabled = false;
+  }
+  const queueUrl = showQueuePoster({
+    planHasQueue: queueInPlan,
+    queueEnabled: queueCfg.enabled,
+    quickQueueEnabled,
+    queueMode: queueCfg.mode,
+  })
+    ? `${publicUrl}/fila`
+    : null;
   // Logo embutida como data URL (evita canvas "tainted" ao exportar o PNG).
   const logoUrl = branding?.logo_url ?? tenant.branding.logoUrl ?? null;
   let logoData: string | null = null;
