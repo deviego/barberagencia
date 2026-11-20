@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, X } from "lucide-react";
+import { configHref } from "@/features/admin/config-tabs";
 
 const KEY = "bb_contract_cta_dismissed";
 
@@ -41,7 +42,7 @@ export function ContractCtaBanner({ dataComplete }: { dataComplete: boolean }) {
       </div>
       <div className="flex items-center gap-2">
         <Link
-          href="/admin/config#contrato"
+          href={configHref("plano-contrato", "contrato")}
           className="whitespace-nowrap rounded-md bg-accent px-3.5 py-2 text-caption font-bold text-text-inverse hover:bg-accent-hover"
         >
           {dataComplete ? "Assinar agora" : "Preencher agora"}

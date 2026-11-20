@@ -53,8 +53,10 @@ export function PlanUsage({ view }: { view: PlanUsageView }) {
   const locked = DISPLAY_FEATURES.filter((f) => !view.features[f.key]);
   const included = DISPLAY_FEATURES.filter((f) => view.features[f.key]);
 
-  // "Ver planos" abre /admin/config#meu-plano, mas esta seção entra na página depois do
-  // carregamento, quando o navegador já procurou a âncora. Então a rolagem é feita aqui.
+  // "Ver planos" (PLAN_SCREEN_HREF) abre a aba Plano e contrato com #meu-plano. Na navegação
+  // dentro do app, a seção pode entrar na página depois de o navegador procurar a âncora, então
+  // a rolagem também é feita aqui. Link antigo só com #meu-plano: quem rola é o ConfigTabs,
+  // depois de abrir a aba.
   const sectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (window.location.hash !== `#${SECTION_ID}`) return;

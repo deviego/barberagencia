@@ -53,7 +53,7 @@ export function ContractSection({ view, initial }: { view: ContractView; initial
   ];
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="contrato">
+    <section className="flex scroll-mt-20 flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="contrato">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-text-muted" />

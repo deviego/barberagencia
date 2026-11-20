@@ -1,30 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Check, Download, QrCode } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Copy, Check, Download, FileText, QrCode, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-type Variant = "classic" | "logo";
+import {
+  A4_H,
+  A4_W,
+  assertPosterUrl,
+  drawPoster,
+  drawQrOnly,
+  jpegToA4Pdf,
+  pngWithDpi,
+  type PosterInput,
+  type PosterModel,
+  type QueueEntryMode,
+} from "./qr-posters/draw";
 
 type Props = {
-  /** URL pública da barbearia (para onde o QR leva o cliente). */
+  /** Link público do cliente: /b/<slug> (modelo B, Cadastro). */
   publicUrl: string;
-  /** Slug da barbearia (nome do arquivo baixado). */
+  /** Link da fila do cliente: /b/<slug>/fila (modelo A). null = plano sem fila ou fila desligada. */
+  queueUrl: string | null;
+  /** Como o cliente entra na fila hoje (muda o passo 2 do modelo A). */
+  queueEntry: QueueEntryMode;
   slug: string;
-  /** QR já renderizado no servidor (data URL, correção de erro alta). */
-  qrDataUrl: string;
   /** Logo embutida como data URL (evita canvas "tainted" ao exportar). */
   logoDataUrl: string | null;
-  /** Iniciais da marca, usadas quando não há logo. */
+  /** Iniciais da marca, usadas quando não há logo (ou ela não carrega). */
   logoText: string;
   name: string;
-  instagram: string | null;
-  accent: string;
+  /** Cor da marca da barbearia; sem ela, o cartaz usa o dourado padrão. */
+  accent: string | null;
 };
 
-const POSTER_W = 1080;
-const POSTER_H = 1350;
-const FONT = "'Segoe UI', system-ui, sans-serif";
+const ERROR = "Não deu certo. Tente de novo.";
+const PREVIEW_SCALE = 0.25; // 620 × 877 no canvas da pré-visualização
+const SEAL_SRC = "/barber-agencia-selo.png";
+const MODE_KEY = (slug: string) => `bb-cartaz-fila-modo:${slug}`;
+
+const MODELS: { key: PosterModel; label: string }[] = [
+  { key: "QUEUE", label: "Fila digital" },
+  { key: "SIGNUP", label: "Cadastro do cliente" },
+];
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -35,385 +52,258 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function normalizeInstagram(raw: string | null): string | null {
-  if (!raw) return null;
-  const handle = raw
-    .trim()
-    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
-    .replace(/^@/, "")
-    .replace(/\/+$/, "")
-    .trim();
-  return handle ? `@${handle}` : null;
+/** Fontes do app (Big Shoulders e Inter), carregadas antes de desenhar no canvas. */
+async function loadFonts(): Promise<PosterInput["fonts"]> {
+  const css = getComputedStyle(document.body);
+  const display = `${css.getPropertyValue("--font-big-shoulders").trim() || "'Big Shoulders'"}, Inter, sans-serif`;
+  const text = `${css.getPropertyValue("--font-inter").trim() || "Inter"}, system-ui, sans-serif`;
+  try {
+    await Promise.all([
+      document.fonts.load(`700 100px ${display}`),
+      document.fonts.load(`400 40px ${text}`),
+      document.fonts.load(`600 40px ${text}`),
+      document.fonts.load(`700 40px ${text}`),
+    ]);
+  } catch {
+    // sem a fonte, o cartaz sai com a fonte reserva: não trava o download
+  }
+  return { display, text };
 }
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  const rr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-}
-
-/** Desenha a imagem cobrindo (cover) a área, cortando o excedente. */
-function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
-  const r = Math.max(w / img.width, h / img.height);
-  const iw = img.width * r;
-  const ih = img.height * r;
-  ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
-}
-
-/** Desenha a logo (ou as iniciais) centralizada num quadrado branco arredondado. */
-function drawLogoBadge(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  side: number,
-  logo: HTMLImageElement | null,
-  logoText: string,
-  accent: string,
-) {
-  const x = cx - side / 2;
-  const y = cy - side / 2;
-  ctx.save();
-  ctx.fillStyle = "#FFFFFF";
-  roundRect(ctx, x, y, side, side, side * 0.18);
-  ctx.fill();
-  ctx.restore();
-
-  if (logo) {
-    const pad = side * 0.16;
-    const area = side - pad * 2;
-    const ratio = Math.min(area / logo.width, area / logo.height);
-    const w = logo.width * ratio;
-    const h = logo.height * ratio;
-    ctx.drawImage(logo, cx - w / 2, cy - h / 2, w, h);
-  } else {
-    const r = side * 0.42;
-    ctx.save();
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#FFFFFF";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = `bold ${Math.round(side * 0.34)}px ${FONT}`;
-    ctx.fillText((logoText || "??").slice(0, 2).toUpperCase(), cx, cy + side * 0.02);
-    ctx.restore();
+function readStoredMode(slug: string): string | null {
+  try {
+    return localStorage.getItem(MODE_KEY(slug));
+  } catch {
+    return null;
   }
 }
 
-export function ClientQr(props: Props) {
-  const { publicUrl, slug, qrDataUrl, logoDataUrl, logoText, name, instagram, accent } = props;
-  const posterRef = useRef<HTMLCanvasElement | null>(null);
+function storeMode(slug: string, mode: QueueEntryMode) {
+  try {
+    localStorage.setItem(MODE_KEY(slug), mode);
+  } catch {
+    // sem armazenamento local: só não avisa da próxima vez
+  }
+}
+
+function save(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob"))), type, quality),
+  );
+}
+
+export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, logoText, name, accent }: Props) {
+  const previewRef = useRef<HTMLCanvasElement | null>(null);
+  const [model, setModel] = useState<PosterModel>(queueUrl ? "QUEUE" : "SIGNUP");
+  const [logo, setLogo] = useState<HTMLImageElement | null>(null);
+  const [seal, setSeal] = useState<HTMLImageElement | null>(null);
+  const [fonts, setFonts] = useState<PosterInput["fonts"] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [variant, setVariant] = useState<Variant>("classic");
-  const insta = normalizeInstagram(instagram);
-  const domain = publicUrl.replace(/^https?:\/\//, "");
+  const [modeChanged, setModeChanged] = useState(false);
 
-  /** QR + logo dentro de um quadrado (usado nos cartazes e no "só QR"). */
-  const drawQrSquare = useCallback(
-    (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, qr: HTMLImageElement, logo: HTMLImageElement | null) => {
-      ctx.drawImage(qr, x, y, size, size);
-      drawLogoBadge(ctx, x + size / 2, y + size / 2, size * 0.24, logo, logoText, accent);
-    },
-    [logoText, accent],
-  );
+  const canQueue = !!queueUrl;
+  const activeModel: PosterModel = canQueue ? model : "SIGNUP";
+  const url = activeModel === "QUEUE" && queueUrl ? queueUrl : publicUrl;
+  const kind = activeModel === "QUEUE" ? "fila" : "cadastro";
+  const ready = !!fonts;
 
-  /** Cartaz clássico: fundo branco, cartão do QR limpo. */
-  const drawClassic = useCallback(
-    (ctx: CanvasRenderingContext2D, qr: HTMLImageElement, logo: HTMLImageElement | null) => {
-      const W = POSTER_W;
-      const H = POSTER_H;
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(0, 0, W, H);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 6;
-      roundRect(ctx, 30, 30, W - 60, H - 60, 30);
-      ctx.stroke();
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-
-      let fontSize = 68;
-      ctx.fillStyle = "#14110E";
-      do {
-        ctx.font = `bold ${fontSize}px ${FONT}`;
-        if (ctx.measureText(name).width <= 860) break;
-        fontSize -= 3;
-      } while (fontSize > 34);
-      ctx.fillText(name, W / 2, 175);
-
-      ctx.fillStyle = accent;
-      roundRect(ctx, W / 2 - 46, 205, 92, 6, 3);
-      ctx.fill();
-
-      ctx.fillStyle = "#6B6B6B";
-      ctx.font = `500 34px ${FONT}`;
-      ctx.fillText("Agende e cadastre-se pelo celular", W / 2, 275);
-
-      const card = 720;
-      const cx = (W - card) / 2;
-      const cy = 330;
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.10)";
-      ctx.shadowBlur = 30;
-      ctx.shadowOffsetY = 10;
-      ctx.fillStyle = "#FFFFFF";
-      roundRect(ctx, cx, cy, card, card, 32);
-      ctx.fill();
-      ctx.restore();
-      ctx.strokeStyle = "#ECE7DD";
-      ctx.lineWidth = 2;
-      roundRect(ctx, cx, cy, card, card, 32);
-      ctx.stroke();
-
-      const qrPad = 46;
-      drawQrSquare(ctx, cx + qrPad, cy + qrPad, card - qrPad * 2, qr, logo);
-
-      ctx.fillStyle = "#14110E";
-      ctx.font = `600 32px ${FONT}`;
-      ctx.fillText("Aponte a câmera do celular e toque no link", W / 2, cy + card + 78);
-
-      ctx.fillStyle = accent;
-      ctx.font = `bold 32px ${FONT}`;
-      ctx.fillText(domain, W / 2, cy + card + 132);
-
-      if (insta) {
-        ctx.fillStyle = "#6B6B6B";
-        ctx.font = `500 30px ${FONT}`;
-        ctx.fillText(insta, W / 2, cy + card + 182);
-      }
-    },
-    [accent, name, domain, insta, drawQrSquare],
-  );
-
-  /** Cartaz com a logo de fundo: a logo "emoldura" o QR. */
-  const drawLogoStyle = useCallback(
-    (ctx: CanvasRenderingContext2D, qr: HTMLImageElement, logo: HTMLImageElement | null) => {
-      const W = POSTER_W;
-      const H = POSTER_H;
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(0, 0, W, H);
-
-      // fundo = logo (cover) dentro da moldura arredondada
-      ctx.save();
-      roundRect(ctx, 30, 30, W - 60, H - 60, 30);
-      ctx.clip();
-      if (logo) {
-        drawCover(ctx, logo, 30, 30, W - 60, H - 60);
-      } else {
-        ctx.fillStyle = accent;
-        ctx.fillRect(30, 30, W - 60, H - 60);
-      }
-      // escurece p/ legibilidade dos textos brancos
-      const g = ctx.createLinearGradient(0, 30, 0, H - 30);
-      g.addColorStop(0, "rgba(15,12,10,0.74)");
-      g.addColorStop(0.42, "rgba(15,12,10,0.42)");
-      g.addColorStop(1, "rgba(15,12,10,0.80)");
-      ctx.fillStyle = g;
-      ctx.fillRect(30, 30, W - 60, H - 60);
-      ctx.restore();
-
-      // moldura
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 6;
-      roundRect(ctx, 30, 30, W - 60, H - 60, 30);
-      ctx.stroke();
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-
-      // nome (branco com sombra)
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.6)";
-      ctx.shadowBlur = 14;
-      ctx.shadowOffsetY = 2;
-      let fontSize = 68;
-      ctx.fillStyle = "#FFFFFF";
-      do {
-        ctx.font = `bold ${fontSize}px ${FONT}`;
-        if (ctx.measureText(name).width <= 860) break;
-        fontSize -= 3;
-      } while (fontSize > 34);
-      ctx.fillText(name, W / 2, 175);
-      ctx.restore();
-
-      ctx.fillStyle = accent;
-      roundRect(ctx, W / 2 - 46, 205, 92, 6, 3);
-      ctx.fill();
-
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.55)";
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.font = `500 34px ${FONT}`;
-      ctx.fillText("Agende e cadastre-se pelo celular", W / 2, 275);
-      ctx.restore();
-
-      // painel branco do QR (menor: a logo aparece em volta)
-      const card = 600;
-      const cx = (W - card) / 2;
-      const cy = 360;
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.40)";
-      ctx.shadowBlur = 44;
-      ctx.shadowOffsetY = 16;
-      ctx.fillStyle = "#FFFFFF";
-      roundRect(ctx, cx, cy, card, card, 32);
-      ctx.fill();
-      ctx.restore();
-
-      const qrPad = 44;
-      drawQrSquare(ctx, cx + qrPad, cy + qrPad, card - qrPad * 2, qr, logo);
-
-      // textos inferiores (brancos)
-      ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.6)";
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = `600 32px ${FONT}`;
-      ctx.fillText("Aponte a câmera do celular e toque no link", W / 2, cy + card + 84);
-      ctx.font = `bold 32px ${FONT}`;
-      ctx.fillText(domain, W / 2, cy + card + 138);
-      if (insta) {
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.font = `500 30px ${FONT}`;
-        ctx.fillText(insta, W / 2, cy + card + 188);
-      }
-      ctx.restore();
-    },
-    [accent, name, domain, insta, drawQrSquare],
-  );
-
-  // Renderiza o preview quando as imagens carregam ou o estilo muda.
+  // Logo (se não carregar, fica null e o cartaz usa as iniciais) + fontes.
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [qr, logo] = await Promise.all([
-        loadImage(qrDataUrl),
+      const [img, sealImg, f] = await Promise.all([
         logoDataUrl ? loadImage(logoDataUrl).catch(() => null) : Promise.resolve(null),
+        loadImage(SEAL_SRC).catch(() => null), // não carregou: o rodapé usa o anel "BA"
+        loadFonts(),
       ]);
       if (!alive) return;
-      const canvas = posterRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      (variant === "logo" ? drawLogoStyle : drawClassic)(ctx, qr, logo);
-      setReady(true);
+      setLogo(img);
+      setSeal(sealImg);
+      setFonts(f);
     })();
     return () => {
       alive = false;
     };
-  }, [qrDataUrl, logoDataUrl, variant, drawClassic, drawLogoStyle]);
+  }, [logoDataUrl]);
 
-  function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = filename;
-    a.click();
+  // Aviso quando o modo da fila mudou desde o último cartaz de fila baixado neste aparelho.
+  useEffect(() => {
+    if (!canQueue) return;
+    const stored = readStoredMode(slug);
+    setModeChanged(!!stored && stored !== queueEntry);
+  }, [canQueue, slug, queueEntry]);
+
+  function input(): PosterInput {
+    return { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, accent, queueEntry, fonts: fonts! };
   }
 
-  function baixarCartaz() {
-    if (posterRef.current) downloadCanvas(posterRef.current, `cartaz-${variant}-${slug}.png`);
+  useEffect(() => {
+    if (!fonts) return;
+    const canvas = previewRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    try {
+      drawPoster(ctx, { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, accent, queueEntry, fonts }, PREVIEW_SCALE);
+    } catch {
+      setError(ERROR);
+    }
+  }, [fonts, logo, seal, accent, activeModel, url, name, logoText, queueEntry]);
+
+  async function run(task: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await task();
+    } catch {
+      setError(ERROR);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function baixarQr() {
-    const [qr, logo] = await Promise.all([
-      loadImage(qrDataUrl),
-      logoDataUrl ? loadImage(logoDataUrl).catch(() => null) : Promise.resolve(null),
-    ]);
-    const size = 1080;
+  function fullCanvas(): HTMLCanvasElement {
     const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
+    canvas.width = A4_W;
+    canvas.height = A4_H;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, size, size);
-    const pad = 90;
-    drawQrSquare(ctx, pad, pad, size - pad * 2, qr, logo);
-    downloadCanvas(canvas, `qr-${slug}.png`);
+    if (!ctx) throw new Error("canvas");
+    drawPoster(ctx, input(), 1);
+    return canvas;
   }
+
+  function afterPosterDownload() {
+    if (activeModel !== "QUEUE") return;
+    storeMode(slug, queueEntry);
+    setModeChanged(false);
+  }
+
+  const baixarPng = () =>
+    run(async () => {
+      const png = new Uint8Array(await (await canvasBlob(fullCanvas(), "image/png")).arrayBuffer());
+      save(new Blob([pngWithDpi(png, 300) as BlobPart], { type: "image/png" }), `cartaz-${kind}-${slug}.png`);
+      afterPosterDownload();
+    });
+
+  const baixarPdf = () =>
+    run(async () => {
+      const jpeg = new Uint8Array(await (await canvasBlob(fullCanvas(), "image/jpeg", 0.92)).arrayBuffer());
+      save(jpegToA4Pdf(jpeg, A4_W, A4_H), `cartaz-${kind}-${slug}.pdf`);
+      afterPosterDownload();
+    });
+
+  const baixarQr = () =>
+    run(async () => {
+      const size = 1080;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("canvas");
+      drawQrOnly(ctx, assertPosterUrl(url), size, logo, logoText, fonts!);
+      save(await canvasBlob(canvas, "image/png"), `qr-${kind}-${slug}.png`);
+    });
 
   function copy() {
-    navigator.clipboard?.writeText(publicUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+    let safe: string;
+    try {
+      safe = assertPosterUrl(url); // a mesma guarda do totem dos cartazes
+    } catch {
+      setError(ERROR);
+      return;
+    }
+    navigator.clipboard?.writeText(safe).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      },
+      () => setError(ERROR),
+    );
   }
+
+  const locked = !ready || busy;
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="qr-cliente">
       <div className="flex items-center gap-2">
-        <div className="text-overline uppercase text-text-muted">QR Code da barbearia</div>
-        <QrCode size={16} className="text-text-muted" />
+        <div className="text-overline uppercase text-text-muted">QR code da barbearia</div>
+        <QrCode size={16} className="text-text-muted" aria-hidden />
       </div>
       <p className="text-caption text-text-2">
-        QR único da sua barbearia — leva o cliente direto para a sua página, onde ele agenda e se cadastra.
-        Escolha o modelo do cartaz, baixe (com a sua logo), imprima e cole na parede ou use em um banner.
+        Cartaz pronto para imprimir em A4, com a sua logo. Cole na parede e o cliente aponta a câmera, sem pedir ajuda no balcão.
       </p>
 
-      {/* Seletor de modelo */}
-      <div className="inline-flex w-fit rounded-md border border-border bg-surface-2 p-0.5">
-        <button
-          type="button"
-          onClick={() => setVariant("classic")}
-          className={`rounded px-3 py-1.5 text-caption font-semibold transition ${
-            variant === "classic" ? "bg-accent text-accent-contrast shadow-sm" : "text-text-muted hover:text-text"
-          }`}
-        >
-          Cartão clássico
-        </button>
-        <button
-          type="button"
-          onClick={() => setVariant("logo")}
-          className={`rounded px-3 py-1.5 text-caption font-semibold transition ${
-            variant === "logo" ? "bg-accent text-accent-contrast shadow-sm" : "text-text-muted hover:text-text"
-          }`}
-        >
-          Com a logo de fundo
-        </button>
-      </div>
+      {canQueue && (
+        <div role="radiogroup" aria-label="Modelo do cartaz" className="grid w-full grid-cols-2 rounded-md border border-border bg-surface-2 p-0.5 sm:w-fit">
+          {MODELS.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              role="radio"
+              aria-checked={activeModel === m.key}
+              onClick={() => setModel(m.key)}
+              className={`min-h-11 rounded px-3 text-caption font-semibold transition ${
+                activeModel === m.key ? "bg-accent text-accent-contrast shadow-sm" : "text-text-muted hover:text-text"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {canQueue && modeChanged && activeModel === "QUEUE" && (
+        <p role="status" className="flex items-start gap-2 text-caption text-warning-strong">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+          Você mudou o modo da fila. Imprima o cartaz de novo para o passo 2 ficar certo.
+        </p>
+      )}
 
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-        {/* Preview do cartaz */}
-        <div className="mx-auto w-full max-w-[280px] shrink-0">
+        <div className="mx-auto w-full max-w-[260px] shrink-0">
           <canvas
-            ref={posterRef}
-            width={POSTER_W}
-            height={POSTER_H}
-            className="w-full rounded-md border border-border bg-white shadow-sm"
-            style={{ aspectRatio: `${POSTER_W} / ${POSTER_H}` }}
+            ref={previewRef}
+            width={Math.round(A4_W * PREVIEW_SCALE)}
+            height={Math.round(A4_H * PREVIEW_SCALE)}
+            role="img"
+            aria-label={`Pré-visualização do cartaz ${activeModel === "QUEUE" ? "Fila digital" : "Cadastro do cliente"}`}
+            className="h-auto w-full rounded-md border border-border bg-black shadow-sm"
+            style={{ aspectRatio: `${A4_W} / ${A4_H}` }}
           />
         </div>
 
-        {/* Ações */}
         <div className="flex flex-1 flex-col gap-2">
-          <Button onClick={baixarCartaz} disabled={!ready}>
-            <Download size={16} /> Baixar cartaz (PNG)
+          <Button onClick={baixarPng} disabled={locked} loading={busy}>
+            <Download size={16} aria-hidden /> Baixar PNG
           </Button>
-          <Button variant="outline" onClick={baixarQr} disabled={!ready}>
-            <QrCode size={16} /> Baixar só o QR (PNG)
+          <Button variant="outline" onClick={baixarPdf} disabled={locked}>
+            <FileText size={16} aria-hidden /> Baixar PDF
+          </Button>
+          <Button variant="outline" onClick={baixarQr} disabled={locked}>
+            <QrCode size={16} aria-hidden /> Baixar só o QR
           </Button>
           <Button variant="ghost" onClick={copy}>
-            {copied ? <Check size={16} /> : <Copy size={16} />}
+            {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
             {copied ? "Link copiado!" : "Copiar link"}
           </Button>
-          <p className="mt-1 break-all text-caption text-text-muted">{domain}</p>
-          {variant === "logo" && !logoDataUrl && (
-            <p className="text-caption text-warning-strong">
-              Envie a logo acima (White-label) para o fundo ficar com a sua marca — sem logo, usamos a cor de destaque.
+          <p className="mt-1 break-all text-caption text-text-muted">{url.replace(/^https?:\/\//, "")}</p>
+          {error && (
+            <p role="alert" className="text-caption text-danger">
+              {error}
             </p>
           )}
-          <p className="text-caption text-text-muted">
-            Dica: o cartaz tem 1080×1350 — ótimo para imprimir (A4/A5) ou postar nos stories.
-          </p>
+          <p className="text-caption text-text-muted">A4 (21 × 29,7 cm), pronto para qualquer impressora.</p>
         </div>
       </div>
     </section>

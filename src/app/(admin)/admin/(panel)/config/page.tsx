@@ -8,7 +8,8 @@ import { getBranding, getUnitSettings } from "@/features/admin/data";
 import { getTenantContract } from "@/features/contract/data";
 import { buildContractView, contractToData } from "@/features/contract/view";
 import { ContractSection } from "@/features/contract/components/contract-section";
-import { getPlanUsage } from "@/lib/plan/effective";
+import { getEffectivePlan, getPlanUsage } from "@/lib/plan/effective";
+import { hasEntitlement } from "@/lib/entitlements";
 import { PlanUsage } from "@/features/plan/components/plan-usage";
 import QRCode from "qrcode";
 import { getRequestOrigin } from "@/lib/http";
@@ -16,23 +17,46 @@ import { getQueueConfig, getTotemToken } from "@/features/queue/data";
 import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
 import { TotemConfig } from "@/features/queue/components/totem-config";
 import { ClientQr } from "@/features/admin/components/client-qr";
+import { ConfigTabs } from "@/features/admin/components/config-tabs";
+import { showQueuePoster } from "@/features/admin/components/qr-posters/visibility";
+import { loadQuickQueueTenantState } from "@/features/quick-queue/data";
 
 export default async function ConfigPage() {
-  const [tenant, branding, unit, contract, planUsage] = await Promise.all([
+  const [tenant, branding, unit, contract, planUsage, eff] = await Promise.all([
     getCurrentTenant(),
     getBranding(),
     getUnitSettings(),
     getTenantContract(),
     getPlanUsage(),
+    getEffectivePlan(),
   ]);
   const contractView = buildContractView(contract);
   const queueCfg = await getQueueConfig(tenant.id);
 
   const origin = await getRequestOrigin();
 
-  // QR público da barbearia (cartaz para a parede) — leva o cliente à página dele.
+  // Cartazes de QR (#127). Só links do cliente, montados com a origem + o slug desta barbearia:
+  // B (Cadastro) leva a /b/<slug>; A (Fila digital) leva a /b/<slug>/fila. Nunca o link do totem.
   const publicUrl = `${origin}/b/${tenant.subdomain}`;
-  const publicQr = await QRCode.toDataURL(publicUrl, { margin: 1, width: 600, errorCorrectionLevel: "H" });
+  // A: só com plano com "queue" (ou em teste) + fila ligada + fila rápida ligada nesta barbearia
+  // (regra em showQueuePoster). A chave vem da mesma leitura do #123, que falha fechado: sem a
+  // coluna da schema-51, com erro ou com outra barbearia no estado, vale false e o cartaz A some.
+  const queueInPlan = !eff.gated || hasEntitlement(eff.plan, "queue");
+  let quickQueueEnabled = false;
+  try {
+    const qq = await loadQuickQueueTenantState(tenant.subdomain);
+    quickQueueEnabled = qq?.id === tenant.id && qq.quickQueueEnabled === true;
+  } catch {
+    quickQueueEnabled = false;
+  }
+  const queueUrl = showQueuePoster({
+    planHasQueue: queueInPlan,
+    queueEnabled: queueCfg.enabled,
+    quickQueueEnabled,
+    queueMode: queueCfg.mode,
+  })
+    ? `${publicUrl}/fila`
+    : null;
   // Logo embutida como data URL (evita canvas "tainted" ao exportar o PNG).
   const logoUrl = branding?.logo_url ?? tenant.branding.logoUrl ?? null;
   let logoData: string | null = null;
@@ -60,65 +84,78 @@ export default async function ConfigPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6" id="unidade">
+    <div className="flex min-w-0 flex-col gap-6">
       <h1 className="text-h3 font-bold text-text">Configurações & Branding</h1>
 
-      {/* Dados da unidade + horários (salvam de verdade) */}
-      <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
-        <div className="text-overline uppercase text-text-muted">Dados da unidade</div>
-        <UnitSettingsForm tenantName={tenant.name} initial={unit} />
-      </section>
+      <ConfigTabs
+        panels={{
+          unidade: (
+            /* Dados da unidade + horários (salvam de verdade) */
+            <section className="flex scroll-mt-20 flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="unidade">
+              <div className="text-overline uppercase text-text-muted">Dados da unidade</div>
+              <UnitSettingsForm tenantName={tenant.name} initial={unit} />
+            </section>
+          ),
+          marca: (
+            /* White-label */
+            <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
+              <div className="flex items-center gap-2">
+                <div className="text-overline uppercase text-text-muted">White-label</div>
+                <Badge variant="accent">Marca</Badge>
+              </div>
 
-      {/* White-label */}
-      <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
-        <div className="flex items-center gap-2">
-          <div className="text-overline uppercase text-text-muted">White-label</div>
-          <Badge variant="accent">Marca</Badge>
-        </div>
+              <LogoUpload
+                current={branding?.logo_url ?? tenant.branding.logoUrl ?? null}
+                logoText={tenant.branding.logoText}
+              />
 
-        <LogoUpload
-          current={branding?.logo_url ?? tenant.branding.logoUrl ?? null}
-          logoText={tenant.branding.logoText}
-        />
+              <BrandingForm
+                initialAccent={branding?.accent ?? "#C9A24B"}
+                initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
+              />
+            </section>
+          ),
+          "qr-fila": (
+            <>
+              <ClientQr
+                publicUrl={publicUrl}
+                queueUrl={queueUrl}
+                // TODO(#123/#102): "PHONE" quando a fila rápida estiver ligada nesta barbearia.
+                queueEntry="LOGIN"
+                slug={tenant.subdomain}
+                logoDataUrl={logoData}
+                logoText={tenant.branding.logoText}
+                name={tenant.name}
+                accent={branding?.accent ?? tenant.branding.accent ?? null}
+              />
 
-        <BrandingForm
-          initialAccent={branding?.accent ?? "#C9A24B"}
-          initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
-        />
-      </section>
+              {queueCfg.enabled && totem && (
+                <TotemConfig
+                  totemUrl={totem.url}
+                  qrDataUrl={totem.qr}
+                  mode={queueCfg.mode}
+                  planRequiresService={queueCfg.planRequiresService}
+                />
+              )}
 
-      <ClientQr
-        publicUrl={publicUrl}
-        slug={tenant.subdomain}
-        qrDataUrl={publicQr}
-        logoDataUrl={logoData}
-        logoText={tenant.branding.logoText}
-        name={tenant.name}
-        instagram={branding?.instagram ?? tenant.branding.instagram ?? null}
-        accent={branding?.accent ?? "#C9A24B"}
+              {queueCfg.enabled && <PickBarberToggle enabled={queueCfg.pickBarber} />}
+            </>
+          ),
+          whatsapp: <WhatsAppConnect />,
+          "plano-contrato": (
+            <>
+              <PlanUsage view={planUsage} />
+
+              {contractView && (
+                <ContractSection
+                  view={contractView}
+                  initial={{ ...contractToData(contract), tradeName: contract?.trade_name ?? tenant.name }}
+                />
+              )}
+            </>
+          ),
+        }}
       />
-
-      <WhatsAppConnect />
-
-      {queueCfg.enabled && totem && (
-        <TotemConfig
-          totemUrl={totem.url}
-          qrDataUrl={totem.qr}
-          mode={queueCfg.mode}
-          planRequiresService={queueCfg.planRequiresService}
-        />
-      )}
-
-      {queueCfg.enabled && <PickBarberToggle enabled={queueCfg.pickBarber} />}
-
-      <PlanUsage view={planUsage} />
-
-      {contractView && (
-        <ContractSection
-          view={contractView}
-          initial={{ ...contractToData(contract), tradeName: contract?.trade_name ?? tenant.name }}
-        />
-      )}
     </div>
   );
 }
