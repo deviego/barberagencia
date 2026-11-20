@@ -46,4 +46,6 @@ export type QuickQueueRoute = "QUICK" | "LEGACY";
 export const QUICK_QUEUE_MESSAGES = {
   notFound: "Barbearia não encontrada.",
   unavailable: "A fila não está disponível agora. Fale no balcão.",
+  /** "Continuar" tocado sem a entrada pelo telefone ligada (antes da #96). O botão nunca falha calado. */
+  entryNotReady: "A entrada pela fila rápida ainda não está disponível nesta barbearia. Fale com a equipe no balcão.",
 } as const;

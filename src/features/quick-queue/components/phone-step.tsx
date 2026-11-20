@@ -4,6 +4,7 @@ import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { maskPhoneBR } from "@/lib/masks";
+import { QUICK_QUEUE_MESSAGES } from "../types";
 
 /** Retorno da ação de continuar (ligada na #96). Só uma mensagem de erro pronta para o cliente. */
 export type PhoneStepResult = { error?: string } | void;
@@ -28,8 +29,12 @@ export function PhoneStep({ onContinue }: { onContinue?: (phone: string) => Prom
       setError("Confira o telefone: DDD e número.");
       return;
     }
+    if (!onContinue) {
+      // Sem a identificação ligada, o botão avisa na tela em vez de não fazer nada.
+      setError(QUICK_QUEUE_MESSAGES.entryNotReady);
+      return;
+    }
     setError(null);
-    if (!onContinue) return;
     startTransition(async () => {
       const res = await onContinue(digits);
       if (res?.error) setError(res.error);
