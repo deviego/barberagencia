@@ -22,7 +22,7 @@ import { LockedFeature } from "@/features/plan/components/locked-feature";
 import { waStatus } from "@/features/admin/whatsapp-actions";
 import { ClientQr } from "@/features/admin/components/client-qr";
 import { ConfigTabs } from "@/features/admin/components/config-tabs";
-import { showQueuePoster } from "@/features/admin/components/qr-posters/visibility";
+import { quickQueueOnFor, showQueuePoster, showQueuePosterHint } from "@/features/admin/components/qr-posters/visibility";
 import { loadQuickQueueTenantState } from "@/features/quick-queue/data";
 
 export default async function ConfigPage() {
@@ -48,19 +48,19 @@ export default async function ConfigPage() {
   const queueInPlan = !eff.gated || hasEntitlement(eff.plan, "queue");
   let quickQueueEnabled = false;
   try {
-    const qq = await loadQuickQueueTenantState(tenant.subdomain);
-    quickQueueEnabled = qq?.id === tenant.id && qq.quickQueueEnabled === true;
+    quickQueueEnabled = quickQueueOnFor(await loadQuickQueueTenantState(tenant.subdomain), tenant.id);
   } catch {
     quickQueueEnabled = false;
   }
-  const queueUrl = showQueuePoster({
+  const posterGate = {
     planHasQueue: queueInPlan,
     queueEnabled: queueCfg.enabled,
     quickQueueEnabled,
     queueMode: queueCfg.mode,
-  })
-    ? `${publicUrl}/fila`
-    : null;
+  };
+  const queueUrl = showQueuePoster(posterGate) ? `${publicUrl}/fila` : null;
+  // Fila no plano e ligada, fila rápida desligada: só o cartaz B + o aviso do cartaz da fila (#102).
+  const queuePosterHint = showQueuePosterHint(posterGate);
   // Logo embutida como data URL (evita canvas "tainted" ao exportar o PNG).
   const logoUrl = branding?.logo_url ?? tenant.branding.logoUrl ?? null;
   let logoData: string | null = null;
@@ -150,6 +150,7 @@ export default async function ConfigPage() {
               <ClientQr
                 publicUrl={publicUrl}
                 queueUrl={queueUrl}
+                queuePosterHint={queuePosterHint}
                 // O cartaz A só aparece com a fila rápida ligada (showQueuePoster): passo 2 = telefone.
                 queueEntry={quickQueueEnabled ? "PHONE" : "LOGIN"}
                 slug={tenant.subdomain}

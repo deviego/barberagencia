@@ -16,3 +16,22 @@ export type QueuePosterGate = {
 export function showQueuePoster(g: QueuePosterGate): boolean {
   return g.planHasQueue === true && g.queueEnabled === true && g.quickQueueEnabled === true && g.queueMode !== "TOTEM";
 }
+
+/**
+ * Aviso no lugar do cartaz A (#102): fila no plano e ligada, mas fila rápida desligada (estado
+ * inicial). Mostra só o cartaz B e QUICK_QUEUE_ADMIN_MESSAGES.posterHint. Fora disso, nada muda.
+ */
+export function showQueuePosterHint(g: QueuePosterGate): boolean {
+  return g.planHasQueue === true && g.queueEnabled === true && g.quickQueueEnabled !== true;
+}
+
+/**
+ * A fila rápida desta barbearia está ligada? Falha fechado: sem estado, coluna ausente, valor que
+ * não é true ou estado de OUTRA barbearia = desligada. Erro de leitura fica com quem chama (false).
+ */
+export function quickQueueOnFor(
+  state: { id?: string | null; quickQueueEnabled?: boolean | null } | null | undefined,
+  tenantId: string,
+): boolean {
+  return !!state && !!tenantId && state.id === tenantId && state.quickQueueEnabled === true;
+}

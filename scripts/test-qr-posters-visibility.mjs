@@ -10,7 +10,7 @@ const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/
 const js = ts.transpileModule(readFileSync(file, "utf8"), {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-const { showQueuePoster } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
+const { showQueuePoster, showQueuePosterHint, quickQueueOnFor } = await import(`data:text/javascript;base64,${Buffer.from(js).toString("base64")}`);
 
 let n = 0;
 function check(name, input, expected) {
@@ -40,5 +40,33 @@ check("número 1", { planHasQueue: 1, queueEnabled: true, quickQueueEnabled: tru
 
 // Modo só totem esconde mesmo com tudo ligado.
 check("modo TOTEM", { planHasQueue: true, queueEnabled: true, quickQueueEnabled: true, queueMode: "TOTEM" }, false);
+
+// Aviso do cartaz da fila (#102): só com plano + fila ligada e a fila rápida desligada.
+function hint(name, input, expected) {
+  assert.equal(showQueuePosterHint(input), expected, `aviso: ${name}`);
+  n++;
+}
+hint("rápida desligada", { planHasQueue: true, queueEnabled: true, quickQueueEnabled: false }, true);
+hint("rápida desconhecida (null)", { planHasQueue: true, queueEnabled: true, quickQueueEnabled: null }, true);
+hint("rápida ligada", { planHasQueue: true, queueEnabled: true, quickQueueEnabled: true }, false);
+hint("plano sem fila", { planHasQueue: false, queueEnabled: true, quickQueueEnabled: false }, false);
+hint("fila desligada", { planHasQueue: true, queueEnabled: false, quickQueueEnabled: false }, false);
+hint("plano desconhecido", { planHasQueue: undefined, queueEnabled: true, quickQueueEnabled: false }, false);
+
+// Leitura da chave (falha fechado): só o estado DESTA barbearia com true liga.
+function qq(name, state, expected) {
+  assert.equal(quickQueueOnFor(state, "t1"), expected, `chave: ${name}`);
+  n++;
+}
+qq("ligada", { id: "t1", quickQueueEnabled: true }, true);
+qq("desligada", { id: "t1", quickQueueEnabled: false }, false);
+qq("coluna ausente", { id: "t1" }, false);
+qq("valor null", { id: "t1", quickQueueEnabled: null }, false);
+qq("outra barbearia", { id: "t2", quickQueueEnabled: true }, false);
+qq("sem estado (null)", null, false);
+qq("sem estado (undefined)", undefined, false);
+qq("string 'true'", { id: "t1", quickQueueEnabled: "true" }, false);
+assert.equal(quickQueueOnFor({ id: "", quickQueueEnabled: true }, ""), false, "chave: tenant vazio");
+n++;
 
 console.log(`ok: ${n} casos`);

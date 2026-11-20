@@ -15,12 +15,15 @@ import {
   type PosterModel,
   type QueueEntryMode,
 } from "./qr-posters/draw";
+import { QUICK_QUEUE_ADMIN_MESSAGES } from "@/features/quick-queue/types";
 
 type Props = {
   /** Link público do cliente: /b/<slug> (modelo B, Cadastro). */
   publicUrl: string;
   /** Link da fila do cliente: /b/<slug>/fila (modelo A). null = plano sem fila ou fila desligada. */
   queueUrl: string | null;
+  /** Fila no plano e ligada com a fila rápida desligada: avisa onde está o cartaz da fila (#102). */
+  queuePosterHint?: boolean;
   /** Como o cliente entra na fila hoje (muda o passo 2 do modelo A). */
   queueEntry: QueueEntryMode;
   slug: string;
@@ -101,7 +104,7 @@ function canvasBlob(canvas: HTMLCanvasElement, type: string, quality?: number): 
   );
 }
 
-export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, logoText, name, accent }: Props) {
+export function ClientQr({ publicUrl, queueUrl, queuePosterHint = false, queueEntry, slug, logoDataUrl, logoText, name, accent }: Props) {
   const previewRef = useRef<HTMLCanvasElement | null>(null);
   const [model, setModel] = useState<PosterModel>(queueUrl ? "QUEUE" : "SIGNUP");
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
@@ -264,6 +267,12 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
             </button>
           ))}
         </div>
+      )}
+
+      {!canQueue && queuePosterHint && (
+        <p role="status" className="text-caption text-text-2">
+          {QUICK_QUEUE_ADMIN_MESSAGES.posterHint}
+        </p>
       )}
 
       {canQueue && modeChanged && activeModel === "QUEUE" && (
