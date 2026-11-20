@@ -86,7 +86,7 @@ registerHooks({
 
 const rules = await import("@/features/quick-queue/rules");
 const { getQuickQueueEntry, getQuickQueueRoute } = await import("@/features/quick-queue/data");
-const { requireQuickQueueOpen, QuickQueueClosedError } = await import("@/features/quick-queue/guard");
+const { requireQuickQueueOpen, requireQuickQueueTicketAccess, QuickQueueClosedError } = await import("@/features/quick-queue/guard");
 const { QUICK_QUEUE_MESSAGES } = await import("@/features/quick-queue/types");
 
 const NOW = new Date("2026-11-17T12:00:00Z");
@@ -341,15 +341,87 @@ await test("guard e leitura são server-only; nenhum deles é server action", ()
   }
 });
 
+// Ações do painel do dono (admin-actions.ts) não usam o guard público: exigem a sessão de admin
+// da unidade e pegam a barbearia da sessão (conferido no teste seguinte).
+const ADMIN_ACTIONS = "admin-actions.ts";
+const TICKET_ACCESS_ACTIONS = new Set(["leaveQuickQueue"]);
+
 await test('toda server action do módulo ("use server") passa pelo guard', () => {
   for (const f of files) {
+    if (f === ADMIN_ACTIONS) continue;
     const src = readFileSync(path.join(MOD, f), "utf8");
     if (!/^["']use server["']/m.test(src)) continue;
     // Aceita anotação de retorno ("): Promise<...> {"). Corpo = até a "}" sozinha na linha.
     const exported = [...src.matchAll(/export\s+async\s+function\s+(\w+)\s*\([^)]*\)[^{]*{([\s\S]*?)\n}/g)];
     assert.ok(exported.length > 0, `${f}: nenhuma ação encontrada para conferir`);
-    for (const [, name, body] of exported) assert.match(body, /requireQuickQueueOpen\(/, `${f}: ${name}`);
+    for (const [, name, body] of exported) {
+      // Só "Sair da fila" usa o guard da senha já criada (#102); todo o resto, o da fila aberta.
+      const guard = TICKET_ACCESS_ACTIONS.has(name) ? /requireQuickQueueTicketAccess\(/ : /requireQuickQueueOpen\(/;
+      assert.match(body, guard, `${f}: ${name}`);
+    }
   }
+});
+
+await test("ações do painel exigem admin da unidade e pegam a barbearia só da sessão", () => {
+  const src = readFileSync(path.join(MOD, ADMIN_ACTIONS), "utf8");
+  assert.match(src, /^["']use server["']/m);
+  const exported = [...src.matchAll(/export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)[^{]*{([\s\S]*?)\n}/g)];
+  assert.ok(exported.length > 0, "nenhuma ação encontrada para conferir");
+  for (const [, name, params, body] of exported) {
+    assert.match(body, /getSessionUser\(\)/, `${name}: sessão`);
+    assert.match(body, /isUnitAdmin\(/, `${name}: papel`);
+    assert.match(body, /tenantId\s*=\s*user\.tenantId/, `${name}: barbearia da sessão`);
+    assert.doesNotMatch(params, /tenant|slug/i, `${name}: não recebe barbearia do navegador`);
+  }
+});
+
+// ---------- #102: desligar não encerra senha já criada ----------
+
+await test("liga, entra, desliga: consulta e saída continuam; entrar fica recusado", async () => {
+  const S = shop(A, "fila-liga");
+  setDb([S]);
+  assert.deepEqual(await requireQuickQueueOpen("fila-liga", NOW), { tenantId: A });
+  assert.deepEqual(await requireQuickQueueTicketAccess("fila-liga", NOW), { tenantId: A });
+  S.tenant.quick_queue_enabled = false; // o dono desliga
+  setDb([S]);
+  await assert.rejects(requireQuickQueueOpen("fila-liga", NOW), QuickQueueClosedError);
+  assert.deepEqual(await requireQuickQueueTicketAccess("fila-liga", NOW), { tenantId: A });
+});
+
+await test("senha já criada: vale com fila fechada ou modo totem; não vale sem plano, distribuidor, leitura com erro ou barbearia inexistente", async () => {
+  for (const over of [{ tenant: { queue_enabled: false } }, { settings: { queue_mode: "TOTEM" } }]) {
+    setDb([shop(A, "fila-aberta-nao", over)]);
+    await assert.rejects(requireQuickQueueOpen("fila-aberta-nao", NOW), QuickQueueClosedError);
+    assert.deepEqual(await requireQuickQueueTicketAccess("fila-aberta-nao", NOW), { tenantId: A });
+  }
+  setDb([shop(A, "fila-personal", { tenant: { saas_plan: "personal" } })]);
+  await assert.rejects(requireQuickQueueTicketAccess("fila-personal", NOW), QuickQueueClosedError);
+  setDb([shop(A, "fila-dist", { tenant: { kind: "DISTRIBUTOR" } })]);
+  await assert.rejects(requireQuickQueueTicketAccess("fila-dist", NOW), QuickQueueClosedError);
+  setDb([shop(A, "fila-erro")], { failTables: ["tenant_settings"] });
+  await assert.rejects(requireQuickQueueTicketAccess("fila-erro", NOW), QuickQueueClosedError);
+  setDb([]);
+  await assert.rejects(requireQuickQueueTicketAccess("fila-nenhuma", NOW), QuickQueueClosedError);
+});
+
+await test("rota de status usa o guard da senha já criada; nenhuma outra porta usa", () => {
+  const route = readFileSync(path.join(SRC, "app/b/[slug]/fila/rapida/status/route.ts"), "utf8");
+  assert.match(route, /requireQuickQueueTicketAccess\(/);
+  assert.doesNotMatch(route, /requireQuickQueueOpen\(/);
+  for (const f of files) {
+    if (f === "guard.ts" || f === "actions.ts") continue;
+    assert.doesNotMatch(readFileSync(path.join(MOD, f), "utf8"), /requireQuickQueueTicketAccess\(/, f);
+  }
+  const actions = readFileSync(path.join(MOD, "actions.ts"), "utf8");
+  assert.equal((actions.match(/await requireQuickQueueTicketAccess\(/g) ?? []).length, 1);
+});
+
+await test("página com a fila rápida desligada e sem senha neste aparelho: neutra, sem marca", async () => {
+  setDb([shop(A, "fila-off", { tenant: { quick_queue_enabled: false } })]);
+  const e = await getQuickQueueEntry("fila-off");
+  assert.equal(e.status, "UNAVAILABLE");
+  assert.equal(e.brand, undefined);
+  assert.equal(e.viewer, "VISITOR");
 });
 
 console.log(`\n${passed} testes ok`);
