@@ -300,8 +300,26 @@ export async function saveBranding(values: { accent?: string; instagram?: string
   return { ok: true as const };
 }
 
+/** Mensagem da recusa de plano para cliente que ainda não criou o acesso (#130). */
+const INVITED_NO_PLAN = "Este cliente ainda não criou o acesso.";
+
+/**
+ * Plano só para cliente que já criou o acesso: a mesma regra do filtro da tela de Clientes, agora
+ * também no servidor (#130). A leitura passa pela RLS: cliente de outra barbearia nem é encontrado.
+ */
+async function refuseInvitedClient(clientId: string): Promise<string | null> {
+  if (!clientId) return "Cliente inválido.";
+  const supabase = await createSupabaseServerClient();
+  const { data: client } = await supabase.from("clients").select("status").eq("id", clientId).maybeSingle();
+  if (!client) return "Cliente não encontrado.";
+  if (client.status === "INVITED") return INVITED_NO_PLAN;
+  return null;
+}
+
 /** Atribui/renova um combo a um cliente (admin). Planos Livres. */
 export async function assignComboToClient(clientId: string, comboPlanId: string) {
+  const refused = await refuseInvitedClient(clientId);
+  if (refused) return { ok: false as const, error: refused };
   const gate = await guardNewSubscriber(clientId);
   if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
   const supabase = await createSupabaseServerClient();
@@ -321,6 +339,8 @@ export async function activateFixedPlan(
   comboPlanId: string,
   slot: { weekday: number; startMin: number; barberId: string }
 ) {
+  const refused = await refuseInvitedClient(clientId);
+  if (refused) return { ok: false as const, error: refused };
   const gate = await guardNewSubscriber(clientId);
   if (!gate.allowed) return { ok: false as const, error: gate.message, blocked: gate };
   const supabase = await createSupabaseServerClient();
