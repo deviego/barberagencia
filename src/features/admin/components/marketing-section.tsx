@@ -24,8 +24,10 @@ export async function MarketingSection() {
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-wash">
           <Lock size={24} className="text-accent" />
         </div>
-        <h2 className="text-h4 font-semibold text-text">Disponível no plano Essencial</h2>
-        <p className="text-body text-text-2">Fila com senha por QR e vitrine de produtos para seus clientes.</p>
+        <h2 className="text-h4 font-semibold text-text">Campanhas a partir do plano Essencial</h2>
+        <p className="text-body text-text-2">
+          Um lugar para registrar suas campanhas e se organizar. A plataforma não dispara mensagens em massa.
+        </p>
         <Link href={PLAN_SCREEN_HREF} className={buttonVariants()}>
           Ver planos
         </Link>

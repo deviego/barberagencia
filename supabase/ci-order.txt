@@ -38,3 +38,4 @@ schema-31-fixed-plan-debit.sql
 schema-33-rpc-tenant-scope.sql
 schema-35-marketing-leads.sql
 schema-50-queue-totem-checks.sql
+schema-59-plan-switch-cancel-fixed.sql
