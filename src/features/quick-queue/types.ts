@@ -278,8 +278,9 @@ export type SetQuickQueueEnabledResult =
   | {
       ok: false;
       /** FORBIDDEN: sem permissão de administrar a barbearia. PLAN: plano sem fila.
-       * QUEUE_OFF: a fila da barbearia está desativada. GENERIC: falha ao salvar. */
-      code: "FORBIDDEN" | "PLAN" | "QUEUE_OFF" | "GENERIC";
+       * QUEUE_OFF: a fila da barbearia está desativada. ROTATE_FIRST (#103): renovar a chave do
+       * totem antes (mostrar "Antes de começar"; a fila rápida segue desligada). GENERIC: falha. */
+      code: "FORBIDDEN" | "PLAN" | "QUEUE_OFF" | "ROTATE_FIRST" | "GENERIC";
       error: string;
     };
 
@@ -294,6 +295,8 @@ export const QUICK_QUEUE_ADMIN_MESSAGES = {
   plan: "A fila não faz parte do seu plano.",
   queueOff: "Ative a fila da barbearia antes de ligar a fila rápida.",
   failed: "Não deu certo. Tente de novo.",
+  /** #103 */
+  rotateFirst: "Para ligar a fila rápida, renove a chave do totem.",
   /*
    * Alerta ao dono (#99/#145, copy da PO em 20/11). Aparece com tenantCapHit ou com o total do
    * dia >= QUICK_QUEUE_ALERT_MIN_TOTAL, só com a fila no plano e a fila rápida ligada. Só o total,
@@ -313,4 +316,30 @@ export const QUICK_QUEUE_ADMIN_MESSAGES = {
   confirmNo: "Voltar",
   turnedOff: "Fila rápida desligada.",
 } as const;
+
+/** #103 — passo a passo "Antes de começar" (renovar a chave do totem antes de ligar). */
+export const QUICK_QUEUE_ONBOARDING_MESSAGES = {
+  title: "Antes de começar",
+  steps: [
+    "1. Renove a chave do totem.",
+    "2. Abra o totem de novo no tablet.",
+    "3. Imprima o QR do cliente e troque qualquer QR antigo.",
+  ],
+  rotate: "Renovar chave",
+  later: "Fazer depois",
+  /** Confirmação da renovação (copy da PO, #157/#103). */
+  confirmTitle: "Renovar a chave do totem?",
+  confirm: "O totem do balcão para de funcionar até você abrir o novo acesso no tablet.",
+  confirmYes: "Renovar chave",
+  confirmNo: "Voltar",
+  reminder: "Para ligar a fila rápida, renove a chave do totem.",
+  oldAccess: "Este acesso não vale mais. Peça ajuda no balcão.",
+} as const;
+
+/** Estado do interruptor para o painel (#102/#103). */
+export type QuickQueueAdminState = {
+  enabled: boolean;
+  /** Adoção começou e a chave do totem ainda não foi renovada depois: mostrar o lembrete. */
+  needsKeyRotation: boolean;
+};
 
