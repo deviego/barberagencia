@@ -1,4 +1,5 @@
-// Testes de banco da entrada na fila pela fila rápida (#97): schema-53 + quick_queue_join.
+// Testes de banco da entrada na fila pela fila rápida (#97): schema-53 + quick_queue_join
+// (na assinatura da schema-54, com as travas folgadas).
 // SÓ em Supabase LOCAL descartável (loopback), com o ci-order aplicado. Dados fictícios.
 // Cada execução cria barbearias novas com sufixo aleatório e não apaga nada.
 // Uso: DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:<porta>/postgres node scripts/test-quick-queue-join-db.mjs
@@ -20,7 +21,8 @@ const pool = new pg.Pool({ ...config, max: 25 });
 
 const RUN = randomBytes(3).toString("hex");
 const hash = () => createHash("sha256").update(randomBytes(32)).digest("hex");
-const MIGRATION = new URL("../supabase/schema-53-quick-queue-join.sql", import.meta.url);
+// Reaplicar a 53 depois da 54 recriaria a versão antiga; o teste de re-execução usa a mais nova.
+const MIGRATION = new URL("../supabase/schema-54-quick-queue-limits.sql", import.meta.url);
 
 let passed = 0;
 async function test(name, fn) {
@@ -87,13 +89,17 @@ async function device(tenant, { clientId, expires = "30 days" } = {}) {
   return { hash: h, id, clientId: cid };
 }
 
+// Desde a schema-54 a função recebe também as travas da #99. Aqui elas ficam folgadas: este
+// arquivo testa a entrada (#97); as travas têm o teste próprio (test-quick-queue-limits-db.mjs).
+const LOOSE = [600, 1000, 1000, 1000, 30];
 async function join(tenant, dev, svc, cents = 3500, barberId = null, c = pool) {
-  const { rows } = await c.query(`select public.quick_queue_join($1, $2, $3, $4, $5) as r`, [
+  const { rows } = await c.query(`select public.quick_queue_join($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) as r`, [
     tenant,
     typeof dev === "string" ? dev : dev.hash,
     svc,
     cents,
     barberId,
+    ...LOOSE,
   ]);
   return rows[0].r;
 }
@@ -269,7 +275,12 @@ await test("assinatura não aceita cliente nem número de senha", async () => {
        join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and p.proname = 'quick_queue_join'`
   );
-  assert.equal(args, "p_tenant_id uuid, p_device_hash text, p_service_id uuid, p_price_cents integer, p_barber_id uuid");
+  assert.equal(
+    args,
+    "p_tenant_id uuid, p_device_hash text, p_service_id uuid, p_price_cents integer, p_barber_id uuid, " +
+      "p_window_seconds integer, p_join_per_device integer, p_active_per_device integer, " +
+      "p_tenant_active_cap integer, p_device_ttl_days integer"
+  );
 });
 
 await test("origem fora do permitido é recusada pela tabela", async () => {
