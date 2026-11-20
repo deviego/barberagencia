@@ -158,6 +158,39 @@ await test("repetir a confirmação não desconta duas vezes (em série e ao mes
   assert.equal((await one(`select count(*)::int n from public.appointments where client_id = $1`, [cid])).n, 1);
 });
 
+await test("duas confirmações ao mesmo tempo: a segunda espera a primeira e não desconta de novo", async () => {
+  const s = await shop("race");
+  const cid = await client(s);
+  await plan(s, cid, { saldo: 5 });
+  const id = await ticket(s, cid);
+  const open = async () => {
+    const c = await pool.connect();
+    await c.query("begin");
+    await c.query("set local role authenticated");
+    await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: s.admin, role: "authenticated" })]);
+    return c;
+  };
+  const c1 = await open();
+  const c2 = await open();
+  try {
+    const a1 = (await c1.query(`select public.start_queue_entry($1, true, null, null) as appt`, [id])).rows[0].appt;
+    // A primeira ainda não confirmou a transação; a segunda começa agora.
+    const second = c2.query(`select public.start_queue_entry($1, true, null, null) as appt`, [id]);
+    await new Promise((r) => setTimeout(r, 300));
+    await c1.query("commit");
+    const a2 = (await second).rows[0].appt;
+    await c2.query("commit");
+    assert.equal(a2, a1);
+  } finally {
+    await c1.query("rollback").catch(() => {});
+    await c2.query("rollback").catch(() => {});
+    c1.release();
+    c2.release();
+  }
+  assert.equal(await saldo(cid), 4);
+  assert.equal((await one(`select count(*)::int n from public.appointments where client_id = $1`, [cid])).n, 1);
+});
+
 await test("plano fixo: 'Usar plano' recusado, nada muda; painel não oferece", async () => {
   const s = await shop("fixed");
   const cid = await client(s);
