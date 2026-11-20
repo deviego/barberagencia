@@ -40,9 +40,17 @@ export function ConfigTabs({ panels }: { panels: Record<ConfigTab, ReactNode> })
     document.getElementById(id)?.scrollIntoView({ block: "start" });
   }, [active]);
 
-  // No celular, a aba ativa fica à vista na faixa que rola na horizontal.
+  // No celular, a aba ativa fica à vista na faixa que rola na horizontal. Rola só a faixa:
+  // scrollIntoView rolaria a página também e desfaria a rolagem até a âncora (#contrato).
+  const stripRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    tabRefs.current[active]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const strip = stripRef.current;
+    const tab = tabRefs.current[active];
+    if (!strip || !tab) return;
+    const left = tab.offsetLeft; // a faixa é "relative": o offset já é medido a partir dela
+    const right = left + tab.offsetWidth;
+    if (left < strip.scrollLeft) strip.scrollTo({ left });
+    else if (right > strip.scrollLeft + strip.clientWidth) strip.scrollTo({ left: right - strip.clientWidth });
   }, [active]);
 
   const select = useCallback(
@@ -72,7 +80,10 @@ export function ConfigTabs({ panels }: { panels: Record<ConfigTab, ReactNode> })
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <div className="-mx-4 min-w-0 overflow-x-auto px-4 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={stripRef}
+        className="relative -mx-4 min-w-0 overflow-x-auto px-4 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <div
           role="tablist"
           aria-label="Seções das configurações"
