@@ -334,14 +334,32 @@ await test("guard e leitura são server-only; nenhum deles é server action", ()
   }
 });
 
+// Ações do painel do dono (admin-actions.ts) não usam o guard público: exigem a sessão de admin
+// da unidade e pegam a barbearia da sessão (conferido no teste seguinte).
+const ADMIN_ACTIONS = "admin-actions.ts";
+
 await test('toda server action do módulo ("use server") passa pelo guard', () => {
   for (const f of files) {
+    if (f === ADMIN_ACTIONS) continue;
     const src = readFileSync(path.join(MOD, f), "utf8");
     if (!/^["']use server["']/m.test(src)) continue;
     // Aceita anotação de retorno ("): Promise<...> {"). Corpo = até a "}" sozinha na linha.
     const exported = [...src.matchAll(/export\s+async\s+function\s+(\w+)\s*\([^)]*\)[^{]*{([\s\S]*?)\n}/g)];
     assert.ok(exported.length > 0, `${f}: nenhuma ação encontrada para conferir`);
     for (const [, name, body] of exported) assert.match(body, /requireQuickQueueOpen\(/, `${f}: ${name}`);
+  }
+});
+
+await test("ações do painel exigem admin da unidade e pegam a barbearia só da sessão", () => {
+  const src = readFileSync(path.join(MOD, ADMIN_ACTIONS), "utf8");
+  assert.match(src, /^["']use server["']/m);
+  const exported = [...src.matchAll(/export\s+async\s+function\s+(\w+)\s*\(([^)]*)\)[^{]*{([\s\S]*?)\n}/g)];
+  assert.ok(exported.length > 0, "nenhuma ação encontrada para conferir");
+  for (const [, name, params, body] of exported) {
+    assert.match(body, /getSessionUser\(\)/, `${name}: sessão`);
+    assert.match(body, /isUnitAdmin\(/, `${name}: papel`);
+    assert.match(body, /tenantId\s*=\s*user\.tenantId/, `${name}: barbearia da sessão`);
+    assert.doesNotMatch(params, /tenant|slug/i, `${name}: não recebe barbearia do navegador`);
   }
 });
 

@@ -184,3 +184,34 @@ export type QuickQueueLimitSummary = {
   /** true quando o teto de senhas da fila rápida foi atingido hoje: mostrar alerta com "Desligar". */
   tenantCapHit: boolean;
 };
+
+/*
+ * #102 — interruptor "Fila rápida" no painel (dono/gerente da própria barbearia).
+ *   setQuickQueueEnabled(enabled) → SetQuickQueueEnabledResult (server action, ./admin-actions.ts)
+ * A barbearia vem só da sessão do painel; o navegador manda só true/false.
+ * Ligar exige plano com fila e a fila da barbearia ativada; desligar é sempre permitido.
+ * Cada mudança fica registrada em audit_log (quem e quando). Depois de salvar, a página de
+ * configurações é revalidada: o cartaz A some ou aparece na hora.
+ */
+export type SetQuickQueueEnabledResult =
+  | { ok: true; enabled: boolean }
+  | {
+      ok: false;
+      /** FORBIDDEN: sem permissão de administrar a barbearia. PLAN: plano sem fila.
+       * QUEUE_OFF: a fila da barbearia está desativada. GENERIC: falha ao salvar. */
+      code: "FORBIDDEN" | "PLAN" | "QUEUE_OFF" | "GENERIC";
+      error: string;
+    };
+
+/** Textos fixos da #102 (chave e avisos). */
+export const QUICK_QUEUE_ADMIN_MESSAGES = {
+  label: "Fila rápida",
+  on: "Ligada: o cliente entra na fila só com o telefone.",
+  off: "Desligada: o cliente precisa entrar na conta para pegar senha.",
+  posterHint: "O cartaz da fila aparece quando a fila rápida estiver ligada.",
+  whatsappOff: "WhatsApp desconectado. A fila funciona normal, só a mensagem de acesso não sai.",
+  forbidden: "Você não tem permissão para mudar isso.",
+  plan: "A fila não faz parte do seu plano.",
+  queueOff: "Ative a fila da barbearia antes de ligar a fila rápida.",
+  failed: "Não deu certo. Tente de novo.",
+} as const;
