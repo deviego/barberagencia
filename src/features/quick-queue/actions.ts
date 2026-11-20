@@ -4,7 +4,12 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { phoneKey } from "@/lib/phone";
 import { requireQuickQueueOpen, QuickQueueClosedError } from "./guard";
 import { hashDeviceToken, newDeviceToken, readDeviceToken, writeDeviceToken } from "./device";
-import { QUICK_QUEUE_DEVICE_TTL_DAYS, QUICK_QUEUE_IDENTIFY_LIMITS, QUICK_QUEUE_PENDING_MINUTES } from "./limits";
+import {
+  QUICK_QUEUE_DEVICE_TTL_DAYS,
+  QUICK_QUEUE_IDENTIFY_LIMITS,
+  QUICK_QUEUE_JOIN_LIMITS,
+  QUICK_QUEUE_PENDING_MINUTES,
+} from "./limits";
 import { deviceHasClient, loadQuickQueueOptions as readOptions } from "./options";
 import {
   IdentifyPhoneInput,
@@ -16,6 +21,7 @@ import {
 import {
   QUICK_QUEUE_IDENTIFY_MESSAGES as MSG,
   QUICK_QUEUE_JOIN_MESSAGES as JOIN_MSG,
+  QUICK_QUEUE_LIMIT_MESSAGES as LIMIT_MSG,
   type IdentifyPhoneResult,
   type JoinQuickQueueInput,
   type JoinQuickQueueResult,
@@ -66,9 +72,16 @@ async function callIdentify(
     return null;
   }
   const row = (Array.isArray(data) ? data[0] : data) as { result?: string; new_device?: boolean } | undefined;
+  if (row?.result === "LIMIT") await recordLimit(tenantId, "IDENTIFY");
   if (row?.new_device && fresh) await writeDeviceToken(slug, fresh);
   else if (current && row?.result !== "NO_PENDING") await writeDeviceToken(slug, current); // renova a validade
   return (row?.result as IdentifyCode | undefined) ?? null;
+}
+
+/** Soma 1 na contagem do dia (alerta ao dono). Falha aqui não muda a resposta ao cliente. */
+async function recordLimit(tenantId: string, kind: "IDENTIFY"): Promise<void> {
+  const { error } = await createSupabaseAdminClient().rpc("quick_queue_record_limit", { p_tenant_id: tenantId, p_kind: kind });
+  if (error) console.error(`[quick-queue] registro de limite indisponível (${error.code ?? "sem código"})`);
 }
 
 function fail(error: string, field?: QuickQueueActionError["field"]): QuickQueueActionError {
@@ -176,12 +189,25 @@ export async function loadQuickQueueOptions(slug: string): Promise<QuickQueueOpt
   return { ok: true, options };
 }
 
-type JoinCode = "OK" | "EXISTING" | "CLOSED" | "NO_CLIENT" | "SERVICE_CHANGED" | "INVALID";
+type JoinCode =
+  | "OK"
+  | "EXISTING"
+  | "CLOSED"
+  | "NO_CLIENT"
+  | "SERVICE_CHANGED"
+  | "INVALID"
+  | "PHONE_BUSY"
+  | "DEVICE_LIMIT"
+  | "RATE_LIMIT"
+  | "TENANT_CAP";
+
+const JL = QUICK_QUEUE_JOIN_LIMITS;
 
 /**
  * "Entrar na fila". O cliente vem da credencial do aparelho; serviço, barbeiro e preço são
  * conferidos dentro de quick_queue_join (schema-53), que também numera a senha com trava.
  * Preço, número da senha e cliente nunca vêm do aparelho: priceCents só confere a lista vista.
+ * Travas da #99 (schema-54) dentro da mesma função; os valores vêm de QUICK_QUEUE_JOIN_LIMITS.
  */
 export async function joinQuickQueue(slug: string, input: JoinQuickQueueInput): Promise<JoinQuickQueueResult> {
   const generic: JoinQuickQueueResult = { ok: false, code: "GENERIC", error: MSG.failed };
@@ -210,6 +236,11 @@ export async function joinQuickQueue(slug: string, input: JoinQuickQueueInput): 
     p_service_id: parsed.data.serviceId,
     p_price_cents: parsed.data.priceCents,
     p_barber_id: parsed.data.barberId ?? null,
+    p_window_seconds: JL.windowSeconds,
+    p_join_per_device: JL.perDevice,
+    p_active_per_device: JL.activePerDevice,
+    p_tenant_active_cap: JL.tenantActiveCap,
+    p_device_ttl_days: QUICK_QUEUE_DEVICE_TTL_DAYS,
   });
   if (error) {
     console.error(`[quick-queue] entrada na fila indisponível (${error.code ?? "sem código"})`);
@@ -223,6 +254,16 @@ export async function joinQuickQueue(slug: string, input: JoinQuickQueueInput): 
       return { ok: true };
     case "NO_CLIENT":
       return { ok: false, code: "RESTART", error: MSG.restart };
+    case "PHONE_BUSY":
+      return { ok: false, code: "LIMIT", error: LIMIT_MSG.phoneBusy };
+    case "DEVICE_LIMIT":
+      return { ok: false, code: "LIMIT", error: LIMIT_MSG.deviceLimit };
+    case "RATE_LIMIT":
+      return { ok: false, code: "LIMIT", error: LIMIT_MSG.tooMany };
+    case "TENANT_CAP":
+      // Marcador fixo para o log (sem dado de cliente), como o teto do totem.
+      console.error(`[quick-queue][teto-barbearia] tenant=${tenantId}`);
+      return { ok: false, code: "LIMIT", error: LIMIT_MSG.tenantCap };
     case "CLOSED":
       return { ok: false, code: "CLOSED", error: new QuickQueueClosedError().message };
     case "SERVICE_CHANGED": {

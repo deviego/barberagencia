@@ -9,11 +9,17 @@ import { isMaster } from "@/lib/rbac";
 /** Cliente entra na fila (ou atualiza serviço/barbeiro da senha de hoje). */
 export async function joinQueue(tenantId: string, serviceId?: string | null, barberId?: string | null) {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("join_queue", {
-    p_tenant_id: tenantId,
-    p_service_id: serviceId ?? null,
-    p_barber_id: barberId ?? null,
-  });
+  const call = () =>
+    supabase.rpc("join_queue", {
+      p_tenant_id: tenantId,
+      p_service_id: serviceId ?? null,
+      p_barber_id: barberId ?? null,
+    });
+  let { data, error } = await call();
+  // 23505: outro caminho (totem, fila rápida ou um segundo toque) gravou no mesmo instante. A
+  // regra de 1 senha ativa por cliente (schema-54) ou a numeração seguraram; a segunda chamada
+  // devolve a senha que ficou valendo.
+  if (error?.code === "23505") ({ data, error } = await call());
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/client/fila");
   revalidatePath("/client");
