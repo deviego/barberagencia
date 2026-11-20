@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireQuickQueueOpen, QuickQueueClosedError } from "@/features/quick-queue/guard";
 import { hashDeviceToken, readDeviceToken } from "@/features/quick-queue/device";
-import { quickQueueMyTicket } from "@/features/quick-queue/rules";
+import { quickQueueMyTicket } from "@/features/quick-queue/ticket-rules";
 import { claimStatusSlot, loadDeviceTicket, loadSnapshot } from "@/features/quick-queue/ticket";
 import type { QuickQueueStatusResponse } from "@/features/quick-queue/types";
 

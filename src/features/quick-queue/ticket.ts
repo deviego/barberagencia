@@ -1,7 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { QUICK_QUEUE_STATUS_LIMITS } from "./limits";
-import { pickDeviceTicket, type QuickQueueSnapshot, type QuickQueueTicketRow } from "./rules";
+import { pickDeviceTicket, type QuickQueueSnapshot, type QuickQueueTicketRow } from "./ticket-rules";
 
 /*
  * Leituras e escrita da tela "Minha senha" (#98). Por que service role: visitante sem sessão.

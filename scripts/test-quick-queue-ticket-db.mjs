@@ -63,7 +63,7 @@ registerHooks({
 });
 
 const ticket = await import("@/features/quick-queue/ticket");
-const { quickQueueMyTicket } = await import("@/features/quick-queue/rules");
+const { quickQueueMyTicket } = await import("@/features/quick-queue/ticket-rules");
 
 const RUN = randomBytes(3).toString("hex");
 const hash = () => createHash("sha256").update(randomBytes(32)).digest("hex");
