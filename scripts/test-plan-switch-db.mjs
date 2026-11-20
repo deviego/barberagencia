@@ -1,4 +1,4 @@
-// Testes de banco do bug #131 (schema-36): trocar plano fixo não deixa reservas do plano antigo.
+// Testes de banco do bug #131 (schema-59): trocar plano fixo não deixa reservas do plano antigo.
 // SÓ em Supabase LOCAL descartável (loopback), com o ci-order aplicado. Dados fictícios.
 // Cada execução cria barbearias novas com sufixo aleatório e não apaga nada.
 // Uso: DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:<porta>/postgres node scripts/test-plan-switch-db.mjs
@@ -324,6 +324,81 @@ await test("cliente sem assinatura: assign_combo cria como antes", async () => {
   const uid = await admin(s.t, "new");
   await assignCombo(uid, cl, s.combo);
   assert.equal((await sub(cl)).saldo_cortes, 5);
+});
+
+const cancelPlan = (uid, cl) => asUser(uid, `select public.cancel_client_plan($1) n`, [cl]);
+
+await test("aprovar cancelamento de plano fixo: plano cancelado e reservas futuras do plano canceladas", async () => {
+  const s = await shop("cancel");
+  const cl = await client(s.t, "Cliente Cancela Teste");
+  const uid = await admin(s.t, "cancel");
+  await activateFixed(uid, cl, s.fixedA, 2, 600, s.barber);
+  const r = await cancelPlan(uid, cl);
+  assert.equal(r.rows[0].n, 4);
+  assert.equal(await futureActive(cl, s.fixedA), 0);
+  assert.equal((await sub(cl)).status, "CANCELLED");
+});
+
+await test("aprovar cancelamento: passadas, atendidas, debitadas, em atendimento, avulsas, outro cliente e outra barbearia não mudam", async () => {
+  const s = await shop("cancel-keep");
+  const o = await shop("cancel-other");
+  const cl = await client(s.t, "Cliente Cancela Mantem Teste");
+  const other = await client(s.t, "Outro Cliente Cancela Teste");
+  const clB = await client(o.t, "Cliente B Cancela Teste");
+  const uid = await admin(s.t, "cancel-keep");
+  const uidB = await admin(o.t, "cancel-other");
+  await activateFixed(uid, cl, s.fixedA, 4, 600, s.barber);
+  await activateFixed(uid, other, s.fixedA, 4, 660, s.barber);
+  await activateFixed(uidB, clB, o.fixedA, 4, 600, o.barber);
+  const keep = {
+    passada: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: inDays(-7) }),
+    atendida: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: inDays(-14), status: "DONE" }),
+    debitada: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: inDays(40), status: "CANCELLED", debited: true }),
+    emAtendimento: await appt(s, cl, { plan: s.fixedA, fromPlan: true, at: new Date(Date.now() + 60 * 1000), started: true }),
+    avulsa: await appt(s, cl, { at: inDays(3) }),
+  };
+  const before = Object.fromEntries(await Promise.all(Object.entries(keep).map(async ([k, id]) => [k, await statusOf(id)])));
+  await cancelPlan(uid, cl);
+  for (const [k, id] of Object.entries(keep)) assert.equal(await statusOf(id), before[k], k);
+  assert.equal(await futureActive(other, s.fixedA), 4);
+  assert.equal(await futureActive(clB, o.fixedA), 4);
+});
+
+await test("aprovar cancelamento de combo (flexível): plano cancelado, reservas não mudam", async () => {
+  const s = await shop("cancel-flex");
+  const cl = await client(s.t, "Cliente Cancela Combo Teste");
+  const uid = await admin(s.t, "cancel-flex");
+  await assignCombo(uid, cl, s.combo);
+  const flex = await appt(s, cl, { plan: s.combo, fromPlan: true, at: inDays(2) });
+  const r = await cancelPlan(uid, cl);
+  assert.equal(r.rows[0].n, 0);
+  assert.equal((await sub(cl)).status, "CANCELLED");
+  assert.equal(await statusOf(flex), "CONFIRMED");
+});
+
+await test("aprovar cancelamento sem plano ativo: nada muda", async () => {
+  const s = await shop("cancel-none");
+  const cl = await client(s.t, "Cliente Sem Plano Teste");
+  const uid = await admin(s.t, "cancel-none");
+  assert.equal((await cancelPlan(uid, cl)).rows[0].n, 0);
+  assert.equal(await sub(cl), undefined);
+});
+
+await test("cancelamento por admin de outra barbearia: recusado e nada muda", async () => {
+  const s = await shop("cancel-x-a");
+  const o = await shop("cancel-x-b");
+  const cl = await client(s.t, "Cliente Alvo Cancela Teste");
+  const uid = await admin(s.t, "cancel-x-a");
+  const intruder = await admin(o.t, "cancel-x-b");
+  await activateFixed(uid, cl, s.fixedA, 2, 600, s.barber);
+  await assert.rejects(cancelPlan(intruder, cl), /forbidden/);
+  assert.equal(await futureActive(cl, s.fixedA), 4);
+  assert.equal((await sub(cl)).status, "ACTIVE");
+});
+
+await test("cancelamento: visitante não executa a função", async () => {
+  const { rows } = await q(`select has_function_privilege('anon', 'public.cancel_client_plan(uuid)', 'execute') ok`);
+  assert.equal(rows[0].ok, false);
 });
 
 await test("o helper interno não é executável por nenhum papel do app", async () => {

@@ -753,11 +753,8 @@ export async function approvePlanRequest(id: string) {
       /* notificação não deve quebrar o fluxo */
     }
   } else if (req.type === "CANCEL") {
-    const { error } = await supabase
-      .from("client_subscriptions")
-      .update({ status: "CANCELLED" })
-      .eq("client_id", req.client_id)
-      .eq("status", "ACTIVE");
+    // Cancela o plano e, se for fixo, as reservas futuras dele, na mesma transação (schema-59).
+    const { error } = await supabase.rpc("cancel_client_plan", { p_client_id: req.client_id });
     if (error) return { ok: false as const, error: error.message };
     try {
       await notifyPlanCancelled(req.client_id);

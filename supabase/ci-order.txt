@@ -37,4 +37,4 @@ schema-30-auth-phone.sql
 schema-31-fixed-plan-debit.sql
 schema-33-rpc-tenant-scope.sql
 schema-35-marketing-leads.sql
-schema-36-plan-switch-cancel-fixed.sql
+schema-59-plan-switch-cancel-fixed.sql
