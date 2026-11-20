@@ -48,12 +48,33 @@ export function QuickQueueShell({
       </main>
 
       <footer className="relative flex flex-col items-center gap-2 px-4 pb-6">
-        <Link
-          href="/privacidade"
-          className="inline-flex min-h-11 items-center px-2 text-caption text-text-2 underline underline-offset-4 hover:text-accent"
-        >
-          Aviso de privacidade
-        </Link>
+        {brand ? (
+          // Copy aprovada pela Regua no #126 (LGPD). Sem o nome carregado: "desta barbearia".
+          <p className="max-w-[380px] text-center text-caption text-text-2">
+            Seu nome e telefone ficam no cadastro{" "}
+            {brand.name?.trim() ? (
+              <>
+                da <span className="font-semibold text-text">{brand.name.trim()}</span>
+              </>
+            ) : (
+              "desta barbearia"
+            )}
+            , para a sua senha na fila e para falar com você sobre o atendimento.{" "}
+            <Link
+              href="/privacidade"
+              className="-my-3 inline-block py-3 underline underline-offset-4 hover:text-accent"
+            >
+              Aviso de privacidade
+            </Link>
+          </p>
+        ) : (
+          <Link
+            href="/privacidade"
+            className="inline-flex min-h-11 items-center px-2 text-caption text-text-2 underline underline-offset-4 hover:text-accent"
+          >
+            Aviso de privacidade
+          </Link>
+        )}
         <Copyright />
       </footer>
     </div>

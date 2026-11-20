@@ -1,0 +1,26 @@
+/**
+ * Limites da identificação (#96, preparação da #99). Conferidos DENTRO da função de banco, com
+ * trava por barbearia, então valem também para pedido feito direto ao servidor.
+ * Valores provisórios dos tetos por barbearia: revistos com a linha de base da #105.
+ * Nenhum limite usa telefone ou rede como chave: telefone conhecido conta pelo cliente já
+ * resolvido; telefone novo conta só nos tetos por barbearia.
+ */
+export const QUICK_QUEUE_IDENTIFY_LIMITS = {
+  /** Janela das contagens de tentativa. */
+  windowSeconds: 10 * 60,
+  /** Tentativas por aparelho (credencial) na janela. */
+  perDevice: 5,
+  /** Tentativas por cliente já cadastrado (telefone conhecido) na janela. */
+  perClient: 5,
+  /** Teto de tentativas por barbearia na janela (provisório). */
+  perTenant: 200,
+  /** Teto de credenciais novas por barbearia por hora (provisório). */
+  newDevicesPerTenantHour: 60,
+  /** Teto de contas novas pela fila rápida por barbearia por dia (provisório). */
+  newClientsPerTenantDay: 100,
+} as const;
+
+/** Validade da credencial do aparelho, renovada a cada uso. */
+export const QUICK_QUEUE_DEVICE_TTL_DAYS = 30;
+/** Quanto tempo o passo "nome" espera depois do telefone. */
+export const QUICK_QUEUE_PENDING_MINUTES = 10;

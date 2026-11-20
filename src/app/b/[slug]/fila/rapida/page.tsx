@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getQuickQueueEntry } from "@/features/quick-queue/data";
 import { QuickQueueShell } from "@/features/quick-queue/components/quick-queue-shell";
 import { QuickQueueNotice } from "@/features/quick-queue/components/quick-queue-notice";
-import { PhoneStep } from "@/features/quick-queue/components/phone-step";
+import { IdentifyFlow } from "@/features/quick-queue/components/identify-flow";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export default async function QuickQueuePage({ params }: { params: Promise<{ slu
   // TODO(#97): CLIENT vai direto para a escolha do serviço. TODO(#98): HAS_TICKET cai em "Minha senha".
   return (
     <QuickQueueShell brand={entry.brand}>
-      <PhoneStep />
+      <IdentifyFlow slug={slug} />
     </QuickQueueShell>
   );
 }

@@ -17,6 +17,7 @@ import { getQueueConfig, getTotemToken } from "@/features/queue/data";
 import { PickBarberToggle } from "@/features/queue/components/pick-barber-toggle";
 import { TotemConfig } from "@/features/queue/components/totem-config";
 import { ClientQr } from "@/features/admin/components/client-qr";
+import { ConfigTabs } from "@/features/admin/components/config-tabs";
 import { showQueuePoster } from "@/features/admin/components/qr-posters/visibility";
 import { loadQuickQueueTenantState } from "@/features/quick-queue/data";
 
@@ -83,66 +84,78 @@ export default async function ConfigPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6" id="unidade">
+    <div className="flex min-w-0 flex-col gap-6">
       <h1 className="text-h3 font-bold text-text">Configurações & Branding</h1>
 
-      {/* Dados da unidade + horários (salvam de verdade) */}
-      <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
-        <div className="text-overline uppercase text-text-muted">Dados da unidade</div>
-        <UnitSettingsForm tenantName={tenant.name} initial={unit} />
-      </section>
+      <ConfigTabs
+        panels={{
+          unidade: (
+            /* Dados da unidade + horários (salvam de verdade) */
+            <section className="flex scroll-mt-20 flex-col gap-4 rounded-lg border border-border bg-surface p-5" id="unidade">
+              <div className="text-overline uppercase text-text-muted">Dados da unidade</div>
+              <UnitSettingsForm tenantName={tenant.name} initial={unit} />
+            </section>
+          ),
+          marca: (
+            /* White-label */
+            <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
+              <div className="flex items-center gap-2">
+                <div className="text-overline uppercase text-text-muted">White-label</div>
+                <Badge variant="accent">Marca</Badge>
+              </div>
 
-      {/* White-label */}
-      <section className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
-        <div className="flex items-center gap-2">
-          <div className="text-overline uppercase text-text-muted">White-label</div>
-          <Badge variant="accent">Marca</Badge>
-        </div>
+              <LogoUpload
+                current={branding?.logo_url ?? tenant.branding.logoUrl ?? null}
+                logoText={tenant.branding.logoText}
+              />
 
-        <LogoUpload
-          current={branding?.logo_url ?? tenant.branding.logoUrl ?? null}
-          logoText={tenant.branding.logoText}
-        />
+              <BrandingForm
+                initialAccent={branding?.accent ?? "#C9A24B"}
+                initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
+              />
+            </section>
+          ),
+          "qr-fila": (
+            <>
+              <ClientQr
+                publicUrl={publicUrl}
+                queueUrl={queueUrl}
+                // TODO(#123/#102): "PHONE" quando a fila rápida estiver ligada nesta barbearia.
+                queueEntry="LOGIN"
+                slug={tenant.subdomain}
+                logoDataUrl={logoData}
+                logoText={tenant.branding.logoText}
+                name={tenant.name}
+                accent={branding?.accent ?? tenant.branding.accent ?? null}
+              />
 
-        <BrandingForm
-          initialAccent={branding?.accent ?? "#C9A24B"}
-          initialInstagram={branding?.instagram ?? tenant.branding.instagram ?? ""}
-        />
-      </section>
+              {queueCfg.enabled && totem && (
+                <TotemConfig
+                  totemUrl={totem.url}
+                  qrDataUrl={totem.qr}
+                  mode={queueCfg.mode}
+                  planRequiresService={queueCfg.planRequiresService}
+                />
+              )}
 
-      <ClientQr
-        publicUrl={publicUrl}
-        queueUrl={queueUrl}
-        // TODO(#123/#102): "PHONE" quando a fila rápida estiver ligada nesta barbearia.
-        queueEntry="LOGIN"
-        slug={tenant.subdomain}
-        logoDataUrl={logoData}
-        logoText={tenant.branding.logoText}
-        name={tenant.name}
-        accent={branding?.accent ?? tenant.branding.accent ?? null}
+              {queueCfg.enabled && <PickBarberToggle enabled={queueCfg.pickBarber} />}
+            </>
+          ),
+          whatsapp: <WhatsAppConnect />,
+          "plano-contrato": (
+            <>
+              <PlanUsage view={planUsage} />
+
+              {contractView && (
+                <ContractSection
+                  view={contractView}
+                  initial={{ ...contractToData(contract), tradeName: contract?.trade_name ?? tenant.name }}
+                />
+              )}
+            </>
+          ),
+        }}
       />
-
-      <WhatsAppConnect />
-
-      {queueCfg.enabled && totem && (
-        <TotemConfig
-          totemUrl={totem.url}
-          qrDataUrl={totem.qr}
-          mode={queueCfg.mode}
-          planRequiresService={queueCfg.planRequiresService}
-        />
-      )}
-
-      {queueCfg.enabled && <PickBarberToggle enabled={queueCfg.pickBarber} />}
-
-      <PlanUsage view={planUsage} />
-
-      {contractView && (
-        <ContractSection
-          view={contractView}
-          initial={{ ...contractToData(contract), tradeName: contract?.trade_name ?? tenant.name }}
-        />
-      )}
     </div>
   );
 }

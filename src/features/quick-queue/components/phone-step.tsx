@@ -1,44 +1,51 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { maskPhoneBR } from "@/lib/masks";
-import { QUICK_QUEUE_MESSAGES } from "../types";
-
-/** Retorno da ação de continuar (ligada na #96). Só uma mensagem de erro pronta para o cliente. */
-export type PhoneStepResult = { error?: string } | void;
+import { QUICK_QUEUE_IDENTIFY_MESSAGES, QUICK_QUEUE_MESSAGES } from "../types";
 
 /**
- * Tela inicial da fila rápida: telefone com DDD e "Continuar".
- * A identificação pelo telefone é da #96 (`onContinue`); nesta story a tela só coleta o número.
+ * Passo do telefone da fila rápida: telefone com DDD e "Continuar".
+ * Controlado por fora (`value`/`onChange`) para o que foi digitado sobreviver a erro, falha de
+ * conexão e volta do passo do nome. `error` vem do servidor; a validação local cobre só o formato.
  */
-export function PhoneStep({ onContinue }: { onContinue?: (phone: string) => Promise<PhoneStepResult> }) {
+export function PhoneStep({
+  value,
+  onChange,
+  error,
+  onErrorChange,
+  pending = false,
+  onContinue,
+}: {
+  value: string;
+  onChange: (masked: string) => void;
+  error: string | null;
+  onErrorChange: (error: string | null) => void;
+  pending?: boolean;
+  /** Sem ela (entrada ainda não ligada), "Continuar" avisa na tela: o botão nunca falha calado. */
+  onContinue?: (digits: string) => void;
+}) {
   const inputId = useId();
   const errorId = useId();
-  const [phone, setPhone] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
-  const digits = phone.replace(/\D/g, "");
+  const digits = value.replace(/\D/g, "");
   const valid = digits.length === 10 || digits.length === 11;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (pending) return;
     if (!valid) {
-      setError("Confira o telefone: DDD e número.");
+      onErrorChange(QUICK_QUEUE_IDENTIFY_MESSAGES.invalidPhone);
       return;
     }
     if (!onContinue) {
-      // Sem a identificação ligada, o botão avisa na tela em vez de não fazer nada.
-      setError(QUICK_QUEUE_MESSAGES.entryNotReady);
+      onErrorChange(QUICK_QUEUE_MESSAGES.entryNotReady);
       return;
     }
-    setError(null);
-    startTransition(async () => {
-      const res = await onContinue(digits);
-      if (res?.error) setError(res.error);
-    });
+    onErrorChange(null);
+    onContinue(digits);
   }
 
   return (
@@ -56,11 +63,13 @@ export function PhoneStep({ onContinue }: { onContinue?: (phone: string) => Prom
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"
+          enterKeyHint="go"
           placeholder="(00) 00000-0000"
-          value={phone}
+          value={value}
+          readOnly={pending}
           onChange={(e) => {
-            setPhone(maskPhoneBR(e.target.value));
-            if (error) setError(null);
+            onChange(maskPhoneBR(e.target.value));
+            if (error) onErrorChange(null);
           }}
           error={!!error}
           aria-invalid={!!error}

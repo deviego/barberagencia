@@ -37,5 +37,7 @@ schema-30-auth-phone.sql
 schema-31-fixed-plan-debit.sql
 schema-33-rpc-tenant-scope.sql
 schema-35-marketing-leads.sql
+schema-50-queue-totem-checks.sql
 schema-51-quick-queue-settings.sql
+schema-52-quick-queue-clients.sql
 schema-59-plan-switch-cancel-fixed.sql
