@@ -24,6 +24,7 @@ function query(table) {
       if (q.table === "tenants" && q.cols.includes("quick_queue_enabled") && d.noColumn) {
         return { data: null, error: { code: "42703" } };
       }
+      if (d.failTables?.includes(q.table)) return { data: null, error: { code: "XX000" } };
       const rows = d.tables[q.table] ?? [];
       const row = rows.find((r) => Object.entries(q.filters).every(([k, v]) => r[k] === v)) ?? null;
       return { data: row, error: null };
@@ -98,9 +99,10 @@ function shop(id, slug, over = {}) {
   };
 }
 
-function setDb(shops, { user = null, memberships = [], noColumn = false } = {}) {
+function setDb(shops, { user = null, memberships = [], noColumn = false, failTables = [] } = {}) {
   globalThis.__qq = {
     noColumn,
+    failTables,
     user,
     reads: [],
     tables: {
@@ -121,6 +123,7 @@ const state = (over = {}) => ({
   queueEnabled: true,
   queueMode: "APP",
   quickQueueEnabled: true,
+  readFailed: false,
   ...over,
 });
 
@@ -150,6 +153,7 @@ await test("status: aberta só com fila rápida ligada, plano com fila e fila re
   assert.equal(rules.quickQueueStatus(state({ quickQueueEnabled: false }), NOW), "UNAVAILABLE");
   assert.equal(rules.quickQueueStatus(state({ queueEnabled: false }), NOW), "UNAVAILABLE");
   assert.equal(rules.quickQueueStatus(state({ queueMode: "TOTEM" }), NOW), "UNAVAILABLE");
+  assert.equal(rules.quickQueueStatus(state({ readFailed: true }), NOW), "UNAVAILABLE");
 });
 
 await test("plano: Personal sem fila depois do teste; durante o teste segue a regra do painel (liberado)", () => {
@@ -284,6 +288,31 @@ await test("guard: confere a cada chamada (desligar depois de abrir passa a recu
   s.tenant.quick_queue_enabled = false;
   await assert.rejects(requireQuickQueueOpen("barbearia-a", NOW), QuickQueueClosedError);
 });
+
+// ---------- falha fechado ----------
+
+for (const table of ["tenant_settings", "tenant_contracts"]) {
+  await test(`erro na leitura de ${table}: entrada UNAVAILABLE, sem marca e sem olhar a sessão`, async () => {
+    setDb([shop(A, "barbearia-a")], {
+      failTables: [table],
+      user: { id: "u1" },
+      memberships: [{ user_id: "u1", tenant_id: A, role: "CLIENT" }],
+    });
+    assert.deepEqual(await getQuickQueueEntry("barbearia-a"), { status: "UNAVAILABLE", viewer: "VISITOR" });
+    const reads = globalThis.__qq.reads;
+    assert.ok(!reads.some((r) => r.startsWith("branding")), "não lê a marca");
+    assert.ok(!reads.includes("auth"), "não olha a sessão");
+  });
+
+  await test(`erro na leitura de ${table}: o guard recusa`, async () => {
+    setDb([shop(A, "barbearia-a")], { failTables: [table] });
+    await assert.rejects(requireQuickQueueOpen("barbearia-a", NOW), (e) => {
+      assert.ok(e instanceof QuickQueueClosedError);
+      assert.equal(e.message, QUICK_QUEUE_MESSAGES.unavailable);
+      return true;
+    });
+  });
+}
 
 // ---------- checagens estáticas ----------
 

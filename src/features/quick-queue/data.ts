@@ -61,7 +61,7 @@ export const loadQuickQueueTenantState = cache(async (slug: string): Promise<Qui
   if (!t) return null;
   const id = t.id as string;
 
-  const [{ data: s }, { data: c }] = await Promise.all([
+  const [{ data: s, error: settingsError }, { data: c, error: contractError }] = await Promise.all([
     admin.from("tenant_settings").select("queue_mode").eq("tenant_id", id).maybeSingle(),
     admin.from("tenant_contracts").select("trial_ends_at").eq("tenant_id", id).maybeSingle(),
   ]);
@@ -76,6 +76,8 @@ export const loadQuickQueueTenantState = cache(async (slug: string): Promise<Qui
     // Mesmo padrão de getQueueConfig: sem linha em tenant_settings, o modo é APP.
     queueMode: mode === "TOTEM" || mode === "BOTH" ? mode : "APP",
     quickQueueEnabled: t.quick_queue_enabled === true,
+    // Erro nessas leituras = UNAVAILABLE (nunca abre a jornada sem saber o modo e o plano).
+    readFailed: Boolean(settingsError || contractError),
   };
 });
 
