@@ -154,4 +154,6 @@ export const QUICK_QUEUE_JOIN_MESSAGES = {
   join: "Entrar na fila",
   noServices: "Nenhum serviço disponível na fila agora. Fale no balcão.",
   serviceChanged: "Esse serviço mudou. Escolha de novo.",
+  /** Botão quando loadQuickQueueOptions falha sem restart (leitura indisponível). */
+  retry: "Tentar de novo",
 } as const;
