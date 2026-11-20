@@ -333,5 +333,83 @@ await test("usuário comum não grava phone_key, origem nem verificação na pr�
   assert.deepEqual(rows[0], { name: "Invasor Mudou Teste", phone_key: "21985550002", signup_origin: null, phone_verified_at: null });
 });
 
+/** Usuário fictício com vínculo na barbearia; devolve o id. */
+async function member(tenantId, role, label) {
+  const uid = randomUUID();
+  await pool.query(
+    `insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+     values ($1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $2, '', now(), now(), now(), '{}', '{}')`,
+    [uid, `${label}-${RUN}@example.test`]
+  );
+  await pool.query(`insert into public.memberships (user_id, tenant_id, role) values ($1, $2, $3)`, [uid, tenantId, role]);
+  return uid;
+}
+
+/** Roda sql como esse usuário (papel authenticated + jwt), como o PostgREST faz. */
+async function asUser(uid, sql, params) {
+  const c = await pool.connect();
+  try {
+    await c.query("begin");
+    await c.query("set local role authenticated");
+    await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: uid, role: "authenticated" })]);
+    const r = await c.query(sql, params);
+    await c.query("commit");
+    return r;
+  } catch (e) {
+    await c.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+
+await test("cliente logado troca o telefone para um número já usado na barbearia: sem erro, ficha sem chave", async () => {
+  const t = await shop("perfil");
+  await pool.query(`insert into public.clients (tenant_id, name, phone) values ($1, 'Outro Cliente Teste', '21984440001')`, [t]);
+  const uid = await member(t, "CLIENT", "perfil");
+  const { rows: mine } = await pool.query(
+    `insert into public.clients (tenant_id, user_id, name, phone) values ($1, $2, 'Cliente Perfil Teste', '21984440002') returning id`,
+    [t, uid]
+  );
+  const r = await asUser(uid, `update public.clients set phone = '(21) 98444-0001' where id = $1`, [mine[0].id]);
+  assert.equal(r.rowCount, 1, "a atualização passou pela RLS");
+  let row = (await pool.query(`select phone, phone_key from public.clients where id = $1`, [mine[0].id])).rows[0];
+  assert.deepEqual(row, { phone: "(21) 98444-0001", phone_key: null });
+  // Número livre: ganha a chave. Mesma resposta (sem erro) nos dois casos.
+  await asUser(uid, `update public.clients set phone = '(21) 98444-0003' where id = $1`, [mine[0].id]);
+  row = (await pool.query(`select phone_key from public.clients where id = $1`, [mine[0].id])).rows[0];
+  assert.equal(row.phone_key, "21984440003");
+});
+
+await test("admin da barbearia grava telefone repetido: ficha nova sem chave, sem erro", async () => {
+  const t = await shop("admin");
+  await pool.query(`insert into public.clients (tenant_id, name, phone) values ($1, 'Primeiro Teste', '21983330001')`, [t]);
+  const uid = await member(t, "UNIT_ADMIN", "admin");
+  await asUser(uid, `insert into public.clients (tenant_id, name, phone) values ($1, 'Segundo Teste', '+55 21 98333-0001')`, [t]);
+  const { rows } = await pool.query(`select name, phone_key from public.clients where tenant_id = $1 order by created_at`, [t]);
+  assert.deepEqual(rows, [
+    { name: "Primeiro Teste", phone_key: "21983330001" },
+    { name: "Segundo Teste", phone_key: null },
+  ]);
+});
+
+await test("a função do gatilho não é chamável por visitante ou usuário comum", async () => {
+  for (const role of ["anon", "authenticated"]) {
+    const { rows } = await pool.query(`select has_function_privilege($1, 'public.clients_phone_key_sync()', 'execute') ok`, [role]);
+    assert.equal(rows[0].ok, false, role);
+  }
+});
+
+await test("telefone pendente vencido some mesmo com a fila rápida desligada", async () => {
+  const t = await shop("pend-off");
+  const d = newDevice();
+  assert.equal(await identify(t, d, { phone: "21982220002" }), "NEED_NAME");
+  await pool.query(`update public.quick_queue_devices set pending_until = now() - interval '1 second' where token_hash = $1`, [d.current]);
+  await pool.query(`update public.tenants set quick_queue_enabled = false where id = $1`, [t]);
+  assert.equal(await identify(t, newDevice(), { phone: "21982220003" }), "CLOSED");
+  const { rows } = await pool.query(`select pending_phone_key, pending_until from public.quick_queue_devices where tenant_id = $1`, [t]);
+  assert.deepEqual(rows, [{ pending_phone_key: null, pending_until: null }]);
+});
+
 await pool.end();
 console.log(`\n${passed} testes de banco ok`);

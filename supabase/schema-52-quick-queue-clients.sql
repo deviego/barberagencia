@@ -87,14 +87,20 @@ create unique index if not exists uq_clients_tenant_phone_key
   on public.clients (tenant_id, phone_key) where phone_key is not null;
 
 -- 3) Gatilho: phone_key acompanha o telefone; colunas novas só pelo servidor ----------
+-- security definer: a conferência de telefone repetido precisa ver a barbearia inteira, qualquer
+-- que seja o papel de quem grava (cliente logado só enxerga a própria ficha pela RLS). Assim o
+-- resultado é sempre o mesmo: ficha sem chave, sem erro, sem revelar se o número existe.
+-- Dentro de security definer o current_user vira o dono; o papel de quem chamou continua em
+-- current_setting('role'), que é o que decide a proteção das colunas.
 create or replace function public.clients_phone_key_sync()
 returns trigger
 language plpgsql
+security definer
 set search_path = public
 as $$
 declare
   v_key text;
-  v_restricted boolean := current_user in ('anon', 'authenticated');
+  v_restricted boolean := coalesce(current_setting('role', true), 'none') in ('anon', 'authenticated');
 begin
   if v_restricted then
     -- Visitante/usuário comum não escolhe origem nem verificação.
@@ -127,6 +133,9 @@ begin
   return new;
 end;
 $$;
+
+-- Só o gatilho usa esta função; ninguém a chama direto.
+revoke all on function public.clients_phone_key_sync() from public, anon, authenticated;
 
 drop trigger if exists clients_phone_key_sync on public.clients;
 create trigger clients_phone_key_sync
@@ -208,6 +217,12 @@ begin
   -- Uma identificação por vez por barbearia: contagens e criação sem corrida.
   perform pg_advisory_xact_lock(hashtextextended('quick_queue:' || p_tenant_id::text, 0));
 
+  -- Telefone deixado no passo do nome que já venceu: some. Antes de qualquer outra checagem,
+  -- para limpar mesmo com a fila rápida desligada. (Barbearia sem nenhuma chamada: rotina da #108.)
+  update public.quick_queue_devices
+     set pending_phone_key = null, pending_until = null
+   where tenant_id = p_tenant_id and pending_until is not null and pending_until <= v_now;
+
   if not exists (
     select 1 from public.tenants t
      where t.id = p_tenant_id and t.quick_queue_enabled and coalesce(t.kind, 'BARBERSHOP') = 'BARBERSHOP'
@@ -218,11 +233,6 @@ begin
   if (p_phone_key is null) = (p_name is null) then
     return query select 'INVALID'::text, false; return;
   end if;
-
-  -- Telefone deixado no passo do nome que já venceu: some.
-  update public.quick_queue_devices
-     set pending_phone_key = null, pending_until = null
-   where tenant_id = p_tenant_id and pending_until is not null and pending_until <= v_now;
 
   -- Credencial: vale só nesta barbearia e dentro da validade.
   if p_device_hash is not null then
