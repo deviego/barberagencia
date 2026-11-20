@@ -146,7 +146,9 @@ async function startSession(tenantId, prev, force = false) {
   await sleep(300); // deixa a persistência pendente do socket antigo assentar antes de recarregar as chaves
 
   const { state, saveCreds, dispose: disposeAuth } = await makeSupabaseAuthState(supabase, tenantId);
-  const hadCreds = Boolean(state.creds?.registered); // havia sessão pareada salva ao iniciar
+  // Havia sessão pareada salva ao iniciar? Mesma regra do Baileys para tentar login: creds.me.
+  // (creds.registered só vira true no pareamento por código; no pareamento por QR fica false.)
+  const hadCreds = Boolean(state.creds?.me?.id);
   const sock = makeWASocket({
     version: waVersion,
     auth: state,
