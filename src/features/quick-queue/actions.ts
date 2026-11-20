@@ -64,14 +64,11 @@ function fail(error: string, field?: QuickQueueActionError["field"]): QuickQueue
   return field ? { ok: false, error, field } : { ok: false, error };
 }
 
-async function openTenant(slug: string): Promise<{ tenantId: string } | QuickQueueActionError> {
-  try {
-    return await requireQuickQueueOpen(slug);
-  } catch (e) {
-    if (e instanceof QuickQueueClosedError) return fail(e.message);
-    console.error("[quick-queue] conferência da barbearia indisponível");
-    return fail(MSG.failed);
-  }
+/** Recusa do guard → mensagem fixa (fechada) ou genérica (leitura indisponível). */
+function guardFailure(e: unknown): QuickQueueActionError {
+  if (e instanceof QuickQueueClosedError) return fail(e.message);
+  console.error("[quick-queue] conferência da barbearia indisponível");
+  return fail(MSG.failed);
 }
 
 /** Passo do telefone: NAME (novo nesta barbearia) ou SERVICE (já cadastrado). */
@@ -79,13 +76,17 @@ export async function identifyPhone(slug: string, phone: string): Promise<Identi
   const parsed = IdentifyPhoneInput.safeParse({ slug, phone });
   if (!parsed.success) return fail(MSG.invalidPhone, "phone");
 
-  const open = await openTenant(parsed.data.slug);
-  if ("ok" in open) return open;
+  let tenantId: string;
+  try {
+    ({ tenantId } = await requireQuickQueueOpen(parsed.data.slug));
+  } catch (e) {
+    return guardFailure(e);
+  }
 
   const key = phoneKey(parsed.data.phone);
   if (!key) return fail(MSG.invalidPhone, "phone");
 
-  switch (await callIdentify(parsed.data.slug, open.tenantId, { phoneKey: key })) {
+  switch (await callIdentify(parsed.data.slug, tenantId, { phoneKey: key })) {
     case "KNOWN":
       return { ok: true, next: "SERVICE" };
     case "NEED_NAME":
@@ -106,13 +107,17 @@ export async function registerName(slug: string, name: string): Promise<Register
   const parsed = RegisterNameInput.safeParse({ slug, name });
   if (!parsed.success) return fail(MSG.invalidName, "name");
 
-  const open = await openTenant(parsed.data.slug);
-  if ("ok" in open) return open;
+  let tenantId: string;
+  try {
+    ({ tenantId } = await requireQuickQueueOpen(parsed.data.slug));
+  } catch (e) {
+    return guardFailure(e);
+  }
 
   const checked = quickQueueName(parsed.data.name);
   if (!checked.ok) return fail(checked.reason === "chars" ? MSG.nameLettersOnly : MSG.invalidName, "name");
 
-  switch (await callIdentify(parsed.data.slug, open.tenantId, { name: checked.name })) {
+  switch (await callIdentify(parsed.data.slug, tenantId, { name: checked.name })) {
     case "CREATED":
     case "KNOWN": // o telefone foi cadastrado por outro caminho entre os dois passos
       return { ok: true, next: "SERVICE" };
