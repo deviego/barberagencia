@@ -29,7 +29,7 @@ import {
   showQueuePosterHint,
 } from "@/features/admin/components/qr-posters/visibility";
 import { getQuickQueueLimitSummary } from "@/features/quick-queue/admin-data";
-import { QUICK_QUEUE_ALERT_MIN_TOTAL } from "@/features/quick-queue/types";
+import { QUICK_QUEUE_ALERT_MIN_TOTAL } from "@/features/quick-queue/limits";
 import { loadQuickQueueTenantState } from "@/features/quick-queue/data";
 
 export default async function ConfigPage() {
