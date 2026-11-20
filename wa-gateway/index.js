@@ -77,6 +77,44 @@ function toWhatsPhone(phone) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const backoffMs = (attempts) => Math.min(30_000, 2000 * 2 ** Math.max(0, attempts - 1));
 
+/**
+ * Apaga as credenciais salvas (creds + keys, a linha inteira de wa_sessions) do tenant.
+ * Atenção: o builder do supabase-js é "thenable", não Promise — NÃO tem .catch(). Chamar
+ * .catch() nele lança TypeError ANTES da query rodar, e o DELETE nunca acontecia.
+ * Nunca lança: devolve true se apagou.
+ */
+async function clearSavedSession(tenantId, auth) {
+  try { auth?.dispose?.(); } catch {}
+  try {
+    const { error } = await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId);
+    if (error) {
+      log.warn({ tenant: tenantId, err: error.message }, "falha ao apagar a sessão salva");
+      return false;
+    }
+    return true;
+  } catch (e) {
+    log.warn({ tenant: tenantId, err: e?.message }, "falha ao apagar a sessão salva");
+    return false;
+  }
+}
+
+// Falha no LOGIN com credenciais já registradas (antes de abrir a conexão): o WhatsApp recusou a
+// sessão salva (aparelho desconectado no celular, sessão expirada/corrompida). Reconectar com as
+// mesmas credenciais só repete o erro em loop e o QR nunca aparece.
+const INVALID_SESSION_CODES = new Set([
+  DisconnectReason.loggedOut, // 401
+  DisconnectReason.forbidden, // 403
+  DisconnectReason.badSession, // 500
+  DisconnectReason.multideviceMismatch, // 411
+]);
+function isInvalidSavedSession(lastDisconnect, { opened, hadCreds }) {
+  if (opened || !hadCreds) return false;
+  const err = lastDisconnect?.error;
+  const code = err?.output?.statusCode;
+  // "Connection Failure" = nó <failure> do servidor (recusa explícita, não queda de rede).
+  return err?.message === "Connection Failure" || INVALID_SESSION_CODES.has(code);
+}
+
 async function startSession(tenantId, prev, force = false) {
   const existing = sessions.get(tenantId);
   // Single-flight: uma sessão já iniciando impede abrir outra em paralelo.
@@ -107,7 +145,8 @@ async function startSession(tenantId, prev, force = false) {
   try { if (existing?.sock && existing.sock !== prev?.sock) existing.sock.end?.(undefined); } catch {}
   await sleep(300); // deixa a persistência pendente do socket antigo assentar antes de recarregar as chaves
 
-  const { state, saveCreds } = await makeSupabaseAuthState(supabase, tenantId);
+  const { state, saveCreds, dispose: disposeAuth } = await makeSupabaseAuthState(supabase, tenantId);
+  const hadCreds = Boolean(state.creds?.registered); // havia sessão pareada salva ao iniciar
   const sock = makeWASocket({
     version: waVersion,
     auth: state,
@@ -134,6 +173,8 @@ async function startSession(tenantId, prev, force = false) {
     // um código de pareamento em vez de QR.
     pairPhone: prev?.pairPhone ?? existing?.pairPhone ?? null,
     pairingCode: null,
+    opened: false, // este socket chegou a abrir (login aceito)?
+    disposeAuth,
   };
   sessions.set(tenantId, s);
 
@@ -170,6 +211,7 @@ async function startSession(tenantId, prev, force = false) {
       }
     }
     if (connection === "open") {
+      s.opened = true;
       s.status = "connected";
       s.qr = null;
       s.pairingCode = null;
@@ -190,9 +232,22 @@ async function startSession(tenantId, prev, force = false) {
       // Só age se ainda for esta sessão (evita corrida com um restart mais novo).
       if (cur && cur.sock !== sock) return;
 
+      if (isInvalidSavedSession(lastDisconnect, { opened: s.opened, hadCreds })) {
+        // Credenciais salvas recusadas no login: apaga creds + keys e começa do zero (QR novo).
+        // O socket novo nasce sem credencial registrada, então não volta a cair aqui (sem loop).
+        sessions.set(tenantId, { ...s, sock: null, status: "connecting", qr: null });
+        if (!(await clearSavedSession(tenantId, s.disposeAuth))) {
+          // Sem conseguir apagar, religar recarregaria as mesmas credenciais mortas: para aqui.
+          sessions.set(tenantId, { ...s, sock: null, status: "disconnected", qr: null });
+          return;
+        }
+        log.warn({ tenant: tenantId, code }, "sessão salva recusada no login — apagada, gerando QR novo");
+        startSession(tenantId, { attempts: s.attempts }, true).catch((e) => log.error(e, "falha ao gerar QR novo"));
+        return;
+      }
       if (code === DisconnectReason.loggedOut) {
         sessions.set(tenantId, { ...s, sock: null, status: "disconnected", qr: null });
-        await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId).catch(() => {});
+        await clearSavedSession(tenantId, s.disposeAuth);
         log.warn({ tenant: tenantId }, "logout — sessão removida (precisa novo QR)");
         return;
       }
@@ -266,7 +321,9 @@ function tickWatchdog() {
 }
 async function tickReconnectDown() {
   // Religa tenants que têm creds salvas mas estão sem sessão viva.
-  const { data } = await supabase.from("wa_sessions").select("tenant_id").catch(() => ({ data: [] }));
+  // (o builder do supabase-js não tem .catch(): o erro vem em { error })
+  const { data, error } = await supabase.from("wa_sessions").select("tenant_id");
+  if (error) return log.warn({ err: error.message }, "watchdog: falha ao listar sessões");
   for (const r of data ?? []) {
     const s = sessions.get(r.tenant_id);
     if (!s || (!s.sock && s.status === "disconnected" && (s.attempts ?? 0) < MAX_ATTEMPTS)) {
@@ -282,7 +339,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const BUILD = "getmsg-v2";
+const BUILD = "qr-reset-v3";
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size, build: BUILD }));
 
 app.post("/sessions/:tenantId/connect", async (req, res) => {
@@ -312,8 +369,8 @@ app.post("/sessions/:tenantId/pair", async (req, res) => {
     if (prev?.status === "connected") return res.json({ status: "connected", number: prev.number });
     // Pareamento exige um socket LIMPO e não registrado — descarta creds antigas.
     if (prev?.sock) { try { prev.sock.end?.(undefined); } catch {} }
-    await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId).catch(() => {});
     sessions.delete(tenantId);
+    await clearSavedSession(tenantId, prev?.disposeAuth);
     const s = await startSession(tenantId, { pairPhone: number, attempts: 0 }, true);
     s.pairPhone = number;
     s.pairingCode = null;
@@ -417,8 +474,8 @@ app.post("/sessions/:tenantId/logout", async (req, res) => {
     try { s.sock.end?.(undefined); } catch {}
   }
   sessions.set(tenantId, { sock: null, status: "disconnected", qr: null, number: null, attempts: 0, starting: false });
-  await supabase.from("wa_sessions").delete().eq("tenant_id", tenantId).catch(() => {});
-  res.json({ ok: true });
+  const cleared = await clearSavedSession(tenantId, s?.disposeAuth);
+  res.json({ ok: true, cleared });
 });
 
 // ============================ Relatório (PDF profissional + WhatsApp) =======

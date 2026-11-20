@@ -16,17 +16,24 @@ export async function makeSupabaseAuthState(supabase, tenantId) {
   const creds = revive(data?.creds) || initAuthCreds();
   const keys = revive(data?.keys) || {};
 
+  // Depois de descartada (logout, "Recomeçar do zero", sessão inválida), esta instância não grava
+  // mais nada: uma persistência atrasada do socket antigo não pode recriar as credenciais apagadas.
+  let disposed = false;
+
   async function persist() {
+    if (disposed) return;
     // NUNCA deixa rejeitar: é usado como handler de evento (creds.update) e em keys.set.
     // No Node 22 uma promise rejeitada não tratada DERRUBA o processo — um hiccup de rede
     // com o Supabase durante o churn de sessão viraria queda do gateway inteiro.
     try {
-      await supabase.from("wa_sessions").upsert({
+      // O builder do supabase-js não lança em erro do banco: o erro vem em { error }.
+      const { error } = await supabase.from("wa_sessions").upsert({
         tenant_id: tenantId,
         creds: JSON.parse(JSON.stringify(creds, BufferJSON.replacer)),
         keys: JSON.parse(JSON.stringify(keys, BufferJSON.replacer)),
         updated_at: new Date().toISOString(),
       });
+      if (error) console.error("[wa] persist falhou", tenantId, error.message);
     } catch (e) {
       console.error("[wa] persist falhou", tenantId, e?.message);
     }
@@ -61,5 +68,5 @@ export async function makeSupabaseAuthState(supabase, tenantId) {
     },
   };
 
-  return { state, saveCreds: persist };
+  return { state, saveCreds: persist, dispose: () => { disposed = true; } };
 }
