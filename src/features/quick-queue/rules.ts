@@ -16,6 +16,11 @@ export type QuickQueueTenantState = {
   queueMode: "TOTEM" | "APP" | "BOTH";
   /** tenants.quick_queue_enabled (schema-51). Sem a coluna, vale false. */
   quickQueueEnabled: boolean;
+  /**
+   * true se a leitura de tenant_settings ou de tenant_contracts deu erro. Falha FECHADO: sem saber
+   * o modo da fila ou o fim do teste, a jornada não abre.
+   */
+  readFailed: boolean;
 };
 
 /**
@@ -49,6 +54,7 @@ export function queueTakesTicketsFromLink(state: Pick<QuickQueueTenantState, "qu
 export function quickQueueStatus(state: QuickQueueTenantState | null, now: Date): QuickQueueStatus {
   if (!state || state.kind !== "BARBERSHOP") return "NOT_FOUND";
   if (!state.quickQueueEnabled) return "UNAVAILABLE";
+  if (state.readFailed) return "UNAVAILABLE";
   if (!planAllowsQueue(state, now)) return "UNAVAILABLE";
   if (!queueTakesTicketsFromLink(state)) return "UNAVAILABLE";
   return "OPEN";
