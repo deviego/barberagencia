@@ -43,10 +43,10 @@ function useRotateKey(rotateKey: RotateTotemKey, onRotated: () => void) {
     <ConfirmModal
       open={confirming}
       onClose={() => setConfirming(false)}
-      title={MSG.rotate}
+      title={MSG.confirmTitle}
       message={MSG.confirm}
-      confirmLabel={MSG.rotate}
-      cancelLabel={ADMIN.confirmNo}
+      confirmLabel={MSG.confirmYes}
+      cancelLabel={MSG.confirmNo}
       onConfirm={rotate}
     />
   );

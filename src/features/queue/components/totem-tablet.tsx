@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, Copy, ExternalLink, RefreshCw, Tablet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/modal";
-import { QUICK_QUEUE_ADMIN_MESSAGES, QUICK_QUEUE_ONBOARDING_MESSAGES } from "@/features/quick-queue/types";
+import { QUICK_QUEUE_ONBOARDING_MESSAGES as ROTATE } from "@/features/quick-queue/types";
 import { regenerateTotemToken } from "../totem-actions";
 
 /**
@@ -71,7 +71,7 @@ export function TotemTablet({ totemUrl, qrDataUrl }: { totemUrl: string; qrDataU
               Abrir totem <ExternalLink size={13} aria-hidden />
             </a>
             <Button variant="outline" size="sm" onClick={() => setConfirming(true)} disabled={pending}>
-              <RefreshCw size={13} aria-hidden /> Regenerar link
+              <RefreshCw size={13} aria-hidden /> {ROTATE.rotate}
             </Button>
             {msg && <span className="text-caption text-text-muted">{msg}</span>}
           </div>
@@ -81,10 +81,10 @@ export function TotemTablet({ totemUrl, qrDataUrl }: { totemUrl: string; qrDataU
       <ConfirmModal
         open={confirming}
         onClose={() => setConfirming(false)}
-        title={QUICK_QUEUE_ONBOARDING_MESSAGES.rotate}
-        message={QUICK_QUEUE_ONBOARDING_MESSAGES.confirm}
-        confirmLabel={QUICK_QUEUE_ONBOARDING_MESSAGES.rotate}
-        cancelLabel={QUICK_QUEUE_ADMIN_MESSAGES.confirmNo}
+        title={ROTATE.confirmTitle}
+        message={ROTATE.confirm}
+        confirmLabel={ROTATE.confirmYes}
+        cancelLabel={ROTATE.confirmNo}
         onConfirm={regenerate}
       />
     </section>
