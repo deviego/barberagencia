@@ -176,8 +176,8 @@ export const QUICK_QUEUE_JOIN_MESSAGES = {
  *   NEXT      em espera e ninguém na frente: "Você é o próximo"
  *   CALLED    chamada ou em atendimento: "É a sua vez!"
  *   DONE      atendimento concluído
- *   SKIPPED   pulada pela barbearia
- *   CANCELLED cancelada (pelo cliente em "Sair da fila" ou removida pela barbearia)
+ *   SKIPPED   pulada ou removida pela barbearia no painel
+ *   CANCELLED cancelada pelo cliente em "Sair da fila" (queue_entries.left_by_client, schema-54)
  * DONE, SKIPPED e CANCELLED são finais: mostrar o texto e "Pegar nova senha".
  */
 export type QuickQueueTicketState = "WAITING" | "NEXT" | "CALLED" | "DONE" | "SKIPPED" | "CANCELLED";
@@ -194,7 +194,9 @@ export type QuickQueueMyTicket = {
 
 /**
  * ticket null: este aparelho não tem senha hoje (resposta igual para qualquer aparelho sem senha).
- * LIMIT: consultas em série acima do limite (HTTP 429): esperar e tentar de novo, sem aviso de erro.
+ * LIMIT: consultas em série acima do limite (HTTP 429; 1 consulta a cada 2 s por aparelho):
+ *   esperar 2 s e tentar de novo, sem aviso de erro. Acontece também logo depois de entrar na fila.
+ * Aparelho com 2 senhas ativas (pai e filho): vem a de número menor ainda ativa.
  * CLOSED: fila indisponível nesta barbearia. GENERIC: falha; tratar como sem conexão.
  */
 export type QuickQueueStatusResponse =

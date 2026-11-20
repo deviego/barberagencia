@@ -50,6 +50,13 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
     if (specifier === "react") return { url: "data:text/javascript,export const cache = (f) => f;", shortCircuit: true };
+    // Cookie da credencial do aparelho (#98): estes testes rodam sempre sem credencial.
+    if (specifier === "next/headers") {
+      return {
+        url: "data:text/javascript," + encodeURIComponent("export async function cookies() { return { get() {}, set() {} }; }"),
+        shortCircuit: true,
+      };
+    }
     if (specifier === "@/lib/supabase/admin" || specifier === "@/lib/supabase/server") {
       return { url: "data:text/javascript," + encodeURIComponent(FAKE_SUPABASE), shortCircuit: true };
     }
