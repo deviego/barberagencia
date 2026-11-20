@@ -31,6 +31,8 @@ export type QuickQueueBrand = {
 /**
  * Retorno de getQuickQueueEntry(slug). A marca só vem com OPEN; fora disso a resposta não
  * traz dado nenhum da barbearia e o viewer é sempre VISITOR.
+ * Exceção (#102): fila rápida desligada ou fechada com senha ativa criada neste aparelho vem
+ * como OPEN + HAS_TICKET, para a página abrir só "Minha senha" (entrar segue recusado).
  */
 export type QuickQueueEntry =
   | { status: "OPEN"; brand: QuickQueueBrand; viewer: QuickQueueViewer }
@@ -176,8 +178,8 @@ export const QUICK_QUEUE_JOIN_MESSAGES = {
  *   NEXT      em espera e ninguém na frente: "Você é o próximo"
  *   CALLED    chamada ou em atendimento: "É a sua vez!"
  *   DONE      atendimento concluído
- *   SKIPPED   pulada pela barbearia
- *   CANCELLED cancelada (pelo cliente em "Sair da fila" ou removida pela barbearia)
+ *   SKIPPED   pulada ou removida pela barbearia no painel
+ *   CANCELLED cancelada pelo cliente em "Sair da fila" (queue_entries.left_by_client, schema-54)
  * DONE, SKIPPED e CANCELLED são finais: mostrar o texto e "Pegar nova senha".
  */
 export type QuickQueueTicketState = "WAITING" | "NEXT" | "CALLED" | "DONE" | "SKIPPED" | "CANCELLED";
@@ -194,7 +196,9 @@ export type QuickQueueMyTicket = {
 
 /**
  * ticket null: este aparelho não tem senha hoje (resposta igual para qualquer aparelho sem senha).
- * LIMIT: consultas em série acima do limite (HTTP 429): esperar e tentar de novo, sem aviso de erro.
+ * LIMIT: consultas em série acima do limite (HTTP 429; 1 consulta a cada 2 s por aparelho):
+ *   esperar 2 s e tentar de novo, sem aviso de erro. Acontece também logo depois de entrar na fila.
+ * Aparelho com 2 senhas ativas (pai e filho): vem a de número menor ainda ativa.
  * CLOSED: fila indisponível nesta barbearia. GENERIC: falha; tratar como sem conexão.
  */
 export type QuickQueueStatusResponse =
@@ -233,5 +237,61 @@ export const QUICK_QUEUE_TICKET_MESSAGES = {
   cancelled: "Sua senha foi cancelada.",
   newTicket: "Pegar nova senha",
   offline: "Sem conexão. Tentando de novo…",
+  failed: "Não deu certo. Tente de novo.",
+} as const;
+
+/*
+ * #99 — travas. Avisos neutros: nunca dizem de quem é o telefone, o número da senha nem a
+ * posição. joinQuickQueue devolve code "LIMIT" com um destes textos em `error`.
+ */
+export const QUICK_QUEUE_LIMIT_MESSAGES = {
+  /** Telefone com senha ativa tirada em outro aparelho, no totem ou no balcão. */
+  phoneBusy: "Este telefone já tem uma senha na fila. Fale no balcão.",
+  /** Aparelho com 2 senhas ativas nesta barbearia. */
+  deviceLimit: "Limite de senhas neste celular. Fale no balcão.",
+  /** Pedidos em série acima do limite. */
+  tooMany: "Muitas tentativas. Aguarde um pouco e tente de novo.",
+  /** Teto de senhas da fila rápida da barbearia atingido. */
+  tenantCap: "A fila pelo celular está cheia agora. Fale no balcão.",
+} as const;
+
+/** Contagem do dia de limites estourados (alerta ao dono no painel; leitura com RLS de admin). */
+export type QuickQueueLimitKind = "IDENTIFY" | "JOIN_RATE" | "PHONE_BUSY" | "DEVICE_ACTIVE" | "TENANT_ACTIVE";
+export type QuickQueueLimitSummary = {
+  /** Soma do dia (America/Sao_Paulo). */
+  total: number;
+  byKind: Partial<Record<QuickQueueLimitKind, number>>;
+  /** true quando o teto de senhas da fila rápida foi atingido hoje: mostrar alerta com "Desligar". */
+  tenantCapHit: boolean;
+};
+
+/*
+ * #102 — interruptor "Fila rápida" no painel (dono/gerente da própria barbearia).
+ *   setQuickQueueEnabled(enabled) → SetQuickQueueEnabledResult (server action, ./admin-actions.ts)
+ * A barbearia vem só da sessão do painel; o navegador manda só true/false.
+ * Ligar exige plano com fila e a fila da barbearia ativada; desligar é sempre permitido.
+ * Cada mudança fica registrada em audit_log (quem e quando). Depois de salvar, a página de
+ * configurações é revalidada: o cartaz A some ou aparece na hora.
+ */
+export type SetQuickQueueEnabledResult =
+  | { ok: true; enabled: boolean }
+  | {
+      ok: false;
+      /** FORBIDDEN: sem permissão de administrar a barbearia. PLAN: plano sem fila.
+       * QUEUE_OFF: a fila da barbearia está desativada. GENERIC: falha ao salvar. */
+      code: "FORBIDDEN" | "PLAN" | "QUEUE_OFF" | "GENERIC";
+      error: string;
+    };
+
+/** Textos fixos da #102 (chave e avisos). */
+export const QUICK_QUEUE_ADMIN_MESSAGES = {
+  label: "Fila rápida",
+  on: "Ligada: o cliente entra na fila só com o telefone.",
+  off: "Desligada: o cliente precisa entrar na conta para pegar senha.",
+  posterHint: "O cartaz da fila aparece quando a fila rápida estiver ligada.",
+  whatsappOff: "WhatsApp desconectado. A fila funciona normal, só a mensagem de acesso não sai.",
+  forbidden: "Você não tem permissão para mudar isso.",
+  plan: "A fila não faz parte do seu plano.",
+  queueOff: "Ative a fila da barbearia antes de ligar a fila rápida.",
   failed: "Não deu certo. Tente de novo.",
 } as const;

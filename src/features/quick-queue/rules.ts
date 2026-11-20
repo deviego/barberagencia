@@ -60,6 +60,15 @@ export function quickQueueStatus(state: QuickQueueTenantState | null, now: Date)
   return "OPEN";
 }
 
+/**
+ * Senha já criada continua valendo (#102): consultar "Minha senha" e sair da fila exigem só
+ * barbearia existente, leitura sem erro e fila no plano. Não exige a fila rápida ligada nem a
+ * fila aberta: desligar a fila rápida não encerra senhas ativas, só barra senhas novas.
+ */
+export function quickQueueTicketAccess(state: QuickQueueTenantState | null, now: Date): boolean {
+  return !!state && state.kind === "BARBERSHOP" && !state.readFailed && planAllowsQueue(state, now);
+}
+
 /** Despachante: só a chave da fila rápida decide. Desligada (ou sem barbearia) = fluxo de hoje. */
 export function quickQueueRoute(state: QuickQueueTenantState | null): QuickQueueRoute {
   return state && state.kind === "BARBERSHOP" && state.quickQueueEnabled ? "QUICK" : "LEGACY";
