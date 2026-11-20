@@ -11,6 +11,7 @@ import { AvatarUpload } from "@/components/avatar-upload";
 import { addFixedMakeup, adjustClientCuts, adminAddChild, cancelClientSubscription, changeFixedPlanSlot, fetchClientDetail, reinviteClient, removeFixedCut, updateClientAvatar } from "@/features/admin/actions";
 import { CutMeter } from "@/components/cut-meter";
 import { FixedSlotFields, timeToMin, type FixedSlot } from "@/features/admin/components/fixed-slot-fields";
+import { AssignCombo } from "@/features/admin/components/assign-combo";
 import { formatBRL, getInitials } from "@/lib/utils";
 
 function one<T>(rel: T | T[] | null | undefined): T | null {
@@ -31,6 +32,8 @@ interface Detail {
   history: { id: string; start_at: string; status: string; consumed_from_plan: boolean; services: unknown; combo_plans: unknown }[];
   children: { id: string; name: string; age: number | null; photo_url: string | null }[];
   barbers: { id: string; name: string }[];
+  combos: { id: string; name: string; booking_mode?: string | null }[];
+  futureFixed: number;
 }
 
 const STATUS: Record<string, string> = {
@@ -394,6 +397,23 @@ export function ClientDetail({ clientId }: { clientId: string }) {
         ) : (
           <p className="mt-1 text-body text-text-2">Sem plano ativo.</p>
         )}
+
+        {/* Atribuir / trocar plano direto na ficha (#130). Convidado não recebe plano. */}
+        <div className="mt-3">
+          {invited ? (
+            <p className="text-caption text-text-muted">Este cliente ainda não criou o acesso. Ele recebe plano depois que entrar.</p>
+          ) : (
+            <AssignCombo
+              client={{ id: client.id, name: client.name }}
+              current={combo ? { name: combo.name, saldo, fixed: isFixed, futureFixed: data.futureFixed ?? 0 } : null}
+              combos={data.combos ?? []}
+              barbers={data.barbers}
+              triggerLabel={combo ? "Trocar plano" : "Atribuir plano"}
+              triggerSize="sm"
+              onDone={reload}
+            />
+          )}
+        </div>
       </div>
 
       {/* Crianças */}

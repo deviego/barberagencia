@@ -475,11 +475,29 @@ export async function getClientDetail(id: string) {
       .order("start_at", { ascending: false })
       .limit(20),
   ]);
-  const [{ data: children }, { data: barbers }] = await Promise.all([
+  const [{ data: children }, { data: barbers }, { data: combos }, { count: futureFixed }] = await Promise.all([
     supabase.from("children").select("id, name, age, photo_url").eq("client_id", id).order("created_at", { ascending: true }),
     supabase.from("barbers").select("id, name").eq("active", true).order("name"),
+    // Planos para "Atribuir plano" na ficha (#130): os mesmos da lista de Clientes.
+    supabase.from("combo_plans").select("id, name, booking_mode").eq("active", true).order("name"),
+    // Horários fixos já reservados a partir de agora (o aviso de troca diz quantos serão cancelados).
+    supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", id)
+      .eq("consumed_from_plan", true)
+      .gt("start_at", new Date().toISOString())
+      .neq("status", "CANCELLED"),
   ]);
-  return { client, sub, history: history ?? [], children: children ?? [], barbers: barbers ?? [] };
+  return {
+    client,
+    sub,
+    history: history ?? [],
+    children: children ?? [],
+    barbers: barbers ?? [],
+    combos: combos ?? [],
+    futureFixed: futureFixed ?? 0,
+  };
 }
 
 /** Agenda do dia (todos os status ativos) do tenant. */
