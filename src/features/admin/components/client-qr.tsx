@@ -33,6 +33,7 @@ type Props = {
 
 const ERROR = "Não deu certo. Tente de novo.";
 const PREVIEW_SCALE = 0.25; // 620 × 877 no canvas da pré-visualização
+const SEAL_SRC = "/barber-agencia-logo.jpeg";
 const MODE_KEY = (slug: string) => `bb-cartaz-fila-modo:${slug}`;
 
 const MODELS: { key: PosterModel; label: string }[] = [
@@ -101,6 +102,7 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
   const previewRef = useRef<HTMLCanvasElement | null>(null);
   const [model, setModel] = useState<PosterModel>(queueUrl ? "QUEUE" : "SIGNUP");
   const [logo, setLogo] = useState<HTMLImageElement | null>(null);
+  const [seal, setSeal] = useState<HTMLImageElement | null>(null);
   const [fonts, setFonts] = useState<PosterInput["fonts"] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,12 +119,14 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [img, f] = await Promise.all([
+      const [img, sealImg, f] = await Promise.all([
         logoDataUrl ? loadImage(logoDataUrl).catch(() => null) : Promise.resolve(null),
+        loadImage(SEAL_SRC).catch(() => null), // não carregou: o rodapé usa o anel "BA"
         loadFonts(),
       ]);
       if (!alive) return;
       setLogo(img);
+      setSeal(sealImg);
       setFonts(f);
     })();
     return () => {
@@ -138,7 +142,7 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
   }, [canQueue, slug, queueEntry]);
 
   function input(): PosterInput {
-    return { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, queueEntry, fonts: fonts! };
+    return { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, queueEntry, fonts: fonts! };
   }
 
   useEffect(() => {
@@ -147,11 +151,11 @@ export function ClientQr({ publicUrl, queueUrl, queueEntry, slug, logoDataUrl, l
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     try {
-      drawPoster(ctx, { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, queueEntry, fonts }, PREVIEW_SCALE);
+      drawPoster(ctx, { model: activeModel, url: assertPosterUrl(url), name, initials: logoText, logo, seal, queueEntry, fonts }, PREVIEW_SCALE);
     } catch {
       setError(ERROR);
     }
-  }, [fonts, logo, activeModel, url, name, logoText, queueEntry]);
+  }, [fonts, logo, seal, activeModel, url, name, logoText, queueEntry]);
 
   async function run(task: () => Promise<void>) {
     if (busy) return;

@@ -19,6 +19,8 @@ export type PosterInput = {
   name: string;
   initials: string;
   logo: HTMLImageElement | null;
+  /** Selo da Barber Agência para o rodapé (public/barber-agencia-logo.jpeg). null = anel "BA" desenhado. */
+  seal?: HTMLImageElement | null;
   queueEntry: QueueEntryMode;
   fonts: { display: string; text: string };
 };
@@ -329,14 +331,29 @@ export function drawPoster(ctx: CanvasRenderingContext2D, input: PosterInput, sc
   ctx.arc(sealCx, footY, sealR, 0, Math.PI * 2);
   ctx.fillStyle = BG;
   ctx.fill();
+  if (input.seal && input.seal.width > 0) {
+    // O arquivo é uma página retrato com o nome dourado no meio: recorta um quadrado em volta do nome.
+    const crop = Math.min(input.seal.width, input.seal.height) * 0.8;
+    const sx = (input.seal.width - crop) / 2;
+    const sy = input.seal.height * 0.49 - crop / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(sealCx, footY, sealR - 3, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(input.seal, sx, sy, crop, crop, sealCx - sealR, footY - sealR, sealR * 2, sealR * 2);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = GOLD;
+    ctx.font = font(800, 78, display);
+    ctx.textBaseline = "middle";
+    ctx.fillText("BA", sealCx, footY + 4);
+    ctx.textBaseline = "alphabetic";
+  }
+  ctx.beginPath();
+  ctx.arc(sealCx, footY, sealR, 0, Math.PI * 2);
   ctx.lineWidth = 6;
   ctx.strokeStyle = GOLD;
   ctx.stroke();
-  ctx.fillStyle = GOLD;
-  ctx.font = font(800, 78, display);
-  ctx.textBaseline = "middle";
-  ctx.fillText("BA", sealCx, footY + 4);
-  ctx.textBaseline = "alphabetic";
   const tx = sealCx + sealR + 40;
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(245,242,234,0.75)";
