@@ -155,6 +155,20 @@ async function deviceTicketOpen(tenantId: string): Promise<boolean> {
   return deviceHasActiveTicket(admin, tenantId, hashDeviceToken(token));
 }
 
+/**
+ * #148: este aparelho tem senha ativa hoje nesta barbearia (com a fila no plano)? O despachante
+ * usa para levar a "Minha senha" mesmo com a fila rápida desligada. Falha de leitura = não.
+ */
+export async function quickQueueDeviceHasTicket(slug: string): Promise<boolean> {
+  try {
+    const state = await loadQuickQueueTenantState(slug);
+    if (!state || !quickQueueTicketAccess(state, new Date())) return false;
+    return await deviceTicketOpen(state.id);
+  } catch {
+    return false;
+  }
+}
+
 /** Despachante de /b/<slug>/fila: LEGACY = exatamente o fluxo de hoje. */
 export async function getQuickQueueRoute(slug: string): Promise<QuickQueueRoute> {
   try {

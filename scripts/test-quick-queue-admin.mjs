@@ -22,6 +22,12 @@ function query(table) {
   const run = () => {
     const d = db();
     if (d.fail?.includes(table + ":" + q.op)) return { data: null, error: { code: "XX000" } };
+    // failAt["tabela:op"] = [n, ...]: falha só na n-ésima vez (1 = primeira).
+    if (q.op !== "select") {
+      const k = table + ":" + q.op;
+      d.calls[k] = (d.calls[k] ?? 0) + 1;
+      if (d.failAt?.[k]?.includes(d.calls[k])) return { data: null, error: { code: "XX001" } };
+    }
     if (q.op === "update") {
       const hit = rows().filter((r) => match(r, q.filters));
       hit.forEach((r) => Object.assign(r, q.values));
@@ -105,11 +111,13 @@ const B = "00000000-0000-4000-8000-00000000000b";
 const ADMIN_A = "00000000-0000-4000-8000-0000000000a1";
 const PAST = "2026-01-01T00:00:00Z";
 
-function setDb({ role = "UNIT_ADMIN", tenantId = A, plan = "essencial", queue = true, enabled = false, settings = {}, tenant = {}, fail = [] } = {}) {
+function setDb({ role = "UNIT_ADMIN", tenantId = A, plan = "essencial", queue = true, enabled = false, settings = {}, tenant = {}, fail = [], failAt = {} } = {}) {
   const t = (id, slug) => ({ id, subdomain: slug, kind: "BARBERSHOP", saas_plan: plan, queue_enabled: queue, quick_queue_enabled: enabled, totem_token: `tok-${slug}`, totem_key_rotated_at: null, ...tenant });
   globalThis.__adm = {
     user: role ? { id: ADMIN_A, role, tenantId } : null,
     fail,
+    failAt,
+    calls: {},
     writes: [],
     revalidated: [],
     tables: {
@@ -194,6 +202,37 @@ await test("leitura da adoção com erro: falha fechado (GENERIC, nada muda)", a
   setDb({ fail: ["tenant_settings:upsert"] });
   assert.equal((await setQuickQueueEnabled(true)).code, "GENERIC");
   assert.equal(tenant(A).quick_queue_enabled, false);
+});
+
+await test("#148: registro falha e a reversão também: erro no log com o estado, sem dado pessoal", async () => {
+  setDb({ enabled: true, failAt: { "audit_log:insert": [1], "tenants:update": [2] } });
+  const logs = [];
+  const orig = console.error;
+  console.error = (...a) => logs.push(a.join(" "));
+  try {
+    assert.equal((await setQuickQueueEnabled(false)).code, "GENERIC");
+  } finally {
+    console.error = orig;
+  }
+  assert.equal(tenant(A).quick_queue_enabled, false, "a reversão falhou: ficou desligada");
+  const rev = logs.find((l) => l.includes("reversão do interruptor falhou"));
+  assert.ok(rev, "log da reversão");
+  assert.match(rev, /desligado sem registro \(XX001\)/);
+  assert.doesNotMatch(rev, new RegExp(ADMIN_A));
+});
+
+await test("#148: registro falha e a reversão funciona: volta ao estado anterior, sem log de reversão", async () => {
+  setDb({ enabled: true, failAt: { "audit_log:insert": [1] } });
+  const logs = [];
+  const orig = console.error;
+  console.error = (...a) => logs.push(a.join(" "));
+  try {
+    assert.equal((await setQuickQueueEnabled(false)).code, "GENERIC");
+  } finally {
+    console.error = orig;
+  }
+  assert.equal(tenant(A).quick_queue_enabled, true);
+  assert.ok(!logs.some((l) => l.includes("reversão do interruptor falhou")));
 });
 
 // ---- #103: renovar a chave -------------------------------------------------------------------

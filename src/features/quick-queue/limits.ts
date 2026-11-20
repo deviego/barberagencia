@@ -49,6 +49,15 @@ export const QUICK_QUEUE_STATUS_LIMITS = {
   /** "Sair da fila": pedidos por aparelho na janela. */
   leavePerDevice: 10,
   leaveWindowSeconds: 10 * 60,
+  /**
+   * #148: consultas SEM credencial válida (sem cookie, cookie inventado ou vencido), por
+   * barbearia, em memória da instância, antes de qualquer leitura no banco. Nenhum dado de rede
+   * ou pessoal: a chave é só o endereço da barbearia. Aparelho já conferido não entra aqui.
+   */
+  unverifiedPerShop: 60,
+  unverifiedWindowMs: 10_000,
+  /** Quanto tempo um aparelho conferido fica liberado desse teto, nesta instância. */
+  verifiedTtlMs: 10 * 60_000,
 } as const;
 
 /**
