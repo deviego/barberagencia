@@ -145,7 +145,26 @@ export type AdminQueueItem = {
   joinedAt: string;
   hasPlan: boolean;
   planName: string | null;
+  /** #100: mostrar "Usar plano" no início do atendimento (regra do banco: plano ativo, modo
+   * permitido e corte no saldo). */
+  planUsable: boolean;
+  /** #100: senha da fila rápida, com telefone digitado e não confirmado: selo para a equipe
+   * conferir quem está na cadeira antes de usar o plano. */
+  phoneUnverified: boolean;
 };
+
+/**
+ * Clientes que aceitam "Usar plano" agora, pela regra do banco (queue_plan_usable_clients,
+ * schema-55): plano ativo, modo permitido (plano fixo não, nesta fase) e corte no saldo.
+ * A regra do plano fixo fica só no banco; aqui não se repete.
+ */
+async function planUsableClients(client: PgClient, ids: (string | null | undefined)[]): Promise<Set<string>> {
+  const uniq = [...new Set(ids.filter(Boolean) as string[])];
+  if (!uniq.length) return new Set();
+  const { data, error } = await client.rpc("queue_plan_usable_clients", { p_client_ids: uniq });
+  if (error) return new Set(); // sem a leitura, o painel não oferece "Usar plano" (avulso)
+  return new Set(((data ?? []) as string[]).map(String));
+}
 
 /** Fila do admin (WAITING + IN_SERVICE de hoje), sob RLS. */
 export async function getAdminQueue(): Promise<AdminQueueItem[]> {
@@ -153,12 +172,16 @@ export async function getAdminQueue(): Promise<AdminQueueItem[]> {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const { data } = await supabase
     .from("queue_entries")
-    .select("id, ticket_number, status, joined_at, client_id, clients(name), services(name), barbers(name)")
+    .select("id, ticket_number, status, joined_at, client_id, source, phone_verified, clients(name), services(name), barbers(name)")
     .eq("day", today)
     .in("status", ["WAITING", "IN_SERVICE"])
     .order("ticket_number", { ascending: true });
   const rows = (data ?? []) as any[];
-  const plans = await activePlansByClient(supabase as unknown as PgClient, rows.map((r) => r.client_id));
+  const ids = rows.map((r) => r.client_id);
+  const [plans, usable] = await Promise.all([
+    activePlansByClient(supabase as unknown as PgClient, ids),
+    planUsableClients(supabase as unknown as PgClient, ids),
+  ]);
   return rows.map((r) => ({
     id: r.id,
     ticket: r.ticket_number,
@@ -169,6 +192,8 @@ export async function getAdminQueue(): Promise<AdminQueueItem[]> {
     joinedAt: r.joined_at,
     hasPlan: plans.has(r.client_id),
     planName: plans.get(r.client_id) ?? null,
+    planUsable: usable.has(r.client_id),
+    phoneUnverified: r.source === "QUICK_QUEUE" && r.phone_verified === false,
   }));
 }
 
