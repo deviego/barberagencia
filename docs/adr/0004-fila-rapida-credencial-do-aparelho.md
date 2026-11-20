@@ -1,6 +1,6 @@
 # 0004 — Fila rápida: estado da jornada no servidor e credencial do aparelho
 
-- Status: Proposto (aguarda revisão de segurança)
+- Status: Aceito (segurança: Navalha, 2026-11-20, com a emenda das exceções 1 e 2)
 - Stories: #96 (nasce aqui), #98, #99, #101 · Epic #94
 - Autor: Alicerce (Tech Lead)
 
@@ -40,11 +40,13 @@ Opções consideradas:
 ## Exceções (emenda, sujeita à aprovação da segurança)
 1. **Telefone pendente entre dois passos.** Quando o telefone é novo, a chave do telefone fica na linha do
    aparelho (`pending_phone_key`, `pending_until`) por no máximo **10 minutos**, só para que o passo do nome não
-   precise receber o telefone de novo. É apagada quando o nome é registrado, quando vence (a limpeza roda antes de
-   qualquer outra checagem, inclusive com a fila rápida desligada) e pela rotina de retenção (#108).
+   precise receber o telefone de novo. É apagada quando o nome é registrado, quando o aparelho identifica outro
+   telefone, quando vence (a limpeza roda antes de qualquer outra checagem, inclusive com a fila rápida
+   desligada) e pela rotina de retenção (#108). Nunca vai para a tabela de tentativas nem para log.
 2. **Telefone já cadastrado.** Digitar um telefone já cadastrado na barbearia liga o aparelho ao cliente
    existente, **sem prova de posse do número**. Por isso esse vínculo nunca mostra nome, histórico ou plano,
    nunca gasta corte de plano (#100) e só serve para criar e acompanhar a senha feita naquele aparelho.
+   Requisito obrigatório nas revisões da #97 e da #98.
 
 ## Consequências
 - Revogação simples (apagar ou expirar a linha) e limites no mesmo lugar.

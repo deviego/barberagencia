@@ -8,4 +8,4 @@ Novo ADR: `NNNN-<titulo>.md`, numeração sequencial, nunca reescrever um ADR ac
 | 0001 | [Remover o Prisma: supabase-js como única camada de dados](0001-remover-prisma.md) | Aceito |
 | 0002 | [Migrações versionadas com Supabase CLI](0002-migracoes-supabase-cli.md) | Aceito (aguarda Diego) |
 | 0003 | [Outbox de notificações do WhatsApp](0003-outbox-notificacoes.md) | Aceito |
-| 0004 | [Fila rápida: estado da jornada no servidor e credencial do aparelho](0004-fila-rapida-credencial-do-aparelho.md) | Proposto |
+| 0004 | [Fila rápida: estado da jornada no servidor e credencial do aparelho](0004-fila-rapida-credencial-do-aparelho.md) | Aceito |
