@@ -13,6 +13,9 @@ import {
   type QuickQueueTicketState,
 } from "../types";
 
+/** Espera depois de LIMIT (a rota aceita 1 consulta a cada 2 s por aparelho). */
+const LIMIT_WAIT_MS = 2_000;
+
 const FINAL: QuickQueueTicketState[] = ["DONE", "SKIPPED", "CANCELLED"];
 
 export function isFinalTicket(t: QuickQueueMyTicket) {
@@ -40,25 +43,22 @@ export async function fetchQuickQueueStatus(slug: string, signal?: AbortSignal):
  * Tela "Minha senha" (#98). A senha vem só da consulta GET /b/<slug>/fila/rapida/status, que
  * reconhece o aparelho pelo cookie; a tela não guarda nem manda número de senha.
  * Consulta a cada POLL.everyMs com a aba visível e pausa em segundo plano (volta na hora ao
- * reaparecer). Sem conexão: aviso e recuo 5/10/20/30 s. LIMIT: espera em silêncio.
- * A tela nunca volta sozinha para o início: só sem senha (ticket null), depois de sair da fila
- * ou no "Pegar nova senha".
+ * reaparecer). Sem conexão: aviso e recuo 5/10/20/30 s. LIMIT (1 consulta a cada 2 s por
+ * aparelho, comum logo depois de entrar): espera LIMIT_WAIT_MS e consulta de novo, sem aviso.
+ * Estados: SKIPPED = pulada ou removida pela barbearia; CANCELLED = o cliente saiu pela tela.
+ * Depois de "Sair da fila" com sucesso, a tela já mostra CANCELLED, sem esperar a consulta.
+ * A tela nunca volta sozinha para o início: só sem senha (ticket null) ou no "Pegar nova senha".
  */
-export function MyTicket({
+function MyTicketBody({
   slug,
   initial,
-  justJoined = false,
   onNoTicket,
-  onLeft,
   onNewTicket,
 }: {
   slug: string;
   /** Senha já lida (reabrir o link); sem ela, a tela começa consultando. */
   initial?: QuickQueueMyTicket | null;
-  /** Acabou de entrar: anuncia QUICK_QUEUE_JOIN_MESSAGES.joined no leitor de tela. */
-  justJoined?: boolean;
   onNoTicket: () => void;
-  onLeft: () => void;
   onNewTicket: () => void;
 }) {
   const [ticket, setTicket] = useState<QuickQueueMyTicket | null>(initial ?? null);
@@ -111,11 +111,13 @@ export function MyTicket({
       failures.current = 0;
       setOffline(false);
       setClosed(true);
+    } else if (res.code === "LIMIT") {
+      wait = LIMIT_WAIT_MS; // sem aviso e sem contar como falha de conexão
     } else {
       const i = Math.min(failures.current, POLL.backoffMs.length - 1);
       failures.current += 1;
       wait = POLL.backoffMs[i];
-      if (res.code === "GENERIC") setOffline(true); // LIMIT: espera sem aviso
+      setOffline(true);
     }
     timer.current = setTimeout(() => void poll(), wait);
   }, [slug, stop]);
@@ -142,8 +144,11 @@ export function MyTicket({
       try {
         const res = await leaveQuickQueue(slug);
         if (res.ok) {
+          // Saiu: estado final na hora (CANCELLED = saída pela tela); a consulta não precisa voltar.
           stop();
-          onLeft();
+          setConfirming(false);
+          setOffline(false);
+          setTicket((t) => (t ? { ...t, state: "CANCELLED", ahead: 0 } : t));
           return;
         }
         if (res.code === "NOT_WAITING") {
@@ -161,14 +166,10 @@ export function MyTicket({
     });
   }
 
-  const joinedNotice = justJoined ? <span className="sr-only">{QUICK_QUEUE_JOIN_MESSAGES.joined}</span> : null;
 
   if (!ticket) {
     return (
       <div className="flex flex-col items-center gap-6" aria-busy="true">
-        <div role="status" aria-live="polite">
-          {joinedNotice}
-        </div>
         <h1 className="font-display text-h3 font-black uppercase text-text">{MSG.title}</h1>
         <div aria-hidden className="h-32 w-48 animate-pulse rounded-xl border border-border bg-surface" />
         {offline && <p className="text-caption text-text-2">{MSG.offline}</p>}
@@ -198,7 +199,6 @@ export function MyTicket({
 
         {/* Mudanças da fila anunciadas no leitor de tela sem roubar o foco. */}
         <div role="status" aria-live="polite" className="mt-3 flex flex-col items-center gap-1">
-          {joinedNotice}
           {called && <p className="font-display text-h3 font-black uppercase text-accent">{MSG.called}</p>}
           {ticket.state === "NEXT" && <p className="text-body-lg font-semibold text-text">{MSG.next}</p>}
           {ticket.state === "WAITING" && (
@@ -273,5 +273,34 @@ export function MyTicket({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * "Minha senha" + aviso de entrada. A região aria-live fica fora do corpo para continuar montada
+ * quando a tela troca de "consultando" para a senha: ela monta vazia e só depois recebe
+ * "Você entrou na fila." (com o texto já na montagem, alguns leitores de tela não anunciam).
+ */
+export function MyTicket({
+  justJoined = false,
+  ...props
+}: Parameters<typeof MyTicketBody>[0] & {
+  /** Acabou de entrar: anuncia QUICK_QUEUE_JOIN_MESSAGES.joined no leitor de tela. */
+  justJoined?: boolean;
+}) {
+  const [announce, setAnnounce] = useState(false);
+  useEffect(() => {
+    if (!justJoined) return;
+    const t = setTimeout(() => setAnnounce(true), 300);
+    return () => clearTimeout(t);
+  }, [justJoined]);
+
+  return (
+    <>
+      <div role="status" aria-live="polite" className="sr-only">
+        {announce ? QUICK_QUEUE_JOIN_MESSAGES.joined : ""}
+      </div>
+      <MyTicketBody {...props} />
+    </>
   );
 }

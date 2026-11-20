@@ -30,10 +30,11 @@ export default async function QuickQueuePage({ params }: { params: Promise<{ slu
   }
 
   // Cliente logado também passa pelo telefone nesta fase (um caminho só, decisão do CTO no #97).
-  // Senha ativa neste aparelho: o IdentifyFlow consulta /status ao abrir e vai direto para "Minha senha".
+  // HAS_TICKET: senha ativa criada neste aparelho; abre direto em "Minha senha" (#98). Vale também
+  // com a fila rápida desligada (exceção do #102 em getQuickQueueEntry).
   return (
     <QuickQueueShell brand={entry.brand}>
-      <IdentifyFlow slug={slug} />
+      <IdentifyFlow slug={slug} hasTicket={entry.viewer === "HAS_TICKET"} />
     </QuickQueueShell>
   );
 }

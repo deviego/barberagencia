@@ -1,29 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { identifyPhone, registerName } from "../actions";
-import { QUICK_QUEUE_IDENTIFY_MESSAGES, type QuickQueueMyTicket } from "../types";
+import { QUICK_QUEUE_IDENTIFY_MESSAGES } from "../types";
 import { PhoneStep } from "./phone-step";
 import { NameStep } from "./name-step";
 import { ServiceStep } from "./service-step";
-import { MyTicket, fetchQuickQueueStatus, isFinalTicket } from "./my-ticket";
+import { MyTicket } from "./my-ticket";
 
-type Step = "CHECKING" | "PHONE" | "NAME" | "SERVICE" | "TICKET";
-
-/** Tempo máximo da consulta inicial antes de abrir o telefone (rede lenta não trava a entrada). */
-const CHECK_TIMEOUT_MS = 4_000;
+type Step = "PHONE" | "NAME" | "SERVICE" | "TICKET";
 
 /**
  * Jornada telefone → nome → serviço → "Minha senha" da fila rápida (#96, #97, #98).
- * Ao abrir, consulta a senha deste aparelho: com senha ativa vai direto para "Minha senha".
+ * Com senha ativa neste aparelho (viewer HAS_TICKET, decidido no servidor), abre direto em
+ * "Minha senha", sem digitar nada.
  * Todo mundo passa pelo telefone nesta fase, inclusive cliente logado (um caminho só).
  * O telefone e o nome ficam aqui, fora dos passos: erro, falha de conexão ou volta ao telefone
  * nunca apagam o que o cliente digitou. A tela manda só o slug e o texto digitado; quem é o
  * cliente é decidido no servidor (credencial do aparelho em cookie HttpOnly, gravado pela ação).
  */
-export function IdentifyFlow({ slug }: { slug: string }) {
-  const [step, setStep] = useState<Step>("CHECKING");
-  const [resume, setResume] = useState<QuickQueueMyTicket | null>(null);
+export function IdentifyFlow({ slug, hasTicket = false }: { slug: string; hasTicket?: boolean }) {
+  const [step, setStep] = useState<Step>(hasTicket ? "TICKET" : "PHONE");
   const [justJoined, setJustJoined] = useState(false);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -32,28 +29,6 @@ export function IdentifyFlow({ slug }: { slug: string }) {
   const [pending, startTransition] = useTransition();
   // Trava síncrona: dois toques no mesmo instante não disparam dois envios.
   const inFlight = useRef(false);
-
-  // Reabrir o link com senha ativa neste aparelho: direto para "Minha senha", sem digitar nada.
-  useEffect(() => {
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), CHECK_TIMEOUT_MS);
-    let alive = true;
-    fetchQuickQueueStatus(slug, ctrl.signal)
-      .then((res) => {
-        if (!alive) return;
-        if (res.ok && res.ticket && !isFinalTicket(res.ticket)) {
-          setResume(res.ticket);
-          setStep("TICKET");
-        } else setStep("PHONE");
-      })
-      .catch(() => alive && setStep("PHONE"))
-      .finally(() => clearTimeout(timeout));
-    return () => {
-      alive = false;
-      clearTimeout(timeout);
-      ctrl.abort();
-    };
-  }, [slug]);
 
   function run(task: () => Promise<void>, onFail: (msg: string) => void) {
     if (inFlight.current) return;
@@ -124,7 +99,6 @@ export function IdentifyFlow({ slug }: { slug: string }) {
           setStep("PHONE");
         }}
         onJoined={() => {
-          setResume(null);
           setJustJoined(true);
           setStep("TICKET");
         }}
@@ -136,20 +110,13 @@ export function IdentifyFlow({ slug }: { slug: string }) {
     return (
       <MyTicket
         slug={slug}
-        initial={resume}
         justJoined={justJoined}
         onNoTicket={() => {
-          setResume(null);
-          setStep("PHONE");
-        }}
-        onLeft={() => {
-          setResume(null);
           setJustJoined(false);
           setStep("PHONE");
         }}
         onNewTicket={() => {
           // O aparelho já está identificado; se não estiver mais, a escolha volta ao telefone.
-          setResume(null);
           setJustJoined(false);
           setStep("SERVICE");
         }}
@@ -157,9 +124,6 @@ export function IdentifyFlow({ slug }: { slug: string }) {
     );
   }
 
-  if (step === "CHECKING") {
-    return <div aria-busy="true" className="my-auto h-40 animate-pulse rounded-xl border border-border bg-surface" />;
-  }
 
   return (
     <PhoneStep
