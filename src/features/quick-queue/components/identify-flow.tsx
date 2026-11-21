@@ -1,27 +1,31 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { identifyPhone, registerName } from "../actions";
 import { QUICK_QUEUE_IDENTIFY_MESSAGES } from "../types";
 import { PhoneStep } from "./phone-step";
 import { NameStep } from "./name-step";
+import { ServiceStep } from "./service-step";
+import { MyTicket } from "./my-ticket";
 
-type Step = "PHONE" | "NAME" | "SERVICE";
+type Step = "PHONE" | "NAME" | "SERVICE" | "TICKET";
 
 /**
- * Jornada telefone → nome → serviço da fila rápida (#96).
+ * Jornada telefone → nome → serviço → "Minha senha" da fila rápida (#96, #97, #98).
+ * Com senha ativa neste aparelho (viewer HAS_TICKET, decidido no servidor), abre direto em
+ * "Minha senha", sem digitar nada.
+ * Todo mundo passa pelo telefone nesta fase, inclusive cliente logado (um caminho só).
  * O telefone e o nome ficam aqui, fora dos passos: erro, falha de conexão ou volta ao telefone
  * nunca apagam o que o cliente digitou. A tela manda só o slug e o texto digitado; quem é o
  * cliente é decidido no servidor (credencial do aparelho em cookie HttpOnly, gravado pela ação).
  */
-export function IdentifyFlow({ slug }: { slug: string }) {
-  const [step, setStep] = useState<Step>("PHONE");
+export function IdentifyFlow({ slug, hasTicket = false }: { slug: string; hasTicket?: boolean }) {
+  const [step, setStep] = useState<Step>(hasTicket ? "TICKET" : "PHONE");
+  const [justJoined, setJustJoined] = useState(false);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [known, setKnown] = useState(false);
   const [pending, startTransition] = useTransition();
   // Trava síncrona: dois toques no mesmo instante não disparam dois envios.
   const inFlight = useRef(false);
@@ -51,7 +55,6 @@ export function IdentifyFlow({ slug }: { slug: string }) {
         } else setPhoneError(res.error);
         return;
       }
-      setKnown(res.next === "SERVICE");
       setStep(res.next);
     }, setPhoneError);
   }
@@ -66,7 +69,6 @@ export function IdentifyFlow({ slug }: { slug: string }) {
         } else setNameError(res.error);
         return;
       }
-      setKnown(false);
       setStep("SERVICE");
     }, setNameError);
   }
@@ -89,21 +91,39 @@ export function IdentifyFlow({ slug }: { slug: string }) {
   }
 
   if (step === "SERVICE") {
-    // TODO(#97): aqui entra a escolha do serviço. Até lá, a tela diz o que fazer e não promete nada.
     return (
-      <div role="status" className="my-auto flex flex-col items-center gap-4 py-10 text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-wash text-accent">
-          <CheckCircle2 className="h-7 w-7" aria-hidden />
-        </span>
-        <p className="max-w-[300px] text-body-lg font-semibold text-text">
-          {known ? "Já te conhecemos. Bora escolher o serviço." : "Pronto, cadastro feito. Bora escolher o serviço."}
-        </p>
-        <p className="max-w-[300px] text-body text-text-2">
-          A escolha do serviço ainda não está disponível aqui. Fale com a equipe no balcão.
-        </p>
-      </div>
+      <ServiceStep
+        slug={slug}
+        onRestart={(error) => {
+          setPhoneError(error);
+          setStep("PHONE");
+        }}
+        onJoined={() => {
+          setJustJoined(true);
+          setStep("TICKET");
+        }}
+      />
     );
   }
+
+  if (step === "TICKET") {
+    return (
+      <MyTicket
+        slug={slug}
+        justJoined={justJoined}
+        onNoTicket={() => {
+          setJustJoined(false);
+          setStep("PHONE");
+        }}
+        onNewTicket={() => {
+          // O aparelho já está identificado; se não estiver mais, a escolha volta ao telefone.
+          setJustJoined(false);
+          setStep("SERVICE");
+        }}
+      />
+    );
+  }
+
 
   return (
     <PhoneStep

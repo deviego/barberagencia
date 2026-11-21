@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
 import {
   PLANS,
@@ -22,12 +23,28 @@ export type EffectivePlan = {
   tenantId: string | null;
 };
 
+/**
+ * Só plano e fim do teste do contrato da barbearia da sessão, lidos pelo servidor. O contrato
+ * só é legível com a sessão por admin da barbearia; esta leitura também roda para cliente
+ * (agendamento → checkLimit), então não pode depender da sessão. Nada além desses 2 campos.
+ */
+async function contractPlanFields(tenantId: string | null) {
+  if (!tenantId) return { data: null };
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("tenant_contracts")
+    .select("plan, trial_ends_at")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  return { data: error ? null : data };
+}
+
 /** Plano efetivo da barbearia atual: durante o teste, gated=false (tudo liberado). */
 export async function getEffectivePlan(): Promise<EffectivePlan> {
   const user = await getSessionUser();
   const supabase = await createSupabaseServerClient();
   const [{ data: c }, { data: t }] = await Promise.all([
-    supabase.from("tenant_contracts").select("plan, trial_ends_at").maybeSingle(),
+    contractPlanFields(user?.tenantId ?? null),
     supabase.from("tenants").select("saas_plan").maybeSingle(),
   ]);
   const plan = normalizeSaasPlan((t?.saas_plan as string) ?? (c?.plan as string) ?? null);

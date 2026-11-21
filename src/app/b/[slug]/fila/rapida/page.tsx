@@ -29,10 +29,12 @@ export default async function QuickQueuePage({ params }: { params: Promise<{ slu
     );
   }
 
-  // TODO(#97): CLIENT vai direto para a escolha do serviço. TODO(#98): HAS_TICKET cai em "Minha senha".
+  // Cliente logado também passa pelo telefone nesta fase (um caminho só, decisão do CTO no #97).
+  // HAS_TICKET: senha ativa criada neste aparelho; abre direto em "Minha senha" (#98). Vale também
+  // com a fila rápida desligada (exceção do #102 em getQuickQueueEntry).
   return (
     <QuickQueueShell brand={entry.brand}>
-      <IdentifyFlow slug={slug} />
+      <IdentifyFlow slug={slug} hasTicket={entry.viewer === "HAS_TICKET"} />
     </QuickQueueShell>
   );
 }

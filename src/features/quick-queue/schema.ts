@@ -30,3 +30,12 @@ export function quickQueueName(raw: unknown): { ok: true; name: string } | { ok:
 
 export const IdentifyPhoneInput = z.object({ slug: z.string().max(80), phone: z.string().max(40) });
 export const RegisterNameInput = z.object({ slug: z.string().max(80), name: z.string().max(200) });
+
+/** Entrada de joinQuickQueue (#97). Ids são uuid; preço em centavos só para conferência. */
+export const JoinQuickQueueInputSchema = z.object({
+  slug: z.string().max(80),
+  serviceId: z.string().uuid(),
+  priceCents: z.number().int().min(0).max(100_000_00),
+  barberId: z.string().uuid().nullish(),
+});
+export const LoadQuickQueueOptionsInput = z.object({ slug: z.string().max(80) });
