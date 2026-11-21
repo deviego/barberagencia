@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { randomUUID, randomBytes } from "crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
@@ -229,12 +231,18 @@ export async function totemJoinQueue(
   ]);
   if (!serviceOk || !barberOk) return fail(TOTEM_ERRORS.invalidChoice);
 
-  const { data, error } = await admin.rpc("join_queue_totem", {
-    p_tenant_id: tenant.id,
-    p_client_id: clientId,
-    p_service_id: service,
-    p_barber_id: barber,
-  });
+  const call = () =>
+    admin.rpc("join_queue_totem", {
+      p_tenant_id: tenant.id,
+      p_client_id: clientId,
+      p_service_id: service,
+      p_barber_id: barber,
+    });
+  let { data, error } = await call();
+  // 23505: a fila pelo app (sem trava) gravou senha para o mesmo cliente no mesmo instante e a
+  // regra de 1 senha ativa por cliente (schema-54) segurou. A segunda chamada devolve a senha que
+  // ficou valendo (mesmo tratamento de joinQueue).
+  if (error?.code === "23505") ({ data, error } = await call());
   const row = Array.isArray(data) ? data[0] : data;
   if (error || typeof row?.ticket_number !== "number") {
     if (error) console.error(`[totem] senha falhou (${error.code ?? "sem código"})`);
@@ -243,14 +251,54 @@ export async function totemJoinQueue(
   return { ok: true as const, ticket: row.ticket_number as number };
 }
 
-/** ADMIN (UNIT_ADMIN+/MASTER): regenera o token do totem (invalida o link antigo). */
+/**
+ * ADMIN (UNIT_ADMIN+/MASTER): renova a chave do totem (#103). A chave anterior deixa de valer na
+ * hora em todas as funções do totem (todas passam por resolveTotemTenant). A chave fica só em
+ * totem_access_keys (schema-62). Registra quem e quando (tenants.totem_key_rotated_*,
+ * schema-57) e o histórico em audit_log, sem a chave.
+ * Não mexe em senha nenhuma. A chave só volta para o painel do admin.
+ */
 export async function regenerateTotemToken() {
-  const tenantId = await requireAdminTenant();
-  if (!tenantId) return { ok: false as const, error: "Acesso negado." };
+  const user = await getSessionUser();
+  if (!user?.tenantId || !user.role || !isUnitAdmin(user.role)) return { ok: false as const, error: "Acesso negado." };
+  const tenantId = user.tenantId;
   const admin = createSupabaseAdminClient();
-  const token = randomBytes(24).toString("hex");
-  const { error } = await admin.from("tenants").update({ totem_token: token }).eq("id", tenantId);
+  const token = randomBytes(32).toString("hex");
+  // 1) A chave fica só em totem_access_keys (exclusiva do servidor); a anterior deixa de valer
+  //    na hora (resolveTotemTenant lê dali).
+  const { error } = await admin
+    .from("totem_access_keys")
+    .upsert({ tenant_id: tenantId, token, updated_at: new Date().toISOString() }, { onConflict: "tenant_id" });
   if (error) return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
+
+  // 2) Quem e quando (#103). Depois da chave: a renovação só conta para ligar a fila rápida se a
+  //    chave mudou de fato. Se este registro falhar, o admin tenta de novo (renova outra vez).
+  const { error: rErr } = await admin
+    .from("tenants")
+    .update({ totem_key_rotated_at: new Date().toISOString(), totem_key_rotated_by: user.id })
+    .eq("id", tenantId);
+  if (rErr) {
+    console.error(`[totem] registro da renovação falhou (${rErr.code ?? "sem código"})`);
+    return { ok: false as const, error: "Não foi possível salvar. Tente de novo." };
+  }
+
+  // 3) Coluna antiga (até a schema-63) sem a chave. Sem a coluna: nada a fazer.
+  const { error: cErr } = await admin.from("tenants").update({ totem_token: null }).eq("id", tenantId);
+  if (cErr && cErr.code !== "42703" && cErr.code !== "PGRST204") {
+    console.error(`[totem] limpeza da chave antiga falhou (${cErr.code ?? "sem código"})`);
+  }
+
+  // 4) Histórico, sem a chave.
+  const { error: aErr } = await admin.from("audit_log").insert({
+    tenant_id: tenantId,
+    user_id: user.id,
+    action: "totem.key_rotated",
+    target: "totem_access_keys.token",
+    metadata: {},
+  });
+  if (aErr) console.error(`[totem] histórico da renovação indisponível (${aErr.code ?? "sem código"})`);
+  revalidatePath("/admin/config");
+  revalidatePath("/admin/fila");
   return { ok: true as const, token };
 }
 

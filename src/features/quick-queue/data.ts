@@ -6,9 +6,12 @@ import {
   isQuickQueueSlug,
   quickQueueRoute,
   quickQueueStatus,
+  quickQueueTicketAccess,
   quickQueueViewer,
   type QuickQueueTenantState,
 } from "./rules";
+import { hashDeviceToken, readDeviceToken } from "./device";
+import { deviceHasActiveTicket } from "./ticket";
 import type { QuickQueueBrand, QuickQueueEntry, QuickQueueRoute } from "./types";
 
 /*
@@ -124,12 +127,46 @@ export async function loadSessionClientTenantIds(): Promise<string[]> {
  */
 export async function getQuickQueueEntry(slug: string): Promise<QuickQueueEntry> {
   const state = await loadQuickQueueTenantState(slug);
-  const status = quickQueueStatus(state, new Date());
-  if (status !== "OPEN" || !state) return { status: status === "OPEN" ? "NOT_FOUND" : status, viewer: "VISITOR" };
+  const now = new Date();
+  const status = quickQueueStatus(state, now);
+  if (status !== "OPEN" || !state) {
+    // Fila rápida desligada (ou fechada) com senha ativa criada neste aparelho: a senha continua
+    // valendo e a página abre direto em "Minha senha" (#102). Ninguém mais passa daqui.
+    if (state && quickQueueTicketAccess(state, now) && (await deviceTicketOpen(state.id))) {
+      return { status: "OPEN", brand: await loadQuickQueueBrand(state.id), viewer: "HAS_TICKET" };
+    }
+    return { status: status === "OPEN" ? "NOT_FOUND" : status, viewer: "VISITOR" };
+  }
 
-  const [brand, clientTenantIds] = await Promise.all([loadQuickQueueBrand(state.id), loadSessionClientTenantIds()]);
-  // HAS_TICKET depende da credencial do aparelho (#99); até lá só VISITOR ou CLIENT.
-  return { status: "OPEN", brand, viewer: quickQueueViewer(clientTenantIds, state.id) };
+  const [brand, clientTenantIds, hasTicket] = await Promise.all([
+    loadQuickQueueBrand(state.id),
+    loadSessionClientTenantIds(),
+    deviceTicketOpen(state.id),
+  ]);
+  // HAS_TICKET: este aparelho tem senha ativa hoje (credencial do cookie) → "Minha senha" (#98).
+  return { status: "OPEN", brand, viewer: hasTicket ? "HAS_TICKET" : quickQueueViewer(clientTenantIds, state.id) };
+}
+
+/** Senha ativa hoje criada neste aparelho? Falha de leitura = não (a tela começa pelo telefone). */
+async function deviceTicketOpen(tenantId: string): Promise<boolean> {
+  const token = await readDeviceToken();
+  const admin = adminOrNull();
+  if (!token || !admin) return false;
+  return deviceHasActiveTicket(admin, tenantId, hashDeviceToken(token));
+}
+
+/**
+ * #148: este aparelho tem senha ativa hoje nesta barbearia (com a fila no plano)? O despachante
+ * usa para levar a "Minha senha" mesmo com a fila rápida desligada. Falha de leitura = não.
+ */
+export async function quickQueueDeviceHasTicket(slug: string): Promise<boolean> {
+  try {
+    const state = await loadQuickQueueTenantState(slug);
+    if (!state || !quickQueueTicketAccess(state, new Date())) return false;
+    return await deviceTicketOpen(state.id);
+  } catch {
+    return false;
+  }
 }
 
 /** Despachante de /b/<slug>/fila: LEGACY = exatamente o fluxo de hoje. */
