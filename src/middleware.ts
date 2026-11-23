@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { AREA_HEADER, STAFF, areaFromKey, areaKeyFor, type AreaKey } from "@/lib/supabase/area";
+import { AREA_HEADER, NEUTRAL_BRAND_HEADER, STAFF, areaFromKey, areaKeyFor, type AreaKey } from "@/lib/supabase/area";
 import { supabasePublicEnv } from "@/lib/supabase/env";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { REF_COOKIE, normalizeRefCode } from "@/lib/partners/ref";
@@ -76,7 +76,13 @@ export async function middleware(request: NextRequest) {
 
   // Raiz = landing page pública (marketing). Não exige sessão.
   // Também captura o cookie de afiliado (?ref=CODE) para atribuição de indicação.
-  if (path === "/") return applyRefCookie(request, NextResponse.next());
+  // A landing é da marca Barber Agência: sempre a cor neutra (dourado), nunca a da barbearia do
+  // cookie bb_tenant ou da sessão. O root layout lê este header.
+  if (path === "/") {
+    const landingHeaders = new Headers(request.headers);
+    landingHeaders.set(NEUTRAL_BRAND_HEADER, "1");
+    return applyRefCookie(request, NextResponse.next({ request: { headers: landingHeaders } }));
+  }
   if (OLD_REDIRECTS[path])
     return NextResponse.redirect(new URL(OLD_REDIRECTS[path] + request.nextUrl.search, request.url));
 
@@ -91,6 +97,7 @@ export async function middleware(request: NextRequest) {
   // Header para os Server Components saberem a área (qual cookie de sessão usar).
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(AREA_HEADER, areaKey);
+  requestHeaders.delete(NEUTRAL_BRAND_HEADER);
   let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const { url, anonKey } = supabasePublicEnv();
