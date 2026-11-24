@@ -1,10 +1,12 @@
-// Testes de banco do #169 (ADR 0005): com o handle_new_user em vigor (schema-invite-fix), conta nova
-// no formato do Google (metadados do provedor, sem barbearia) nasce só com o perfil; contas de
-// e-mail (telefone + senha, e-mail + senha, convite) seguem como hoje. Sem migration nova.
+// Testes de banco da schema-65 (#169, ADR 0005): só conta de provedor "email" cria cliente e vínculo
+// no cadastro; Google, outro provedor ou provedor ausente nascem só com o perfil (nome e foto), sem
+// barbearia e sem ligar convite. Contas de e-mail (telefone + senha, e-mail + senha, convite)
+// seguem como hoje.
 // SÓ em Supabase LOCAL descartável (loopback), com o ci-order aplicado. Dados fictícios.
 // Cada execução cria barbearias e usuários novos com sufixo aleatório e não apaga nada.
 // Uso: DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:<porta>/postgres node scripts/test-auth-provider-db.mjs
 import { randomBytes, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { localTarget } from "./lib/schema-apply.mjs";
@@ -51,7 +53,7 @@ async function newUser({ provider, email = mail("u"), userMeta = {} }) {
   );
   return id;
 }
-const profile = (id) => one(`select full_name, phone from public.profiles where id = $1`, [id]);
+const profile = (id) => one(`select full_name, phone, avatar_url from public.profiles where id = $1`, [id]);
 const counts = async (id) => ({
   clients: (await one(`select count(*)::int n from public.clients where user_id = $1`, [id])).n,
   memberships: (await one(`select count(*)::int n from public.memberships where user_id = $1`, [id])).n,
@@ -73,10 +75,33 @@ const googleMeta = (name, email) => ({
 });
 
 // ---- Conta no formato do Google ------------------------------------------------------------------
-await test("Google: nasce só com o perfil (nome); sem cliente, sem vínculo, sem barbearia", async () => {
+await test("Google: nasce só com o perfil (nome e foto); sem cliente, sem vínculo, sem barbearia", async () => {
   const email = mail("g");
   const id = await newUser({ provider: "google", email, userMeta: googleMeta("Ana Teste", email) });
-  assert.deepEqual(await profile(id), { full_name: "Ana Teste", phone: null });
+  assert.deepEqual(await profile(id), { full_name: "Ana Teste", phone: null, avatar_url: "https://example.test/foto.png" });
+  assert.deepEqual(await counts(id), { clients: 0, memberships: 0 });
+});
+
+await test("Google com barbearia e telefone nos metadados do usuário: mesmo assim só o perfil", async () => {
+  const email = mail("g2");
+  const id = await newUser({
+    provider: "google",
+    email,
+    userMeta: { ...googleMeta("Bia Teste", email), tenant_subdomain: S.slug, phone: "11987650001" },
+  });
+  assert.deepEqual(await counts(id), { clients: 0, memberships: 0 });
+  assert.equal((await profile(id)).phone, null);
+});
+
+await test("outro provedor qualquer e provedor ausente: só o perfil (lista permitida)", async () => {
+  for (const provider of ["apple", null]) {
+    const id = await newUser({ provider, userMeta: { full_name: "Caio Teste", tenant_subdomain: S.slug } });
+    assert.deepEqual(await counts(id), { clients: 0, memberships: 0 }, String(provider));
+  }
+});
+
+await test("provedor 'email' escrito nos metadados do USUÁRIO não vale (só o do Auth conta)", async () => {
+  const id = await newUser({ provider: "google", userMeta: { full_name: "Dani Teste", provider: "email", tenant_subdomain: S.slug } });
   assert.deepEqual(await counts(id), { clients: 0, memberships: 0 });
 });
 
@@ -99,7 +124,7 @@ await test("e-mail com barbearia: cria cliente e vínculo CLIENT como hoje", asy
   const c = await one(`select tenant_id, name, phone, status from public.clients where user_id = $1`, [id]);
   assert.deepEqual(c, { tenant_id: S.id, name: "Davi Teste", phone: "11987650002", status: "ACTIVE" });
   assert.equal((await one(`select role from public.memberships where user_id = $1`, [id])).role, "CLIENT");
-  assert.deepEqual(await profile(id), { full_name: "Davi Teste", phone: "11987650002" });
+  assert.deepEqual(await profile(id), { full_name: "Davi Teste", phone: "11987650002", avatar_url: null });
 });
 
 await test("e-mail que bate com convite pendente: liga o convite como hoje", async () => {
@@ -118,10 +143,6 @@ await test("e-mail sem barbearia: só o perfil, como hoje", async () => {
   assert.deepEqual(await counts(id), { clients: 0, memberships: 0 });
 });
 
-await test("conta sem provedor nos metadados, com barbearia: cliente criado (como hoje)", async () => {
-  const id = await newUser({ provider: null, userMeta: { full_name: "Gui Teste", tenant_subdomain: S.slug } });
-  assert.deepEqual(await counts(id), { clients: 1, memberships: 1 });
-});
 
 // ---- Estrutura ---------------------------------------------------------------------------------
 await test("trigger segue ligado; função security definer com search_path fixo", async () => {
@@ -135,6 +156,14 @@ await test("trigger segue ligado; função security definer com search_path fixo
   );
   assert.equal(f.prosecdef, true);
   assert.ok(f.proconfig.some((c) => c.startsWith("search_path=")));
+});
+
+await test("migration 65 re-executável", async () => {
+  const sql = readFileSync(new URL("../supabase/schema-65-auth-provider-profile-only.sql", import.meta.url), "utf8");
+  await pool.query(sql);
+  await pool.query(sql);
+  const id = await newUser({ provider: "google", userMeta: { full_name: "Hugo Teste", tenant_subdomain: S.slug } });
+  assert.deepEqual(await counts(id), { clients: 0, memberships: 0 });
 });
 
 await pool.end();
