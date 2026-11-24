@@ -11,7 +11,8 @@ const CALLBACK_ERRORS: Record<string, string> = {
 
 export function callbackErrorMessage(code: string | string[] | undefined): string | null {
   if (!code || Array.isArray(code)) return null;
-  return CALLBACK_ERRORS[code] ?? CALLBACK_ERRORS.auth;
+  // Só chave própria: "__proto__"/"constructor" na URL não podem pegar nada do protótipo.
+  return Object.hasOwn(CALLBACK_ERRORS, code) ? CALLBACK_ERRORS[code] : CALLBACK_ERRORS.auth;
 }
 
 /** Para onde o callback manda quem acabou de entrar com Google. */
