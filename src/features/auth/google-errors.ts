@@ -1,4 +1,4 @@
-import type { GoogleCallbackError } from "@/features/auth/google-types";
+import { GOOGLE_LOGIN_MESSAGES, type GoogleCallbackError } from "@/features/auth/google-types";
 
 /**
  * Mensagens dos erros que o callback devolve em `?error=<código>` (contrato do #170).
@@ -9,6 +9,7 @@ const CALLBACK_ERRORS: Record<GoogleCallbackError, string> = {
   google_cancelado: "Você não terminou de entrar com o Google. Tente de novo ou entre com telefone e senha.",
   google_sem_barbearia: "Não achamos de qual barbearia você veio. Abra o link da sua barbearia e entre com o Google por lá.",
   conta_vinculada_outra: "Essa conta do Google já está ligada a outro cadastro. Escolha outra conta do Google.",
+  email_ja_tem_conta: GOOGLE_LOGIN_MESSAGES.emailHasAccount,
 };
 
 export function callbackErrorMessage(code: string | string[] | undefined): string | null {

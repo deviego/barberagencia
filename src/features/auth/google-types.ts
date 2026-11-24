@@ -60,7 +60,20 @@ export type ProveAccountAndLinkResult =
 export type LoginMethods = { google: boolean };
 
 /** Códigos de erro do callback em /client/login?error= (conta_vinculada_outra vai para /client/perfil). */
-export type GoogleCallbackError = "auth" | "google_cancelado" | "google_sem_barbearia" | "conta_vinculada_outra";
+export type GoogleCallbackError =
+  | "auth"
+  | "google_cancelado"
+  | "google_sem_barbearia"
+  | "conta_vinculada_outra"
+  // #171: Google com o e-mail de uma conta que entra por senha, sem pedido de vínculo.
+  | "email_ja_tem_conta";
+
+/**
+ * "Conectar com Google" no perfil (#171): o servidor registra a intenção de vínculo; com ok, o
+ * NAVEGADOR chama linkIdentity (createClientAreaBrowserClient) com redirectTo para
+ * /client/auth/callback?next=/client/perfil.
+ */
+export type StartGoogleLinkResult = { ok: true } | { ok: false; code: "NOT_SIGNED_IN" | "GENERIC"; error: string };
 
 /** Redação final da PO (Regua, #179). Nenhum traz dado da conta. */
 export const GOOGLE_LOGIN_MESSAGES = {
@@ -72,4 +85,5 @@ export const GOOGLE_LOGIN_MESSAGES = {
   notEligible: "Não deu para juntar as contas. Fale com a barbearia.",
   limited: "Muitas tentativas. Espere alguns minutos e tente de novo.",
   failed: "Não deu certo agora. Tente de novo.",
+  emailHasAccount: "Esse e-mail já tem conta. Entre com telefone ou e-mail e senha, e depois conecte o Google no seu perfil.",
 } as const;

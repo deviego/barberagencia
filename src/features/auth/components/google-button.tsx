@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClientAreaBrowserClient } from "@/lib/supabase/client";
 import { GOOGLE_CONFIRM_PATH } from "@/features/auth/google-errors";
+import { startGoogleLink } from "@/features/auth/google-actions";
 import { cn } from "@/lib/utils";
 
 /** "G" oficial do Google (cores da marca do Google, exigidas pelas regras de uso do botão). */
@@ -44,10 +45,27 @@ export function GoogleButton({
     const origin = window.location.origin;
     const next = mode === "link" ? "/client/perfil" : GOOGLE_CONFIRM_PATH;
     const redirectTo = `${origin}/client/auth/callback?next=${encodeURIComponent(next)}`;
-    const { error: err } =
-      mode === "link"
-        ? await supabase.auth.linkIdentity({ provider: "google", options: { redirectTo } })
-        : await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
+    let err: unknown = null;
+    try {
+      if (mode === "link") {
+        // Registra o pedido de vínculo no servidor; sem ele, o callback desfaz o vínculo (#171).
+        const intent = await startGoogleLink();
+        if (!intent.ok) {
+          if (intent.code === "NOT_SIGNED_IN") {
+            window.location.assign("/client/login");
+            return;
+          }
+          setLoading(false);
+          setError(intent.error);
+          return;
+        }
+        ({ error: err } = await supabase.auth.linkIdentity({ provider: "google", options: { redirectTo } }));
+      } else {
+        ({ error: err } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } }));
+      }
+    } catch (e) {
+      err = e;
+    }
     // Sem erro, o navegador já está indo para o Google: mantém o carregando.
     if (err) {
       setLoading(false);

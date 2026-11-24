@@ -58,7 +58,7 @@ test("flag: só 'on' liga o botão", () => {
 
 // ─── Erros do callback (contrato #170) ──────────────────────
 test("erro: cada código do contrato tem texto próprio", () => {
-  const codes = ["auth", "google_cancelado", "google_sem_barbearia", "conta_vinculada_outra"];
+  const codes = ["auth", "google_cancelado", "google_sem_barbearia", "conta_vinculada_outra", "email_ja_tem_conta"];
   const messages = codes.map((c) => callbackErrorMessage(c));
   for (const [i, m] of messages.entries()) assert.ok(m && m.length > 0, `sem texto para ${codes[i]}`);
   assert.equal(new Set(messages).size, codes.length, "dois códigos com o mesmo texto");
@@ -80,7 +80,7 @@ test("erro: código desconhecido cai no genérico e nunca repete o texto da URL"
 });
 
 test("erro: textos sem dado pessoal e sem prometer recuperação que não existe", () => {
-  for (const c of ["auth", "google_cancelado", "google_sem_barbearia", "conta_vinculada_outra"]) {
+  for (const c of ["auth", "google_cancelado", "google_sem_barbearia", "conta_vinculada_outra", "email_ja_tem_conta"]) {
     const m = callbackErrorMessage(c);
     assert.ok(!/@|\d{4,}/.test(m), `texto de ${c} parece ter e-mail ou telefone`);
     assert.ok(!/c[oó]digo|sms/i.test(m), `texto de ${c} cita código/SMS (fase 1 é só senha)`);
