@@ -14,6 +14,9 @@ import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect("/client/login");
+  // Conta sem vínculo nenhum (ex.: entrou com Google e ainda não confirmou o WhatsApp): só a
+  // tela de confirmar abre (#170). Bloqueio no servidor, antes de qualquer leitura.
+  if (!user.role) redirect("/client/confirmar-whatsapp");
 
   const preview = (await cookies()).get(VIEW_AS_CLIENT_COOKIE)?.value === "1";
   const isAdmin =

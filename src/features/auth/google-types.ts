@@ -24,12 +24,14 @@ export type PendingShop = {
 /**
  * PENDING: logado pelo Google, ainda sem cliente; barbearia do bb_tenant válida.
  * PENDING_NO_SHOP: logado sem cliente e sem barbearia válida (abrir o link da barbearia).
- * ACTIVE: já é cliente; a tela manda para /client.
+ * ACTIVE: já tem vínculo; a tela manda para /client.
+ * SIGNED_OUT: sem sessão; a tela manda para /client/login.
  */
 export type PendingAccount =
   | { status: "PENDING"; shop: PendingShop }
   | { status: "PENDING_NO_SHOP" }
-  | { status: "ACTIVE" };
+  | { status: "ACTIVE" }
+  | { status: "SIGNED_OUT" };
 
 export type ConfirmWhatsappInput = { phone: string };
 

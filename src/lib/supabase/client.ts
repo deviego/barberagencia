@@ -21,3 +21,18 @@ export function createSupabaseBrowserClient() {
     }
   );
 }
+
+/**
+ * Supabase no browser SEMPRE com o cookie da ÁREA DO CLIENTE (sb-cli, /client), em fluxo PKCE.
+ * Usar no "Entrar com Google" e no "Conectar com Google" (signInWithOAuth / linkIdentity): o
+ * code_verifier fica no cookie do cliente e chega ao /client/auth/callback, mesmo vindo de
+ * /b/<slug> ou com a sessão de equipe aberta no navegador.
+ */
+export function createClientAreaBrowserClient() {
+  const area = areaFromKey("client");
+  const { url, anonKey } = supabasePublicEnv();
+  return createBrowserClient(url, anonKey, {
+    auth: { flowType: "pkce" },
+    cookieOptions: { name: area.name, path: area.path, sameSite: "lax", secure: true },
+  });
+}
