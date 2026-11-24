@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { MapPin } from "lucide-react";
-import { LogoMark } from "@/components/brand/logo";
 import { LogoutButton } from "@/components/nav/logout-button";
+import { GoogleAvatar } from "@/features/auth/components/google-avatar";
 import { ConfirmWhatsappFlow } from "@/features/auth/components/confirm-whatsapp-flow";
 import { confirmWhatsapp, proveAccountAndLink } from "@/features/auth/google-actions";
 import { getPendingAccount } from "@/features/auth/google-data";
@@ -43,25 +43,11 @@ export default async function ConfirmarWhatsappPage() {
   return (
     <div className="mx-auto flex w-[400px] max-w-full flex-col gap-6">
       <div className="flex flex-col items-center gap-3">
-        {user.avatarUrl ? (
-          // Foto do Google (domínio externo): <img> simples, sem otimização do Next.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.avatarUrl}
-            alt=""
-            width={72}
-            height={72}
-            referrerPolicy="no-referrer"
-            className="h-[72px] w-[72px] rounded-full border-2 border-accent object-cover"
-          />
-        ) : (
-          <LogoMark
-            text={pending.shop.logoText}
-            src={pending.shop.logoUrl}
-            size={72}
-            className="rounded-lg shadow-lg"
-          />
-        )}
+        <GoogleAvatar
+          src={user.avatarUrl ?? null}
+          logoText={pending.shop.logoText}
+          logoUrl={pending.shop.logoUrl}
+        />
       </div>
       <ConfirmWhatsappFlow
         shopName={pending.shop.name}

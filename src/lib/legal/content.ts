@@ -72,7 +72,7 @@ export const TERMS: LegalDocument = {
 export const PRIVACY: LegalDocument = {
   title: "Política de Privacidade",
   subtitle: "Plataforma de agendamentos",
-  updatedAt: "24 de novembro de 2026",
+  updatedAt: "20 de julho de 2026",
   intro:
     "Este documento explica como a barbearia coleta, utiliza, armazena e protege os dados pessoais dos clientes na plataforma de agendamento, em total conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 – LGPD).",
   sections: [
