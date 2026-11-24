@@ -43,10 +43,19 @@ function from(table) {
 }
 async function rpc(fn, args) {
   const d = g();
-  if (fn === "rate_limit_hit") { log("limit:" + args.p_scope); return { data: !(d.limited ?? []).includes(args.p_scope), error: null }; }
+  if (fn === "rate_limit_hit") {
+    log("limit:" + args.p_scope);
+    if ((d.limitDown ?? []).includes(args.p_scope)) return { data: null, error: { code: "XX000" } };
+    return { data: !(d.limited ?? []).includes(args.p_scope), error: null };
+  }
   if (fn === "auth_email_for_phone") return { data: d.phoneAuth?.[args.p_digits] ?? null, error: null };
   if (fn === "auth_email_for_contact_email") return { data: d.contactAuth?.[args.p_email] ?? null, error: null };
-  if (fn === "finalize_client_signup") { d.finalized.push(args); return { data: d.finalizeResult ?? "OK", error: null }; }
+  if (fn === "finalize_client_signup") {
+    d.finalized.push(args);
+    const next = (d.finalizeQueue ?? []).shift();
+    if (next === "ERROR") return { data: null, error: { code: "57014" } };
+    return { data: next ?? d.finalizeResult ?? "OK", error: null };
+  }
   return { data: null, error: { code: "PGRST202" } };
 }
 const adminAuth = {
@@ -120,6 +129,7 @@ const { registerClientAccount, signInWithIdentifier, sendWelcomeEmail } = await 
 const { requestPasswordReset } = await import("@/features/auth/password-reset");
 const { updateContactEmail, resendContactEmailConfirmation } = await import("@/features/auth/contact-actions");
 const { consumeContactConfirmation, createContactConfirmation } = await import("@/features/auth/contact-email");
+const { completeInviteAcceptance } = await import("@/features/auth/invite-actions");
 const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
 
 function reset(over = {}) {
@@ -172,12 +182,13 @@ await test("cadastro sem convite não leva convite; com convite leva só o HASH 
   assert.equal(g.finalized[0].p_invite_token_hash, sha("convite-token-abc"));
   assert.equal(Object.values(g.users)[0].user_metadata.tenant_subdomain, undefined, "com convite, barbearia só do convite");
   assert.doesNotMatch(JSON.stringify(Object.values(g.users)[0]), /convite-token-abc/);
-  // Convite usado no meio do caminho (corrida): o banco recusa e o cadastro avisa.
+  // Convite usado no meio do caminho (corrida): a conta já existe; o cadastro responde ok com
+  // pendingInvite para a tela concluir o aceite já logada (nunca "tente de novo").
   g = reset({ finalizeResult: "INVITE_INVALID" });
   g.db.client_invites.push({ token: "convite-token-xyz", status: "PENDING", expires_at: new Date(Date.now() + 86400_000).toISOString() });
   assert.deepEqual(
     await registerClientAccount({ name: "Caio", phone: "11987650013", password: "senha-forte", inviteToken: "convite-token-xyz" }),
-    { ok: false, error: "Este convite não vale mais." }
+    { ok: true, authEmail: TECH("11987650013"), pendingInvite: true }
   );
 });
 
@@ -205,6 +216,54 @@ await test("telefone que já tem conta: mensagem de conta existente; e-mail téc
   assert.equal(r2.ok, false);
 });
 
+// ---- Falha entre criar a conta e finalizar ---------------------------------------------------------
+const pendingInviteDb = (g, token) =>
+  g.db.client_invites.push({ token, status: "PENDING", expires_at: new Date(Date.now() + 86400_000).toISOString() });
+
+await test("cadastro comum: finalização falhando (erro ou INVALID) responde ok — a conta já existe", async () => {
+  for (const q of [["ERROR"], ["INVALID"]]) {
+    const g = reset({ finalizeQueue: [...q] });
+    const r = await registerClientAccount({ name: "Gui Teste", phone: "11987650021", password: "senha-forte", email: "gui@example.test" });
+    assert.deepEqual(r, { ok: true, authEmail: TECH("11987650021") }, q[0]);
+    assert.equal(g.finalized.length, 1, "sem nova tentativa no cadastro comum");
+  }
+});
+
+await test("convite: finalização falha → tenta de novo na hora; dando certo, sem pendência", async () => {
+  const g = reset({ finalizeQueue: ["ERROR", "OK"] });
+  pendingInviteDb(g, "convite-token-r1");
+  const r = await registerClientAccount({ name: "Hugo", phone: "11987650022", password: "senha-forte", inviteToken: "convite-token-r1" });
+  assert.deepEqual(r, { ok: true, authEmail: TECH("11987650022") });
+  assert.equal(g.finalized.length, 2);
+});
+
+await test("convite: falha de novo (erro, INVITE_INVALID ou INVALID) → ok com pendingInvite (conclui logado)", async () => {
+  for (const q of [["ERROR", "ERROR"], ["INVITE_INVALID", "INVITE_INVALID"], ["INVALID", "INVALID"]]) {
+    const g = reset({ finalizeQueue: [...q] });
+    pendingInviteDb(g, "convite-token-r2");
+    const r = await registerClientAccount({ name: "Iara", phone: "11987650023", password: "senha-forte", inviteToken: "convite-token-r2" });
+    assert.deepEqual(r, { ok: true, authEmail: TECH("11987650023"), pendingInvite: true }, q[0]);
+    assert.equal(g.finalized.length, 2);
+  }
+});
+
+await test("concluir aceite: só a conta da SESSÃO, com o hash do token; sem sessão ou convite inválido recusa", async () => {
+  let g = reset();
+  assert.equal((await completeInviteAcceptance("convite-token-r3")).code, "NOT_SIGNED_IN");
+  assert.equal(g.finalized.length, 0);
+  g = reset();
+  g.users.u7 = { id: "u7", email: TECH("11987650024") };
+  g.session = "u7";
+  g.db.profiles.push({ id: "u7", contact_email: "iara@example.test" });
+  assert.deepEqual(await completeInviteAcceptance("convite-token-r3"), { ok: true });
+  assert.deepEqual(g.finalized, [{ p_user_id: "u7", p_contact_email: "iara@example.test", p_invite_token_hash: sha("convite-token-r3") }]);
+  g = reset({ finalizeResult: "INVITE_INVALID" });
+  g.users.u7 = { id: "u7" };
+  g.session = "u7";
+  assert.equal((await completeInviteAcceptance("convite-token-r3")).code, "INVALID_INVITE");
+  assert.equal((await completeInviteAcceptance("../x")).code, "INVALID_INVITE");
+});
+
 // ---- Login --------------------------------------------------------------------------------------
 await test("login por e-mail: só contato CONFIRMADO resolve (função do banco); senão vale o e-mail digitado", async () => {
   const g = reset({ contactAuth: { "ana@example.test": TECH("11987650001") } });
@@ -215,6 +274,13 @@ await test("login por e-mail: só contato CONFIRMADO resolve (função do banco)
   const g2 = reset();
   g2.users.u1 = { id: "u1", email: TECH("11987650001"), password: "certa" };
   assert.deepEqual(await signInWithIdentifier("ana@example.test", "certa"), { ok: false, error: "Telefone/e-mail ou senha inválidos." });
+});
+
+await test("login: sem conseguir conferir o limite, recusa com a mensagem genérica (não segue sem limite)", async () => {
+  const g = reset({ limitDown: ["login_identifier"] });
+  g.users.u1 = { id: "u1", email: TECH("11987650001"), password: "certa" };
+  assert.deepEqual(await signInWithIdentifier("11987650001", "certa"), { ok: false, error: "Telefone/e-mail ou senha inválidos." });
+  assert.ok(!g.log.some((l) => l.startsWith("signIn:")));
 });
 
 await test("login: limite por identificador e por conta, com a mesma mensagem de senha errada", async () => {

@@ -7,6 +7,7 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signInWithPassword } from "../services/auth-service";
 import { registerClientAccount, sendWelcomeEmail } from "@/features/auth/actions";
+import { completeInviteAcceptance } from "@/features/auth/invite-actions";
 import { maskPhoneBR } from "@/lib/masks";
 
 export function AcceptInviteForm({
@@ -56,6 +57,8 @@ export function AcceptInviteForm({
         return;
       }
       await signInWithPassword(res.authEmail, pw);
+      // Conta criada, mas o convite não ligou no cadastro: conclui agora, já logado.
+      if (res.pendingInvite) await completeInviteAcceptance(token).catch(() => null);
       await sendWelcomeEmail().catch(() => {});
       router.push("/client");
     } catch (err) {

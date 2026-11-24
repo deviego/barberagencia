@@ -29,7 +29,10 @@ export async function registerClientAccount(input: {
   tenantSubdomain?: string;
   /** Aceite de convite: o token do link. O cadastro liga a ficha convidada só por ele. */
   inviteToken?: string;
-}): Promise<{ ok: true; authEmail: string } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; authEmail: string; /** convite ainda não ligado: chamar completeInviteAcceptance já logado */ pendingInvite?: true }
+  | { ok: false; error: string }
+> {
   const name = input.name?.trim();
   const digits = phoneDigits(input.phone ?? "");
   if (!name) return { ok: false, error: "Informe seu nome." };
@@ -70,20 +73,35 @@ export async function registerClientAccount(input: {
     const msg = (error?.message ?? "").toLowerCase();
     if (msg.includes("already") || msg.includes("registered") || msg.includes("exists"))
       return { ok: false, error: "Este telefone já tem conta. Faça login." };
+    if (msg.includes("database"))
+      return { ok: false, error: "Este telefone já tem cadastro nesta barbearia. Se você recebeu um convite, use o link dele." };
     return { ok: false, error: "Não foi possível criar a conta. Tente de novo." };
   }
 
+  // Cadastro comum com o telefone de uma ficha convidada: nasce ficha NOVA (decisão do CTO; unir
+  // fichas é o #184). O índice único do telefone não quebra: a ficha nova fica sem chave de
+  // telefone (regra do gatilho da schema-52), coberto no teste de banco do cadastro.
   // Contato (sem confirmar) e, com convite, o aceite de uso único: tudo no banco, pelo servidor.
-  const { data: fin, error: finError } = await admin.rpc("finalize_client_signup", {
-    p_user_id: data.user.id,
-    p_contact_email: contact,
-    p_invite_token_hash: inviteHash,
-  });
+  // A conta já existe daqui em diante: falha aqui nunca vira "tente de novo" (cairia em "já tem
+  // conta"). Com convite, uma nova tentativa na hora; se ainda falhar, a tela conclui o aceite
+  // depois, já logada (completeInviteAcceptance).
+  const finalize = () =>
+    admin.rpc("finalize_client_signup", {
+      p_user_id: data.user.id,
+      p_contact_email: contact,
+      p_invite_token_hash: inviteHash,
+    });
+  let { data: fin, error: finError } = await finalize();
+  if (inviteHash && (finError || fin !== "OK")) ({ data: fin, error: finError } = await finalize());
   if (finError) {
-    console.error(`[auth] cadastro não finalizado (${finError.code ?? "sem código"})`);
-    return { ok: false, error: "Não foi possível criar a conta. Tente de novo." };
+    console.error(`[auth] cadastro sem finalização (${finError.code ?? "sem código"})`);
+    return inviteHash ? { ok: true, authEmail, pendingInvite: true } : { ok: true, authEmail };
   }
-  if (fin === "INVITE_INVALID") return { ok: false, error: "Este convite não vale mais." };
+  if (fin !== "OK") {
+    // INVITE_INVALID (convite vencido/usado) ou INVALID (conta fora da regra): registra, sem dado pessoal.
+    console.error(`[auth] cadastro não finalizado (${String(fin)})`);
+    return inviteHash ? { ok: true, authEmail, pendingInvite: true } : { ok: true, authEmail };
+  }
   return { ok: true, authEmail };
 }
 
@@ -134,7 +152,8 @@ export async function signInWithIdentifier(
       p_window_seconds: LOGIN_LIMIT.windowSeconds,
       p_limit: max,
     });
-    if (!limitError && ok === false) return { ok: false, error: "Telefone/e-mail ou senha inválidos." };
+    // Sem conseguir conferir o limite: recusa com a mesma mensagem (não segue sem limite).
+    if (limitError || ok === false) return { ok: false, error: "Telefone/e-mail ou senha inválidos." };
   }
 
   const supabase = await createSupabaseServerClient();
