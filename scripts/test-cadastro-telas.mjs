@@ -83,4 +83,11 @@ test("perfil: link velho com e-mail confirmado não pede Reenviar", () => {
   assert.ok(card.includes("linkResult && state.verified"));
 });
 
+test("convite: quem não está logado volta ao convite depois do login", () => {
+  const mw = read("middleware.ts");
+  assert.ok(mw.includes('url.searchParams.set("next", path + request.nextUrl.search)'));
+  const login = read("app/client/(guest)/login/page.tsx");
+  assert.ok(login.includes("safeNext(") && login.includes("<LoginForm dest={dest} />"));
+});
+
 console.log(`\n${passed} testes passaram.`);

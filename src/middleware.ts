@@ -127,6 +127,9 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublic(path)) {
     const url = request.nextUrl.clone();
     url.pathname = loginFor(path);
+    url.search = "";
+    // Área do cliente: depois de entrar, volta para onde ia (o login passa por safeNext).
+    if (url.pathname === "/client/login") url.searchParams.set("next", path + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
   // Logado na página de login da própria área → home da área.
