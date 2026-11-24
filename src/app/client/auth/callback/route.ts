@@ -4,6 +4,14 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { safeNext } from "@/lib/auth/safe-next";
 import { createClientAreaSupabase, hasAnyMembership, shopFromCookie } from "@/features/auth/google-server";
+import { consumeLinkIntent } from "@/features/auth/google-link";
+import {
+  approvedGoogleIds,
+  freshGoogleNextToPassword,
+  identityKey,
+  newestGoogle,
+  unapprovedGoogleNextToPassword,
+} from "@/features/auth/google-link-rules";
 import type { GoogleCallbackError } from "@/features/auth/google-types";
 
 /**
@@ -13,6 +21,7 @@ import type { GoogleCallbackError } from "@/features/auth/google-types";
  * - Conta sem vínculo nenhum vai para /client/confirmar-whatsapp, ignorando `next`; sem
  *   barbearia válida no bb_tenant, sai da sessão e volta ao login.
  * - Destino só dentro da área do cliente (safeNext).
+ * - Google em conta com senha só fica se aprovado por pedido do cliente; senão é desfeito (#171).
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -35,6 +44,27 @@ export async function GET(request: Request) {
   if (error || !data.user) return toLogin("auth");
 
   const admin = createSupabaseAdminClient();
+
+  // Google numa conta que também entra por senha só vale se o próprio cliente pediu o vínculo
+  // (perfil ou prova de posse): o pedido válido aprova a identidade e a aprovação fica guardada.
+  // Google não aprovado é desfeito a qualquer tempo, e a pessoa sai da sessão (#171).
+  const identities = data.user.identities ?? [];
+  // Um pedido aprova só a identidade google mais nova (a ligada neste fluxo).
+  const newest = newestGoogle(identities);
+  await consumeLinkIntent(admin, data.user, newest ? [identityKey(newest)] : []);
+  const unapproved = unapprovedGoogleNextToPassword(identities, approvedGoogleIds(data.user.app_metadata));
+  if (unapproved) {
+    const recent = !!freshGoogleNextToPassword([unapproved, ...identities.filter((i) => i.provider === "email")], Date.now());
+    const { error: unlinkError } = await supabase.auth.unlinkIdentity(unapproved);
+    if (unlinkError) {
+      console.error(`[auth-google] desfazer vínculo falhou (${unlinkError.code ?? "sem código"}; ${recent ? "recente" : "antigo"})`);
+    } else {
+      console.info(`[auth-google] vínculo sem pedido desfeito (${recent ? "recente" : "antigo"})`);
+    }
+    await supabase.auth.signOut();
+    return toLogin("email_ja_tem_conta");
+  }
+
   const member = await hasAnyMembership(admin, data.user.id);
   if (member === null) return toLogin("auth");
   if (!member) {
