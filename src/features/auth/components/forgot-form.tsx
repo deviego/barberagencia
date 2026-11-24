@@ -5,8 +5,9 @@ import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { requestPasswordReset } from "../password-reset";
+import { CONTACT_SCREEN_COPY as COPY } from "../contact-screen-copy";
 
-/** Passo 1 da recuperação: informar o e-mail e receber o link. */
+/** Passo 1 da recuperação: informar o e-mail ou telefone e receber o link. */
 export function ForgotForm() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -25,7 +26,7 @@ export function ForgotForm() {
       }
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar");
+      setError(COPY.failed);
     } finally {
       setLoading(false);
     }
@@ -39,13 +40,13 @@ export function ForgotForm() {
           <div className="text-caption text-text-2">
             <p className="font-semibold text-text">Pedido recebido</p>
             <p className="mt-0.5">
-              Se existir conta com esse e-mail confirmado, enviamos um link para criar uma nova senha.
-              Confira também o spam.
+              {COPY.resetSent}
             </p>
+            <p className="mt-2">{COPY.resetNoEmail}</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => setSent(false)}>
-          Enviar para outro e-mail
+          {COPY.resetAgain}
         </Button>
       </div>
     );
@@ -57,16 +58,22 @@ export function ForgotForm() {
       className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-7 shadow-lg"
     >
       <div className="flex flex-col gap-1.5">
-        <Label>E-mail cadastrado</Label>
+        <Label htmlFor="recuperar-id">{COPY.resetLabel}</Label>
         <Input
-          type="email"
+          id="recuperar-id"
+          type="text"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="william@email.com"
-          autoComplete="email"
+          placeholder="voce@email.com ou (11) 91234-5678"
+          autoComplete="username"
+          required
         />
       </div>
-      {error && <p className="text-caption text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-caption text-danger">
+          {error}
+        </p>
+      )}
       <Button type="submit" size="lg" loading={loading}>
         Enviar link
       </Button>

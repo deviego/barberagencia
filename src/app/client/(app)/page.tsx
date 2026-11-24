@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Ticket } from "lucide-react";
 import { AppointmentActions } from "@/features/client/components/appointment-actions";
 import { getClientHome } from "@/features/client/data";
+import { ContactEmailNotice } from "@/features/auth/components/contact-email-notice";
 import { getCurrentTenant } from "@/lib/tenant/resolve";
 import { getMyTicket, getQueueBoard, getQueueConfig } from "@/features/queue/data";
 
@@ -17,8 +18,12 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
 }
 
-export default async function ClientHome() {
-  const home = await getClientHome();
+export default async function ClientHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ contato?: string | string[] }>;
+}) {
+  const [home, params] = await Promise.all([getClientHome(), searchParams]);
   const firstName = home?.client?.name?.split(" ")[0] ?? "";
 
   // Fila (só se a barbearia ativou e o cliente tem senha hoje).
@@ -44,6 +49,7 @@ export default async function ClientHome() {
 
   return (
     <div className="flex flex-col gap-6">
+      {params.contato === "enviado" && <ContactEmailNotice />}
       <div>
         <h1 className="font-display text-h2 uppercase leading-none text-text">Olá, {firstName}</h1>
         <p className="mt-1 text-body text-text-muted">

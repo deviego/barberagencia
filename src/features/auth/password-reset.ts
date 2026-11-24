@@ -20,7 +20,7 @@ export type PasswordResetResult = { ok: true } | { ok: false; error: string };
 
 export async function requestPasswordReset(identifier: string): Promise<PasswordResetResult> {
   const parsed = Input.safeParse({ identifier });
-  if (!parsed.success) return { ok: false, error: "Informe o e-mail ou telefone cadastrado." };
+  if (!parsed.success) return { ok: false, error: "Digite seu e-mail ou telefone." };
 
   const admin = createSupabaseAdminClient();
   const key = createHash("sha256").update(parsed.data.identifier.toLowerCase()).digest("hex");

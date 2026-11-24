@@ -59,15 +59,10 @@ export function PerfilForm({
         <Label>Nome completo</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <Label>Telefone</Label>
-          <Input value={tel} onChange={(e) => setTel(maskPhoneBR(e.target.value))} inputMode="tel" maxLength={15} />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label>E-mail</Label>
-          <Input value={email} disabled />
-        </div>
+      {/* E-mail de contato fica no card próprio (#177); o e-mail de login pode ser técnico. */}
+      <div className="flex flex-col gap-1.5 sm:max-w-xs">
+        <Label>Telefone</Label>
+        <Input value={tel} onChange={(e) => setTel(maskPhoneBR(e.target.value))} inputMode="tel" maxLength={15} />
       </div>
       <Button className="self-start" loading={pending} onClick={() => save()}>
         {saved ? (
