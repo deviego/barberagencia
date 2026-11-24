@@ -4,11 +4,12 @@ import { assertPreviewEnv } from "./scripts/check-preview-env.mjs";
 // - script inline do tema + hidratação do Next → 'unsafe-inline' (e 'unsafe-eval' p/ dev)
 // - next/font é self-hosted (sem fonts.googleapis); estilos inline (Tailwind/styled-jsx)
 // - Supabase: REST/Storage (https) + Realtime (wss); QR/canvas usam data:/blob:
+// - lh3.googleusercontent.com: foto do perfil de quem entra com Google (ADR 0005)
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.supabase.co",
+  "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com",
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
   "frame-ancestors 'none'",

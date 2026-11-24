@@ -26,6 +26,8 @@ export const AREAS: Record<AreaKey, AreaCookie> = {
 
 /** Header injetado pelo middleware para os Server Components saberem a área. */
 export const AREA_HEADER = "x-bb-area";
+/** Definido pelo middleware só na landing (/): o root layout usa a marca neutra. */
+export const NEUTRAL_BRAND_HEADER = "x-bb-neutral-brand";
 
 /** Deriva a área a partir do caminho da rota. */
 export function areaKeyFor(pathname: string): AreaKey {

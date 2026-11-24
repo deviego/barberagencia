@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { safeNext } from "@/lib/auth/safe-next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** Callback PKCE da ÁREA DO ADMIN (reset de senha da equipe). */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/admin";
+  const next = safeNext(searchParams.get("next"), origin, "admin");
 
   if (code) {
     const supabase = await createSupabaseServerClient();
