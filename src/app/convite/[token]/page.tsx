@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo";
 import { AcceptInviteForm } from "@/features/auth/components/accept-invite-form";
+import { CONTACT_SCREEN_COPY as COPY } from "@/features/auth/contact-screen-copy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function ConvitePage({ params }: { params: Promise<{ token: string }> }) {
@@ -36,6 +37,15 @@ export default async function ConvitePage({ params }: { params: Promise<{ token:
                 agendar seus cortes.
               </p>
               <AcceptInviteForm token={token} email={info.email ?? ""} name={info.name ?? ""} phone={info.phone ?? ""} tenantSubdomain={info.subdomain ?? ""} />
+              <p className="mt-4 text-center text-caption text-text-muted">
+                {COPY.inviteResume}{" "}
+                <Link
+                  href={`/client/concluir-convite/${encodeURIComponent(token)}`}
+                  className="font-semibold text-accent hover:underline"
+                >
+                  {COPY.inviteButton}
+                </Link>
+              </p>
             </>
           ) : (
             <div className="flex flex-col items-center gap-3 text-center">

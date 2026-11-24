@@ -3,10 +3,28 @@ import { LogoutButton } from "@/components/nav/logout-button";
 import { PerfilForm } from "@/features/client/components/perfil-form";
 import { ChildrenSection } from "@/features/client/components/children-section";
 import type { Child } from "@/features/client/components/child-modal";
+import { ContactEmailCard } from "@/features/auth/components/contact-email-card";
+import { contactLinkResult } from "@/features/auth/contact-screen-copy";
+import { getContactEmailState } from "@/features/auth/contact-data";
+import { GoogleConnectCard } from "@/features/auth/components/google-connect-card";
+import { getMyLoginMethods } from "@/features/auth/google-data";
+import { callbackErrorMessage } from "@/features/auth/google-errors";
+import { isGoogleLoginEnabled } from "@/lib/auth/google-flag";
 import { getProfile, getMyChildren } from "@/features/client/data";
 
-export default async function PerfilPage() {
-  const [data, children] = await Promise.all([getProfile(), getMyChildren()]);
+export default async function PerfilPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[]; contato?: string | string[] }>;
+}) {
+  const google = isGoogleLoginEnabled();
+  const [data, children, contact, methods, params] = await Promise.all([
+    getProfile(),
+    getMyChildren(),
+    getContactEmailState(),
+    google ? getMyLoginMethods() : Promise.resolve(null),
+    searchParams,
+  ]);
   if (!data) redirect("/client/login");
 
   return (
@@ -20,9 +38,15 @@ export default async function PerfilPage() {
         userId={data.userId}
         fullName={data.fullName}
         phone={data.phone}
-        email={data.email}
+        email={contact.email ?? ""}
         avatarUrl={data.avatarUrl}
       />
+
+      <ContactEmailCard state={contact} linkResult={contactLinkResult(params.contato)} />
+
+      {methods && (
+        <GoogleConnectCard connected={methods.google} error={callbackErrorMessage(params.error)} />
+      )}
 
       <ChildrenSection initial={children as Child[]} />
     </div>
