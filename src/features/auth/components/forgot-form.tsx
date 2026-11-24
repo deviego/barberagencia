@@ -4,7 +4,7 @@ import { useState } from "react";
 import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { sendPasswordReset } from "../services/auth-service";
+import { requestPasswordReset } from "../password-reset";
 
 /** Passo 1 da recuperação: informar o e-mail e receber o link. */
 export function ForgotForm() {
@@ -18,7 +18,11 @@ export function ForgotForm() {
     setError(null);
     setLoading(true);
     try {
-      await sendPasswordReset(email);
+      const res = await requestPasswordReset(email);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao enviar");
@@ -33,10 +37,10 @@ export function ForgotForm() {
         <div className="flex items-start gap-2.5 rounded-md border border-accent bg-accent-wash px-3.5 py-3">
           <MailCheck size={18} className="mt-0.5 shrink-0 text-accent" />
           <div className="text-caption text-text-2">
-            <p className="font-semibold text-text">Link enviado!</p>
+            <p className="font-semibold text-text">Pedido recebido</p>
             <p className="mt-0.5">
-              Enviamos um link para <span className="font-semibold">{email}</span>. Abra o e-mail
-              (confira também o spam) e clique no link para definir uma nova senha.
+              Se existir conta com esse e-mail confirmado, enviamos um link para criar uma nova senha.
+              Confira também o spam.
             </p>
           </div>
         </div>

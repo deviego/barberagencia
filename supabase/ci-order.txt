@@ -51,3 +51,4 @@ schema-62-totem-access-keys.sql
 schema-63-tenants-drop-totem-token.sql
 schema-64-quick-queue-identify-tenant-caps.sql
 schema-65-auth-provider-profile-only.sql
+schema-66-cadastro-contato-convite.sql

@@ -127,7 +127,8 @@ await test("e-mail com barbearia: cria cliente e vínculo CLIENT como hoje", asy
   assert.deepEqual(await profile(id), { full_name: "Davi Teste", phone: "11987650002", avatar_url: null });
 });
 
-await test("e-mail que bate com convite pendente: liga o convite como hoje", async () => {
+// Desde a schema-66, cadastro comum NÃO liga ficha convidada (só o aceite de convite liga).
+await test("e-mail que bate com convite pendente: NÃO liga o convite (schema-66); ficha nova", async () => {
   const email = mail("convite2");
   const { id: inviteId } = await one(
     `insert into public.clients (tenant_id, name, email, status) values ($1, 'Eva Teste', $2, 'INVITED') returning id`,
@@ -135,7 +136,8 @@ await test("e-mail que bate com convite pendente: liga o convite como hoje", asy
   );
   const id = await newUser({ provider: "email", email, userMeta: { full_name: "Eva Teste", tenant_subdomain: S.slug } });
   const c = await one(`select user_id, status from public.clients where id = $1`, [inviteId]);
-  assert.deepEqual(c, { user_id: id, status: "ACTIVE" });
+  assert.deepEqual(c, { user_id: null, status: "INVITED" });
+  assert.equal((await counts(id)).clients, 1);
 });
 
 await test("e-mail sem barbearia: só o perfil, como hoje", async () => {
