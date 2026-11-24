@@ -75,7 +75,7 @@ export type GoogleCallbackError =
  */
 export type StartGoogleLinkResult = { ok: true } | { ok: false; code: "NOT_SIGNED_IN" | "GENERIC"; error: string };
 
-/** Redação final da PO (Regua, #179). Nenhum traz dado da conta. */
+/** Textos da PO (redação final, #179). Nenhum traz dado da conta. */
 export const GOOGLE_LOGIN_MESSAGES = {
   invalidPhone: "Confira o número do WhatsApp com DDD.",
   needsProof: "Esse número já tem conta. Digite a senha dela para juntar com o seu Google.",

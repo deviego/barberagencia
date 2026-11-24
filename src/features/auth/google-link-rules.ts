@@ -56,3 +56,41 @@ export function provisionalEligible(input: {
   if (!Number.isFinite(created) || input.now - created >= 24 * 60 * 60_000) return false;
   return true;
 }
+
+/** Id de uma identidade (o Auth usa identity_id; versões antigas, id). */
+export const identityKey = (i: IdentityLike): string => i.identity_id ?? i.id ?? "";
+
+/** Lista de identidades google aprovadas que o servidor guarda no app_metadata. */
+export function approvedGoogleIds(appMetadata: Record<string, unknown> | null | undefined): string[] {
+  const v = appMetadata?.google_linked;
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/**
+ * Identidade google numa conta que também entra por senha (e-mail) e que NÃO foi aprovada por
+ * pedido do próprio cliente. Vale a qualquer tempo (não só logo depois do vínculo).
+ * null = nada a barrar.
+ */
+export function unapprovedGoogleNextToPassword<T extends IdentityLike>(
+  identities: readonly T[] | null | undefined,
+  approved: readonly string[]
+): T | null {
+  const list = identities ?? [];
+  if (!list.some((i) => i.provider === "email")) return null;
+  return list.find((i) => i.provider === "google" && !approved.includes(identityKey(i))) ?? null;
+}
+
+/**
+ * A identidade google mais nova da conta (maior created_at): a que acabou de ser ligada neste
+ * fluxo. Só ela é aprovada por um pedido de vínculo; outras google não aprovadas continuam sendo
+ * desfeitas pelo callback.
+ */
+export function newestGoogle<T extends IdentityLike>(identities: readonly T[] | null | undefined): T | null {
+  const google = (identities ?? []).filter((i) => i.provider === "google");
+  if (!google.length) return null;
+  const at = (i: T) => {
+    const t = Date.parse(i.created_at ?? "");
+    return Number.isFinite(t) ? t : -Infinity;
+  };
+  return google.reduce((a, b) => (at(b) > at(a) ? b : a));
+}
