@@ -12,12 +12,13 @@ export function GoogleConnectCard({ connected, error }: { connected: boolean; er
       {connected ? (
         <p className="flex items-center gap-2 text-body text-text">
           <CheckCircle2 size={18} className="shrink-0 text-accent" aria-hidden="true" />
-          Google conectado. Você entra com o Google ou com telefone e senha.
+          Google conectado. Você pode entrar com ele.
         </p>
       ) : (
         <>
           <p className="text-body text-text-2">
-            Conecte sua conta do Google para entrar sem digitar senha. Telefone e senha continuam valendo.
+            Conecte sua conta do Google para entrar sem digitar senha. Seu telefone e sua senha continuam
+            funcionando.
           </p>
           {error && (
             <p role="alert" className="rounded-md border border-danger bg-danger-bg px-3 py-2.5 text-caption text-danger">

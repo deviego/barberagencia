@@ -46,7 +46,7 @@ export function ConfirmWhatsappFlow({
     setPhoneInvalid(false);
     if (phone.replace(/\D/g, "").length < 10) {
       setPhoneInvalid(true);
-      setError("Informe seu WhatsApp com DDD.");
+      setError("Digite seu WhatsApp com DDD.");
       return;
     }
     setLoading(true);
@@ -115,7 +115,7 @@ export function ConfirmWhatsappFlow({
         <div className="text-center">
           <h1 className="font-display text-h2 uppercase leading-none text-text">Esse número já tem conta</h1>
           <p className="mt-2 text-body text-text-2">
-            Para juntar com o seu Google, digite a senha que você usa para entrar na {shopName}.
+            Para juntar com o seu Google, digite a senha que você já usa para entrar com esse número.
           </p>
         </div>
         <form
@@ -158,14 +158,15 @@ export function ConfirmWhatsappFlow({
           )}
 
           <Button type="submit" size="lg" loading={loading}>
-            Confirmar e juntar
+            Juntar contas
           </Button>
 
           <p className="flex items-start gap-2 rounded-md bg-accent-wash px-3 py-2.5 text-caption text-text-2">
             <MessageCircle size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
             <span>
-              Não lembra a senha? Fale com a {shopName} para recuperar o acesso. Sem a senha, não dá para
-              juntar as contas.
+              Não lembra a senha? Se você cadastrou um e-mail, use &quot;Esqueci minha senha&quot; na tela de
+              entrar. Se cadastrou só o telefone, fale com a {shopName}. Sem a senha, não dá para juntar as
+              contas.
             </span>
           </p>
         </form>

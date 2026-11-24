@@ -1,7 +1,7 @@
 // Testes das telas do "Entrar com Google" (ADR 0005, #172): liga/desliga e mensagens de erro do callback.
 // Sem banco e sem rede. Roda com: node scripts/test-google-login-ui.mjs  (Node 23.6+ remove tipos do .ts sozinho)
 import { registerHooks } from "node:module";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import assert from "node:assert/strict";
@@ -24,6 +24,7 @@ registerHooks({
 
 const { isGoogleLoginEnabled } = await import("@/lib/auth/google-flag");
 const { callbackErrorMessage, GOOGLE_CONFIRM_PATH } = await import("@/features/auth/google-errors");
+const privacy = await import("@/lib/legal/content");
 
 let passed = 0;
 function test(name, fn) {
@@ -89,6 +90,25 @@ test("erro: textos sem dado pessoal e sem prometer recuperação que não existe
 test("destino: o Google volta para a confirmação do WhatsApp, dentro de /client", () => {
   assert.equal(GOOGLE_CONFIRM_PATH, "/client/confirmar-whatsapp");
   assert.ok(GOOGLE_CONFIRM_PATH.startsWith("/client/") && !GOOGLE_CONFIRM_PATH.startsWith("//"));
+});
+
+// ─── Verdade da copy (Regua, #179) ──────────────────────────
+const read = (rel) => readFileSync(path.join(SRC, rel), "utf8");
+
+test("copy: conta só do Google não tem senha (card conectado e privacidade)", () => {
+  const card = read("features/auth/components/google-connect-card.tsx");
+  const connected = card.slice(card.indexOf("{connected ?"), card.indexOf(") : ("));
+  assert.ok(!/senha/i.test(connected), "card conectado cita senha");
+  const { PRIVACY } = privacy;
+  const google = PRIVACY.sections.flatMap((s) => s.paragraphs).find((p) => p.startsWith("Entrar com Google"));
+  assert.ok(google, "parágrafo do Google sumiu da privacidade");
+  assert.ok(!/telefone e senha/i.test(google), "privacidade promete telefone e senha");
+});
+
+test("copy: ajuda da prova não promete que a barbearia recupera a senha (#175)", () => {
+  const flow = read("features/auth/components/confirm-whatsapp-flow.tsx");
+  assert.ok(!/recuperar o acesso|recupera(r)? (a|sua) senha/i.test(flow));
+  assert.ok(flow.includes("Esqueci minha senha"));
 });
 
 console.log(`\n${passed} testes passaram.`);

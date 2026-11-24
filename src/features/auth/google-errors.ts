@@ -6,9 +6,9 @@ import type { GoogleCallbackError } from "@/features/auth/google-types";
  */
 const CALLBACK_ERRORS: Record<GoogleCallbackError, string> = {
   auth: "Não deu para entrar agora. Tente de novo.",
-  google_cancelado: "Você cancelou a entrada com o Google. Tente de novo ou entre com telefone e senha.",
-  google_sem_barbearia: "Abra o link da sua barbearia e entre com o Google por lá.",
-  conta_vinculada_outra: "Essa conta do Google já está ligada a outro cadastro. Use outra conta do Google.",
+  google_cancelado: "Você não terminou de entrar com o Google. Tente de novo ou entre com telefone e senha.",
+  google_sem_barbearia: "Não achamos de qual barbearia você veio. Abra o link da sua barbearia e entre com o Google por lá.",
+  conta_vinculada_outra: "Essa conta do Google já está ligada a outro cadastro. Escolha outra conta do Google.",
 };
 
 export function callbackErrorMessage(code: string | string[] | undefined): string | null {
