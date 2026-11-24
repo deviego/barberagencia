@@ -18,6 +18,7 @@ export default async function ConfirmarWhatsappPage() {
   if (!user) redirect("/client/login");
 
   const pending = await getPendingAccount();
+  if (pending.status === "SIGNED_OUT") redirect("/client/login");
   if (pending.status === "ACTIVE") redirect("/client");
 
   const firstName = user.name?.trim().split(/\s+/)[0] ?? null;

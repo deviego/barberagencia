@@ -6,7 +6,7 @@ import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { createClientAreaBrowserClient } from "@/lib/supabase/client";
 import { maskPhoneBR } from "@/lib/masks";
 import type {
   ConfirmWhatsappInput,
@@ -94,7 +94,7 @@ export function ConfirmWhatsappFlow({
         return;
       }
       // Posse provada: a sessão já é da conta existente. O Google é ligado pelo navegador.
-      const supabase = createSupabaseBrowserClient();
+      const supabase = createClientAreaBrowserClient();
       const redirectTo = `${window.location.origin}/client/auth/callback?next=${encodeURIComponent("/client")}`;
       const { error: linkErr } = await supabase.auth.linkIdentity({ provider: "google", options: { redirectTo } });
       if (linkErr) {

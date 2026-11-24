@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { createClientAreaBrowserClient } from "@/lib/supabase/client";
 import { GOOGLE_CONFIRM_PATH } from "@/features/auth/google-errors";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +40,7 @@ export function GoogleButton({
   async function onClick() {
     setError(null);
     setLoading(true);
-    const supabase = createSupabaseBrowserClient();
+    const supabase = createClientAreaBrowserClient();
     const origin = window.location.origin;
     const next = mode === "link" ? "/client/perfil" : GOOGLE_CONFIRM_PATH;
     const redirectTo = `${origin}/client/auth/callback?next=${encodeURIComponent(next)}`;
