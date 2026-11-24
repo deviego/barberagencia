@@ -8,23 +8,12 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { maskPhoneBR } from "@/lib/masks";
-
-/** Respostas das server actions (contrato do #170/#171). `error` já vem pronto para o cliente. */
-export type ConfirmWhatsappResult =
-  | { ok: true; next: string }
-  | {
-      ok: false;
-      code: "INVALID_PHONE" | "NEEDS_PROOF" | "NO_SHOP" | "NOT_SIGNED_IN" | "LIMIT" | "GENERIC";
-      error: string;
-    };
-
-export type ProveAccountResult =
-  | { ok: true; next: "LINK_GOOGLE" }
-  | {
-      ok: false;
-      code: "WRONG_CREDENTIALS" | "NOT_ELIGIBLE" | "LIMIT" | "NOT_SIGNED_IN" | "GENERIC";
-      error: string;
-    };
+import type {
+  ConfirmWhatsappInput,
+  ConfirmWhatsappResult,
+  ProveAccountAndLinkInput,
+  ProveAccountAndLinkResult,
+} from "@/features/auth/google-types";
 
 /**
  * Fluxo de quem entrou com Google e ainda não tem cadastro de cliente (ADR 0005, itens 3 a 5):
@@ -40,8 +29,8 @@ export function ConfirmWhatsappFlow({
 }: {
   shopName: string;
   firstName: string | null;
-  confirmWhatsapp: (input: { phone: string }) => Promise<ConfirmWhatsappResult>;
-  proveAccountAndLink: (input: { phone: string; password: string }) => Promise<ProveAccountResult>;
+  confirmWhatsapp: (input: ConfirmWhatsappInput) => Promise<ConfirmWhatsappResult>;
+  proveAccountAndLink: (input: ProveAccountAndLinkInput) => Promise<ProveAccountAndLinkResult>;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<"phone" | "proof">("phone");

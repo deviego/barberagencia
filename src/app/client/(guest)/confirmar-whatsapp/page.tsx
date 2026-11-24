@@ -6,7 +6,6 @@ import { ConfirmWhatsappFlow } from "@/features/auth/components/confirm-whatsapp
 import { confirmWhatsapp, proveAccountAndLink } from "@/features/auth/google-actions";
 import { getPendingAccount } from "@/features/auth/google-data";
 import { getSessionUser } from "@/lib/auth/session";
-import { getCurrentTenant } from "@/lib/tenant/resolve";
 
 export const metadata = { title: "Confirme seu WhatsApp", robots: { index: false } };
 
@@ -21,7 +20,6 @@ export default async function ConfirmarWhatsappPage() {
   const pending = await getPendingAccount();
   if (pending.status === "ACTIVE") redirect("/client");
 
-  const tenant = await getCurrentTenant();
   const firstName = user.name?.trim().split(/\s+/)[0] ?? null;
 
   if (pending.status === "PENDING_NO_SHOP") {
@@ -58,8 +56,8 @@ export default async function ConfirmarWhatsappPage() {
           />
         ) : (
           <LogoMark
-            text={tenant.branding.logoText}
-            src={tenant.branding.logoUrl}
+            text={pending.shop.logoText}
+            src={pending.shop.logoUrl}
             size={72}
             className="rounded-lg shadow-lg"
           />
