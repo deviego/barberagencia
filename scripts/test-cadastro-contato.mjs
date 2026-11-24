@@ -63,9 +63,31 @@ const adminAuth = {
     const d = g();
     if (Object.values(d.users).some((u) => u.email === attrs.email)) return { data: {}, error: { message: "User already registered" } };
     const id = "u" + (Object.keys(d.users).length + 1);
-    d.users[id] = { id, ...attrs };
+    d.users[id] = { id, created_at: d.createdAt ?? new Date().toISOString(), ...attrs };
+    if (d.authAppMeta) d.users[id].app_metadata = structuredClone(d.authAppMeta);
     log("createUser");
     return { data: { user: d.users[id] }, error: null };
+  },
+  async getUserById(id) {
+    const d = g();
+    log("getUserById");
+    if (d.authDown) return { data: { user: null }, error: { message: "down" } };
+    const u = d.users[id];
+    return u ? { data: { user: structuredClone(u) }, error: null } : { data: { user: null }, error: { message: "not found" } };
+  },
+  // Como o Auth: mescla o app_metadata por chave; chave com null é apagada, chave ausente fica.
+  async updateUserById(id, attrs) {
+    const d = g();
+    log("updateUserById");
+    if (d.updateDown) return { data: {}, error: { message: "down" } };
+    const u = d.users[id];
+    if (attrs.app_metadata && d.replaceAppMeta) u.app_metadata = { ...attrs.app_metadata };
+    else if (attrs.app_metadata) {
+      const meta = { ...(u.app_metadata ?? {}) };
+      for (const [k, v] of Object.entries(attrs.app_metadata)) if (v === null) delete meta[k]; else meta[k] = v;
+      u.app_metadata = meta;
+    }
+    return { data: { user: u }, error: null };
   },
   async generateLink({ type, email }) {
     const u = Object.values(g().users).find((x) => x.email === email);
@@ -129,7 +151,8 @@ const { registerClientAccount, signInWithIdentifier, sendWelcomeEmail } = await 
 const { requestPasswordReset } = await import("@/features/auth/password-reset");
 const { updateContactEmail, resendContactEmailConfirmation } = await import("@/features/auth/contact-actions");
 const { consumeContactConfirmation, createContactConfirmation } = await import("@/features/auth/contact-email");
-const { completeInviteAcceptance } = await import("@/features/auth/invite-actions");
+const { completeInviteAcceptance, completePendingInvite } = await import("@/features/auth/invite-actions");
+const { hasPendingInvite, PENDING_INVITE_WINDOW_MS } = await import("@/features/auth/pending-invite");
 const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
 
 function reset(over = {}) {
@@ -263,6 +286,146 @@ await test("concluir aceite: só a conta da SESSÃO, com o hash do token; sem se
   assert.equal((await completeInviteAcceptance("convite-token-r3")).code, "INVALID_INVITE");
   assert.equal((await completeInviteAcceptance("../x")).code, "INVALID_INVITE");
 });
+
+// ---- Convite pendente (marcador do servidor) -----------------------------------------------------
+const AUTH_META = { provider: "email", providers: ["email"], google_linked: ["gid-1"] };
+const HOUR = PENDING_INVITE_WINDOW_MS;
+const CREATED = new Date(Date.now() - 60_000).toISOString();
+async function pendingSignup(over = {}, token = "convite-token-p1") {
+  const g = reset({ finalizeQueue: ["ERROR", "ERROR"], authAppMeta: AUTH_META, createdAt: CREATED, ...over });
+  pendingInviteDb(g, token);
+  g.db.profiles.push({ id: "u1", contact_email: "jo@example.test" });
+  const r = await registerClientAccount({ name: "Jo Teste", phone: "11987650031", password: "senha-forte", inviteToken: token });
+  return { g, r, u: g.users.u1 };
+}
+const errors = [];
+const realError = console.error;
+console.error = (...a) => errors.push(a.join(" "));
+
+await test("convite pendente: o cadastro grava o marcador (hash, fim da janela de 1 h) sem perder o resto do app_metadata", async () => {
+  const { g, r, u } = await pendingSignup();
+  assert.equal(r.pendingInvite, true);
+  assert.deepEqual(u.app_metadata, {
+    ...AUTH_META,
+    pending_invite: { h: sha("convite-token-p1"), exp: Date.parse(CREATED) + HOUR },
+  });
+  assert.doesNotMatch(JSON.stringify(u), /convite-token-p1/, "nunca o token, só o hash");
+  assert.equal(u.user_metadata.pending_invite, undefined, "marcador nunca em user_metadata");
+  // Cadastro que liga o convite de primeira não marca nada.
+  const ok = reset({ authAppMeta: AUTH_META });
+  pendingInviteDb(ok, "convite-token-p2");
+  await registerClientAccount({ name: "Lia", phone: "11987650032", password: "senha-forte", inviteToken: "convite-token-p2" });
+  assert.deepEqual(ok.users.u1.app_metadata, AUTH_META);
+  assert.ok(!ok.log.includes("updateUserById"));
+});
+
+await test("convite pendente: gravar e limpar mandam o app_metadata INTEIRO (lido do Auth), mesmo se o Auth substituísse", async () => {
+  const { g, u } = await pendingSignup({ replaceAppMeta: true });
+  assert.deepEqual(u.app_metadata.providers, ["email"]);
+  assert.deepEqual(u.app_metadata.google_linked, ["gid-1"]);
+  assert.ok(u.app_metadata.pending_invite);
+  g.finalizeQueue = ["OK"];
+  await signInWithIdentifier("11987650031", "senha-forte");
+  assert.deepEqual({ ...u.app_metadata, pending_invite: undefined }, { ...AUTH_META, pending_invite: undefined });
+  assert.equal(u.app_metadata.pending_invite ?? null, null);
+});
+
+await test("convite pendente: falha ao gravar o marcador não muda a resposta do cadastro (só registra, sem dado pessoal)", async () => {
+  for (const over of [{ updateDown: true }, { authDown: true }]) {
+    errors.length = 0;
+    const { r, u } = await pendingSignup(over);
+    assert.deepEqual(r, { ok: true, authEmail: TECH("11987650031"), pendingInvite: true });
+    assert.equal(u.app_metadata.pending_invite, undefined);
+    assert.ok(errors.some((e) => e.includes("marcador")));
+    assert.doesNotMatch(errors.join("\n"), /11987650031|jo@example|convite-token|u1/);
+  }
+});
+
+await test("login com senha certa conclui o convite pendente da PRÓPRIA conta e limpa o marcador (resto mantido)", async () => {
+  const { g, u } = await pendingSignup();
+  g.finalized.length = 0;
+  g.finalizeQueue = ["OK"];
+  assert.deepEqual(await signInWithIdentifier("11987650031", "senha-forte"), { ok: true });
+  assert.deepEqual(g.finalized, [{ p_user_id: u.id, p_contact_email: "jo@example.test", p_invite_token_hash: sha("convite-token-p1") }]);
+  assert.deepEqual(u.app_metadata, AUTH_META);
+});
+
+await test("login: recusa do banco também limpa; erro de banco mantém o marcador; nada disso muda o login", async () => {
+  for (const [res, kept] of [["INVITE_INVALID", false], ["INVALID", false], ["ERROR", true]]) {
+    const { g, u } = await pendingSignup();
+    g.finalizeQueue = [res];
+    assert.deepEqual(await signInWithIdentifier("11987650031", "senha-forte"), { ok: true }, res);
+    assert.equal(u.app_metadata.pending_invite !== undefined, kept, res);
+    assert.deepEqual(u.app_metadata.providers, ["email"]);
+  }
+});
+
+await test("login: marcador vencido é só limpo (sem finalize); senha errada não toca em nada", async () => {
+  const past = new Date(Date.now() - 2 * HOUR).toISOString();
+  let { g, u } = await pendingSignup({ createdAt: past });
+  g.finalized.length = 0;
+  assert.deepEqual(await signInWithIdentifier("11987650031", "senha-forte"), { ok: true });
+  assert.equal(g.finalized.length, 0);
+  assert.deepEqual(u.app_metadata, AUTH_META);
+
+  ({ g, u } = await pendingSignup());
+  g.finalized.length = 0;
+  assert.equal((await signInWithIdentifier("11987650031", "senha-errada")).ok, false);
+  assert.equal(g.finalized.length, 0);
+  assert.ok(u.app_metadata.pending_invite);
+});
+
+await test("login sem marcador: nem lê a conta no Auth (custo zero para o login comum)", async () => {
+  const g = reset({ authAppMeta: AUTH_META });
+  await registerClientAccount({ name: "Mel", phone: "11987650033", password: "senha-forte" });
+  g.log.length = 0;
+  assert.deepEqual(await signInWithIdentifier("11987650033", "senha-forte"), { ok: true });
+  assert.ok(!g.log.includes("getUserById") && !g.log.includes("updateUserById"));
+});
+
+await test("concluir sem token: só a conta da SESSÃO, só pelo marcador; sem marcador ou vencido recusa", async () => {
+  let { g, u } = await pendingSignup();
+  g.finalized.length = 0;
+  assert.equal((await completePendingInvite()).code, "NOT_SIGNED_IN");
+  assert.equal(g.finalized.length, 0);
+  g.session = u.id;
+  g.finalizeQueue = ["OK"];
+  assert.deepEqual(await completePendingInvite(), { ok: true });
+  assert.deepEqual(g.finalized, [{ p_user_id: u.id, p_contact_email: "jo@example.test", p_invite_token_hash: sha("convite-token-p1") }]);
+  assert.deepEqual(u.app_metadata, AUTH_META);
+  // Já concluído (sem marcador): recusa sem chamar o banco.
+  assert.equal((await completePendingInvite()).code, "INVALID_INVITE");
+  assert.equal(g.finalized.length, 1);
+  // Erro de banco: tente de novo (marcador fica).
+  ({ g, u } = await pendingSignup());
+  g.session = u.id;
+  g.finalizeQueue = ["ERROR"];
+  assert.equal((await completePendingInvite()).code, "GENERIC");
+  assert.ok(u.app_metadata.pending_invite);
+  // Vencido: limpa e recusa, sem banco.
+  ({ g, u } = await pendingSignup({ createdAt: new Date(Date.now() - 2 * HOUR).toISOString() }));
+  g.session = u.id;
+  g.finalized.length = 0;
+  assert.equal((await completePendingInvite()).code, "INVALID_INVITE");
+  assert.equal(g.finalized.length, 0);
+  assert.deepEqual(u.app_metadata, AUTH_META);
+});
+
+await test("área do cliente: marcador válido manda concluir; vencido é limpo; concluir pelo link também limpa", async () => {
+  let { g, u } = await pendingSignup();
+  assert.equal(await hasPendingInvite(u.id), true);
+  ({ g, u } = await pendingSignup({ createdAt: new Date(Date.now() - 2 * HOUR).toISOString() }));
+  assert.equal(await hasPendingInvite(u.id), false);
+  assert.deepEqual(u.app_metadata, AUTH_META);
+  ({ g, u } = await pendingSignup({ authDown: false }));
+  g.session = u.id;
+  g.finalizeQueue = ["OK"];
+  assert.deepEqual(await completeInviteAcceptance("convite-token-p1"), { ok: true });
+  assert.deepEqual(u.app_metadata, AUTH_META);
+  g.authDown = true;
+  assert.equal(await hasPendingInvite(u.id), false, "Auth fora: segue o fluxo normal");
+});
+console.error = realError;
 
 // ---- Login --------------------------------------------------------------------------------------
 await test("login por e-mail: só contato CONFIRMADO resolve (função do banco); senão vale o e-mail digitado", async () => {

@@ -3,6 +3,7 @@
 import { createHash } from "crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { clearPendingInvite, finishPendingInvite } from "./pending-invite";
 
 /*
  * Concluir o aceite de um convite já com a conta criada (#177): quando o cadastro pelo convite
@@ -43,9 +44,29 @@ export async function completeInviteAcceptance(token: string): Promise<CompleteI
     console.error(`[auth] aceite de convite não concluído (${error.code ?? "sem código"})`);
     return { ok: false, code: "GENERIC", error: MSG.failed };
   }
+  // Resposta do banco (OK ou recusa): o marcador de convite pendente, se houver, já não serve.
+  if (user.app_metadata?.pending_invite != null) await clearPendingInvite(admin, user.id);
   if (data !== "OK") {
     console.error(`[auth] aceite de convite recusado (${String(data)})`);
     return { ok: false, code: "INVALID_INVITE", error: MSG.invalid };
   }
   return { ok: true };
+}
+
+/**
+ * Concluir o convite pendente SEM token na rota (/client/concluir-convite): usa só o marcador que o
+ * servidor gravou na conta da SESSÃO no cadastro. Sem marcador válido (ou vencido, que é limpo),
+ * responde convite inválido.
+ */
+export async function completePendingInvite(): Promise<CompleteInviteResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, code: "NOT_SIGNED_IN", error: MSG.notSignedIn };
+
+  const r = await finishPendingInvite(createSupabaseAdminClient(), user.id);
+  if (r === "OK") return { ok: true };
+  if (r === "ERROR") return { ok: false, code: "GENERIC", error: MSG.failed };
+  return { ok: false, code: "INVALID_INVITE", error: MSG.invalid };
 }
