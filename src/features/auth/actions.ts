@@ -14,6 +14,7 @@ import { createHash } from "crypto";
 import { phoneDigits, syntheticEmail, isEmail } from "@/lib/auth/phone-identity";
 import { isTechnicalEmail, loginEmailFor } from "./account-lookup";
 import { sendContactConfirmation } from "./contact-email";
+import { finishPendingInvite, markPendingInvite, readPendingInvite } from "./pending-invite";
 
 /**
  * [Cliente] Cria a conta pelo telefone (e-mail opcional). Usa o service-role para
@@ -91,14 +92,16 @@ export async function registerClientAccount(input: {
     });
   let { data: fin, error: finError } = await finalize();
   if (inviteHash && (finError || fin !== "OK")) ({ data: fin, error: finError } = await finalize());
-  if (finError) {
-    console.error(`[auth] cadastro sem finalização (${finError.code ?? "sem código"})`);
-    return inviteHash ? { ok: true, authEmail, pendingInvite: true } : { ok: true, authEmail };
-  }
-  if (fin !== "OK") {
-    // INVITE_INVALID (convite vencido/usado) ou INVALID (conta fora da regra): registra, sem dado pessoal.
-    console.error(`[auth] cadastro não finalizado (${String(fin)})`);
-    return inviteHash ? { ok: true, authEmail, pendingInvite: true } : { ok: true, authEmail };
+  if (finError || fin !== "OK") {
+    // Erro, INVITE_INVALID (convite vencido/usado) ou INVALID (conta fora da regra): registra, sem dado pessoal.
+    console.error(
+      finError ? `[auth] cadastro sem finalização (${finError.code ?? "sem código"})` : `[auth] cadastro não finalizado (${String(fin)})`
+    );
+    if (!inviteHash) return { ok: true, authEmail };
+    // Marca a conta para o login e a área do cliente concluírem o aceite depois (janela de 1 h).
+    // Falha ao marcar só registra: a resposta do cadastro é a mesma.
+    await markPendingInvite(admin, data.user.id, inviteHash, data.user.created_at);
+    return { ok: true, authEmail, pendingInvite: true };
   }
   return { ok: true, authEmail };
 }
@@ -155,8 +158,19 @@ export async function signInWithIdentifier(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signed, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { ok: false, error: "Telefone/e-mail ou senha inválidos." };
+
+  // Convite pendente do cadastro (marcador do servidor): senha certa conclui o aceite aqui mesmo,
+  // para a conta que acabou de entrar. Vencido só é limpo. Nada disso muda a resposta do login;
+  // se ainda não der, a área do cliente manda para /client/concluir-convite.
+  if (signed?.user && readPendingInvite(signed.user.app_metadata).state !== "none") {
+    try {
+      await finishPendingInvite(admin, signed.user.id);
+    } catch {
+      console.error("[auth] convite pendente não concluído no login");
+    }
+  }
   return { ok: true };
 }
 

@@ -5,20 +5,21 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/nav/logout-button";
-import { completeInviteAcceptance } from "@/features/auth/invite-actions";
+import { completeInviteAcceptance, completePendingInvite } from "@/features/auth/invite-actions";
 import { CONTACT_SCREEN_COPY as COPY } from "@/features/auth/contact-screen-copy";
 
 /**
  * "Concluir convite" (#177): conta criada pelo convite, mas ainda sem vínculo com a barbearia.
  * Roda numa página dentro de /client para a ação enxergar a sessão do cliente.
  * `autoStart`: vindo direto do cadastro, conclui na hora; o botão fica para tentar de novo.
+ * Sem `token`: usa o convite pendente marcado na conta da sessão (/client/concluir-convite).
  */
 export function CompleteInvite({
   token,
   shopName,
   autoStart,
 }: {
-  token: string;
+  token?: string;
   shopName: string;
   autoStart: boolean;
 }) {
@@ -31,7 +32,7 @@ export function CompleteInvite({
   async function run() {
     setState("loading");
     try {
-      const res = await completeInviteAcceptance(token);
+      const res = token ? await completeInviteAcceptance(token) : await completePendingInvite();
       if (res.ok) {
         setState("done");
         router.replace("/client");

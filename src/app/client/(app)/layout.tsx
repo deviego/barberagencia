@@ -10,13 +10,15 @@ import { getQueueConfig } from "@/features/queue/data";
 import { Copyright } from "@/components/brand/copyright";
 import { exitClientPreview } from "@/features/auth/actions";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
+import { hasPendingInvite } from "@/features/auth/pending-invite";
 
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect("/client/login");
   // Conta sem vínculo nenhum (ex.: entrou com Google e ainda não confirmou o WhatsApp): só a
   // tela de confirmar abre (#170). Bloqueio no servidor, antes de qualquer leitura.
-  if (!user.role) redirect("/client/confirmar-whatsapp");
+  // Conta criada por convite que ainda não ligou a ficha (marcador do servidor): concluir o convite.
+  if (!user.role) redirect((await hasPendingInvite(user.id)) ? "/client/concluir-convite" : "/client/confirmar-whatsapp");
 
   const preview = (await cookies()).get(VIEW_AS_CLIENT_COOKIE)?.value === "1";
   const isAdmin =

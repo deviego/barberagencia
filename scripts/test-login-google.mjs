@@ -297,9 +297,11 @@ await test("getMyLoginMethods: google só quando há identidade google", async (
 });
 
 // ---- Bloqueio no layout --------------------------------------------------------------------------
-await test("layout da área do cliente: conta sem vínculo vai para confirmar WhatsApp antes de qualquer leitura", () => {
+await test("layout da área do cliente: conta sem vínculo vai para confirmar WhatsApp (ou concluir convite pendente) antes de qualquer leitura", () => {
   const src = readFileSync(path.join(SRC, "app/client/(app)/layout.tsx"), "utf8");
-  const gate = src.indexOf('if (!user.role) redirect("/client/confirmar-whatsapp")');
+  const gate = src.indexOf(
+    'if (!user.role) redirect((await hasPendingInvite(user.id)) ? "/client/concluir-convite" : "/client/confirmar-whatsapp")'
+  );
   assert.ok(gate > 0);
   assert.ok(gate < src.indexOf("getActivePlanBalance()"));
 });
