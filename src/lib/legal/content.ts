@@ -72,7 +72,7 @@ export const TERMS: LegalDocument = {
 export const PRIVACY: LegalDocument = {
   title: "Política de Privacidade",
   subtitle: "Plataforma de agendamentos",
-  updatedAt: "20 de julho de 2026",
+  updatedAt: "24 de novembro de 2026",
   intro:
     "Este documento explica como a barbearia coleta, utiliza, armazena e protege os dados pessoais dos clientes na plataforma de agendamento, em total conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 – LGPD).",
   sections: [
@@ -80,6 +80,7 @@ export const PRIVACY: LegalDocument = {
       title: "1. Dados coletados e finalidade (Art. 7º, V da LGPD)",
       paragraphs: [
         "Dados de cadastro: nome completo, número de telefone/WhatsApp e e-mail.",
+        "Entrar com Google (opcional): se você escolher entrar com a sua conta do Google, recebemos do Google apenas seu nome, e-mail e foto de perfil, usados para criar e identificar sua conta. Não recebemos sua senha do Google nem acesso a outros dados da sua conta. Você continua podendo entrar com telefone e senha.",
         "Finalidade contratual: a coleta desses dados é requisito estritamente necessário para a execução do contrato de prestação de serviços (gerenciamento, confirmação, controle de faltas e histórico de agendamentos).",
         "Dados técnicos: podem ser coletados registros de acesso (IP, data e hora) para cumprimento do Marco Civil da Internet (Lei nº 12.965/2014).",
       ],
