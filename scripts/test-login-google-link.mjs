@@ -41,7 +41,17 @@ async function rpc(fn, args) {
 const users = () => g().authUsers;
 const adminAuth = {
   async getUserById(id) { const u = users()[id]; return u ? { data: { user: u }, error: null } : { data: { user: null }, error: { code: "user_not_found" } }; },
-  async updateUserById(id, attrs) { log("admin:update:" + id); users()[id].app_metadata = attrs.app_metadata; return { data: {}, error: null }; },
+  // Como o Auth: mescla o app_metadata por chave; chave com null é apagada, chave ausente fica.
+  async updateUserById(id, attrs) {
+    log("admin:update:" + id);
+    (g().updates ??= []).push(structuredClone(attrs));
+    if (attrs.app_metadata) {
+      const meta = { ...(users()[id].app_metadata ?? {}) };
+      for (const [k, v] of Object.entries(attrs.app_metadata)) if (v === null) delete meta[k]; else meta[k] = v;
+      users()[id].app_metadata = meta;
+    }
+    return { data: {}, error: null };
+  },
   async deleteUser(id) { log("admin:delete:" + id); delete users()[id]; return { data: {}, error: null }; },
 };
 const sessionAuth = {
@@ -217,6 +227,7 @@ await test("callback: com intenção válida do servidor (perfil/prova), o Googl
   assert.deepEqual(u.identities.map((i) => i.provider), ["email", "google"]);
   assert.equal(g.cookies.has("bb_link_intent"), false, "intenção consumida (cookie)");
   assert.equal(u.app_metadata.link_intent, undefined, "intenção consumida (banco)");
+  assert.equal(g.updates.at(-1).app_metadata.link_intent, null, "payload leva link_intent: null (o Auth mescla)");
   assert.deepEqual(u.app_metadata.google_linked, ["i-google"], "identidade aprovada guardada");
   // Login seguinte, sem pedido: a aprovação vale.
   g.session = u.id;
@@ -237,6 +248,9 @@ await test("callback: intenção vencida, de outro valor ou só no banco/só no 
     assert.equal((await cb()).redirect, `${O}/client/login?error=email_ja_tem_conta`);
     assert.deepEqual(u.identities.map((i) => i.provider), ["email"]);
     assert.equal(g.session, null);
+    // Intenção que estava no banco é limpa mesmo sem valer: payload com null, chave some.
+    if (g.updates?.length) assert.equal(g.updates.at(-1).app_metadata.link_intent, null);
+    assert.equal(u.app_metadata.link_intent, undefined);
   }
 });
 
@@ -378,6 +392,16 @@ await test("regra de descarte: só o id da sessão", () => {
   const user = { id: "a", created_at: now(), app_metadata: { provider: "google", providers: ["google"] }, identities: [{ provider: "google" }] };
   assert.equal(provisionalEligible({ sessionUserId: "a", user, memberships: 0, clients: 0, now: Date.now() }), true);
   assert.equal(provisionalEligible({ sessionUserId: "b", user, memberships: 0, clients: 0, now: Date.now() }), false);
+});
+
+await test("callback: link_intent null (já limpo) conta como ausente; nada é regravado", async () => {
+  const g = reset();
+  const u = passwordAccountWithFreshGoogle(g);
+  u.app_metadata.link_intent = null;
+  g.cookies.set("bb_link_intent", { value: "t" });
+  assert.equal((await cb()).redirect, `${O}/client/login?error=email_ja_tem_conta`);
+  assert.deepEqual(u.identities.map((i) => i.provider), ["email"]);
+  assert.ok(!(g.updates ?? []).some((x) => x.app_metadata && "link_intent" in x.app_metadata));
 });
 
 // ---- Conectar com Google (perfil) ----------------------------------------------------------------

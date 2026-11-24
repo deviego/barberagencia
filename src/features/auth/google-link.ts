@@ -22,8 +22,8 @@ async function writeIntentMeta(admin: Admin, userId: string, intent: IntentMeta 
   const { data, error } = await admin.auth.admin.getUserById(userId);
   if (error || !data.user) return false;
   const current = { ...(data.user.app_metadata ?? {}) } as Record<string, unknown>;
-  if (intent) current.link_intent = intent;
-  else delete current.link_intent;
+  // O Auth mescla o app_metadata por chave: só remove a chave enviada como null (ausente = mantém).
+  current.link_intent = intent;
   const { error: uErr } = await admin.auth.admin.updateUserById(userId, { app_metadata: current });
   return !uErr;
 }
@@ -57,6 +57,7 @@ export async function consumeLinkIntent(
   const store = await cookies();
   const token = store.get(LINK_INTENT_COOKIE)?.value ?? "";
   if (token) store.delete(LINK_INTENT_COOKIE);
+  // Chave ausente ou null (já limpa) = sem intenção.
   const meta = (user.app_metadata?.link_intent ?? null) as IntentMeta | null;
   const valid =
     !!token && !!meta && typeof meta.h === "string" && typeof meta.exp === "number" && meta.exp > Date.now() && meta.h === sha256(token);
@@ -65,7 +66,7 @@ export async function consumeLinkIntent(
     const { data, error } = await admin.auth.admin.getUserById(user.id);
     if (!error && data.user) {
       const current = { ...(data.user.app_metadata ?? {}) } as Record<string, unknown>;
-      delete current.link_intent;
+      current.link_intent = null; // remove a chave (o Auth mescla; omitir não apaga)
       if (valid) {
         const before = Array.isArray(current.google_linked) ? (current.google_linked as unknown[]).filter((x) => typeof x === "string") : [];
         current.google_linked = [...new Set([...(before as string[]), ...googleIdentityIds.filter(Boolean)])];
