@@ -7,7 +7,7 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signInWithPassword } from "../services/auth-service";
 import { registerClientAccount, sendWelcomeEmail } from "@/features/auth/actions";
-import { completeInviteAcceptance } from "@/features/auth/invite-actions";
+import { CONTACT_SCREEN_COPY as COPY } from "@/features/auth/contact-screen-copy";
 import { maskPhoneBR } from "@/lib/masks";
 
 export function AcceptInviteForm({
@@ -35,11 +35,11 @@ export function AcceptInviteForm({
     e.preventDefault();
     setError(null);
     if (tel.replace(/\D/g, "").length < 10) {
-      setError("Informe um telefone válido com DDD.");
+      setError(COPY.invitePhone);
       return;
     }
     if (pw.length < 8) {
-      setError("A senha deve ter ao menos 8 caracteres.");
+      setError(COPY.invitePassword);
       return;
     }
     setLoading(true);
@@ -57,12 +57,14 @@ export function AcceptInviteForm({
         return;
       }
       await signInWithPassword(res.authEmail, pw);
-      // Conta criada, mas o convite não ligou no cadastro: conclui agora, já logado.
-      if (res.pendingInvite) await completeInviteAcceptance(token).catch(() => null);
       await sendWelcomeEmail().catch(() => {});
-      router.push("/client");
+      // Conta criada, mas o convite não ligou no cadastro: conclui numa página dentro de /client,
+      // onde a sessão do cliente chega ao servidor (aqui em /convite ela não chega).
+      router.push(
+        res.pendingInvite ? `/client/concluir-convite/${encodeURIComponent(token)}?auto=1` : "/client"
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao criar acesso");
+      setError(COPY.failed);
     } finally {
       setLoading(false);
     }

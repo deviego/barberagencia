@@ -62,10 +62,25 @@ test("recuperar senha: aceita telefone e só reage a ?error=link", () => {
 });
 
 test("copy: sem promessa de código por SMS/WhatsApp e sem dado pessoal", () => {
-  for (const [k, t] of Object.entries(CONTACT_SCREEN_COPY)) {
+  for (const [k, raw] of Object.entries(CONTACT_SCREEN_COPY)) {
+    const t = typeof raw === "function" ? raw("Barbearia Teste") : raw;
     assert.ok(!/sms|whatsapp|c[oó]digo/i.test(t), `${k} promete canal que não existe`);
     assert.ok(!/@\w|\d{4,}/.test(t), `${k} parece ter dado pessoal`);
   }
+});
+
+test("convite: cadastro com convite pendente conclui dentro de /client", () => {
+  const form = read("features/auth/components/accept-invite-form.tsx");
+  assert.ok(!form.includes("completeInviteAcceptance"), "a ação não enxerga a sessão em /convite");
+  assert.ok(form.includes("/client/concluir-convite/"));
+  const flow = read("features/auth/components/complete-invite.tsx");
+  for (const code of ["NOT_SIGNED_IN", "INVALID_INVITE"]) assert.ok(flow.includes(code), `sem tratamento de ${code}`);
+  assert.ok(flow.includes('router.replace("/client")'), "ok deveria seguir para o app");
+});
+
+test("perfil: link velho com e-mail confirmado não pede Reenviar", () => {
+  const card = read("features/auth/components/contact-email-card.tsx");
+  assert.ok(card.includes("linkResult && state.verified"));
 });
 
 console.log(`\n${passed} testes passaram.`);

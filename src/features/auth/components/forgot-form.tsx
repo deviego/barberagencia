@@ -7,7 +7,7 @@ import { Input, Label } from "@/components/ui/input";
 import { requestPasswordReset } from "../password-reset";
 import { CONTACT_SCREEN_COPY as COPY } from "../contact-screen-copy";
 
-/** Passo 1 da recuperação: informar o e-mail e receber o link. */
+/** Passo 1 da recuperação: informar o e-mail ou telefone e receber o link. */
 export function ForgotForm() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -26,7 +26,7 @@ export function ForgotForm() {
       }
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar");
+      setError(COPY.failed);
     } finally {
       setLoading(false);
     }
@@ -40,13 +40,13 @@ export function ForgotForm() {
           <div className="text-caption text-text-2">
             <p className="font-semibold text-text">Pedido recebido</p>
             <p className="mt-0.5">
-              Se existir conta com esse e-mail confirmado, enviamos um link para criar uma nova senha.
-              Confira também o spam.
+              {COPY.resetSent}
             </p>
+            <p className="mt-2">{COPY.resetNoEmail}</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => setSent(false)}>
-          Enviar para outro e-mail
+          {COPY.resetAgain}
         </Button>
       </div>
     );

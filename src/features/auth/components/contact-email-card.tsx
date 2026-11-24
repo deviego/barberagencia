@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { resendContactEmailConfirmation, updateContactEmail } from "@/features/auth/contact-actions";
 import { CONTACT_EMAIL_MESSAGES as MSG, type ContactEmailState } from "@/features/auth/contact-types";
-import type { ContactLinkResult } from "@/features/auth/contact-screen-copy";
+import { CONTACT_SCREEN_COPY as COPY, type ContactLinkResult } from "@/features/auth/contact-screen-copy";
 
 
 /**
@@ -31,10 +31,11 @@ export function ContactEmailCard({
   const [invalid, setInvalid] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Link velho com o e-mail já confirmado: não há "Reenviar", então mostra o confirmado.
   const banner =
-    linkResult === "confirmado" && state.verified
+    linkResult && state.verified
       ? { tone: "success" as const, text: MSG.confirmed }
-      : linkResult === "link-invalido"
+      : linkResult === "link-invalido" && state.email
         ? { tone: "danger" as const, text: MSG.invalidLink }
         : null;
 
@@ -146,6 +147,7 @@ export function ContactEmailCard({
               aria-invalid={invalid || undefined}
               autoFocus
             />
+            {state.verified && <p className="text-caption text-text-muted">{COPY.changeVerifiedHint}</p>}
           </div>
           {error && (
             <p role="alert" className="text-caption text-danger">

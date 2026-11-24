@@ -31,7 +31,7 @@ export default async function RecuperarSenhaPage({
         href="/client/login"
         className="text-center text-caption text-text-muted hover:text-accent"
       >
-        ← Voltar ao login
+        {COPY.resetBack}
       </Link>
     </div>
   );
