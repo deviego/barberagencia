@@ -1,7 +1,8 @@
 # Entrar com Google — configuração (Diego)
 
 Só o Diego faz estes passos. O secret do Google vai direto no painel do Supabase; não cole em chat, issue,
-PR ou arquivo do repositório. Faça primeiro na **staging**, teste, e depois repita na **produção**.
+PR ou arquivo do repositório. Faça primeiro na **staging**, teste, e depois repita na **produção**. Na produção, só depois do aviso do
+CTO de que o código e a migration do login com Google já estão lá.
 
 ## 1. Google Cloud (uma vez)
 1. console.cloud.google.com → crie (ou escolha) o projeto "Barber Agência".
@@ -22,6 +23,7 @@ PR ou arquivo do repositório. Faça primeiro na **staging**, teste, e depois re
 3. **Authentication → URL Configuration → Redirect URLs**, adicionar:
    - staging: `https://barberagencia-git-staging-deviegos-projects.vercel.app/client/auth/callback`
    - produção: `https://www.barberagencia.com/client/auth/callback`
+   - Só essas URLs exatas. Nunca use curinga (`*`).
 4. Avise o CTO: "Google ligado na staging" (sem copiar valores). O Espelho testa.
 
 ## Desfazer

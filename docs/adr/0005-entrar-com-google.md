@@ -1,6 +1,6 @@
 # 0005 — Entrar com Google (área do cliente)
 
-- Status: Proposto (segurança: aguarda Navalha)
+- Status: Aceito com ajustes (segurança: Navalha, #168, 24/11)
 - Decisão de produto: Diego, 2026-11-24
 - Autor: Alicerce (Tech Lead)
 
@@ -24,11 +24,13 @@ Pontos que o código atual impõe:
 1. **Botão** "Entrar com Google" no login e no cadastro do cliente: `signInWithOAuth({ provider: "google" })`
    no navegador (PKCE), com `redirectTo` = `/client/auth/callback?next=/client/confirmar-whatsapp`. A marca
    da barbearia vem do cookie `bb_tenant`, como já acontece no login atual.
-2. **Trigger**: sem migration nova. Um teste de banco garante que uma conta com o formato do Google (sem
-   `tenant_subdomain`) cria só o `profiles` e nenhum `clients`/`memberships`. O nome vem de `full_name` do
-   Google; a foto (`avatar_url`) é lida dos metadados da conta quando a tela precisar.
-3. **Conta pendente**: usuário logado sem `memberships` na área do cliente vai sempre para
-   `/client/confirmar-whatsapp` (bloqueio no servidor, não só na tela).
+2. **Trigger** (`schema-65`, a partir do corpo em vigor do `schema-invite-fix.sql`): só cria `clients` e
+   `memberships` quando o provedor da conta (`raw_app_meta_data`, controlado pelo servidor) é `email`.
+   Qualquer outro provedor cria só o `profiles`. Google não reconcilia convite na fase 1.
+3. **Callback e conta pendente**: o callback grava sempre a sessão da área do cliente (inclusive com
+   "ver como cliente" ativo), usa PKCE com o cookie dessa área e aceita em `next` só caminho interno de
+   `/client` (qualquer outro valor vira `/client`). Sem `memberships`, o destino é sempre
+   `/client/confirmar-whatsapp`, ignorando `next`; o mesmo bloqueio vale no servidor para todo `/client`.
 4. **Confirmar WhatsApp** (server action): recebe o telefone.
    - Telefone sem conta: cria `clients` + `memberships` CLIENT na barbearia do `bb_tenant` (validada no
      servidor; sem barbearia válida, erro e nada é criado). Grava o telefone no perfil.
@@ -36,13 +38,15 @@ Pontos que o código atual impõe:
      existente (fase 1, decisão do CTO 24/11). Código pelo WhatsApp fica para depois. Quem não lembra a
      senha e tem conta só por telefone não tem recuperação sozinho hoje: a tela orienta "fale com a
      barbearia" (ver issue de recuperação de senha por telefone).
-5. **Vínculo com prova**: provada a posse, o servidor encerra a conta provisória criada pelo Google (só se
-   ela não tiver nenhum dado além do perfil), entra na conta existente e chama `linkIdentity` (Google).
-   Requer "Manual linking" ligado no Supabase Auth.
+5. **Vínculo com prova**, nesta ordem: valida a senha da conta existente (com limite próprio de
+   tentativas, mensagem neutra) → descarta a conta provisória do Google (só no servidor, só a da sessão
+   atual, só se for apenas Google, sem nenhum dado e criada há menos de 24 h) → entra na conta existente
+   → `linkIdentity` (Google). Requer "Manual linking" ligado no Supabase Auth. Desistir no meio deixa só a
+   conta existente.
 6. **Perfil**: botão "Conectar com Google" para cliente logado (`linkIdentity` manual).
-7. **Vínculo automático por e-mail**: tratamento definido pela revisão de segurança antes do código
-   (opções: barrar o vínculo automático e usar o fluxo de prova, ou confiar só no e-mail verificado pelo
-   Google com regras extras). O detalhe fica fora do repositório público.
+7. **Vínculo automático por e-mail**: barrado no callback. Vínculo só com intenção explícita (perfil ou
+   fluxo de prova). Contas novas por senha passam a usar o e-mail técnico como e-mail de autenticação; o
+   e-mail real fica só como contato (login por e-mail e "Esqueci minha senha" ajustados para isso).
 8. **Multi-barbearia**: mesmo comportamento das contas por senha hoje (a conta pertence à barbearia em que
    nasceu). Nada de dado de uma barbearia aparecer em outra; caso testado.
 9. **Liga e desliga**: o botão só aparece com `NEXT_PUBLIC_LOGIN_GOOGLE=on` (por ambiente). Na produção fica
@@ -52,7 +56,7 @@ Pontos que o código atual impõe:
    `docs/setup/login-google.md`. Nenhum agente vê o secret.
 
 ## Consequências
-- Nenhuma migration prevista; um teste de banco para o trigger em vigor.
+- Uma migration (`schema-65`) com teste de banco para o trigger.
 - Telas novas: confirmar WhatsApp e provar posse da conta.
 - Revisão de segurança obrigatória (Navalha) no ADR e em cada PR de auth.
 - Testes: cadastro novo com Google; vínculo por telefone com prova; vínculo sem prova falha; mesmo Google
