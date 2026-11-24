@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { safeNext } from "@/lib/auth/safe-next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** Callback PKCE da ÁREA DO DISTRIBUIDOR (reset de senha). */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/distributor";
+  const next = safeNext(searchParams.get("next"), origin, "distributor");
 
   if (code) {
     const supabase = await createSupabaseServerClient();
