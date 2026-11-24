@@ -75,15 +75,15 @@ export type GoogleCallbackError =
  */
 export type StartGoogleLinkResult = { ok: true } | { ok: false; code: "NOT_SIGNED_IN" | "GENERIC"; error: string };
 
-/** Textos provisórios (a redação final é da PO). Nenhum traz dado da conta. */
+/** Textos da PO (redação final, #179). Nenhum traz dado da conta. */
 export const GOOGLE_LOGIN_MESSAGES = {
-  invalidPhone: "Confira o telefone com DDD.",
-  needsProof: "Esse telefone já tem conta. Entre com a senha dela para conectar o Google.",
+  invalidPhone: "Confira o número do WhatsApp com DDD.",
+  needsProof: "Esse número já tem conta. Digite a senha dela para juntar com o seu Google.",
   noShop: "Abra o link da sua barbearia para continuar.",
   notSignedIn: "Sua sessão acabou. Entre de novo.",
   wrongCredentials: "Telefone ou senha incorretos.",
-  notEligible: "Não deu para conectar esta conta. Fale com a barbearia.",
-  limited: "Muitas tentativas. Aguarde alguns minutos e tente de novo.",
-  failed: "Não deu certo. Tente de novo.",
-  emailHasAccount: "Este e-mail já tem conta. Entre com telefone/e-mail e senha e conecte o Google no seu perfil.",
+  notEligible: "Não deu para juntar as contas. Fale com a barbearia.",
+  limited: "Muitas tentativas. Espere alguns minutos e tente de novo.",
+  failed: "Não deu certo agora. Tente de novo.",
+  emailHasAccount: "Esse e-mail já tem conta. Entre com telefone ou e-mail e senha, e depois conecte o Google no seu perfil.",
 } as const;

@@ -49,6 +49,7 @@ const sessionAuth = {
   async exchangeCodeForSession() { const u = users()[g().session]; return { data: { user: u }, error: null }; },
   async unlinkIdentity(identity) {
     log("unlink:" + identity.provider);
+    if (g().unlinkFails > 0) { g().unlinkFails--; return { data: {}, error: { code: "unexpected_failure" } }; }
     const u = users()[g().session];
     u.identities = u.identities.filter((i) => i !== identity);
     return { data: {}, error: null };
@@ -206,6 +207,11 @@ await test("callback: com intenção válida do servidor (perfil/prova), o Googl
   assert.deepEqual(u.identities.map((i) => i.provider), ["email", "google"]);
   assert.equal(g.cookies.has("bb_link_intent"), false, "intenção consumida (cookie)");
   assert.equal(u.app_metadata.link_intent, undefined, "intenção consumida (banco)");
+  assert.deepEqual(u.app_metadata.google_linked, ["i-google"], "identidade aprovada guardada");
+  // Login seguinte, sem pedido: a aprovação vale.
+  g.session = u.id;
+  assert.equal((await cb("code=def&next=/client/agendar")).redirect, `${O}/client/agendar`);
+  assert.deepEqual(u.identities.map((i) => i.provider), ["email", "google"]);
 });
 
 await test("callback: intenção vencida, de outro valor ou só no banco/só no cookie não vale", async () => {
@@ -224,15 +230,51 @@ await test("callback: intenção vencida, de outro valor ou só no banco/só no 
   }
 });
 
-await test("callback: conta só com Google (nova) e Google ligado há tempo não são barrados", async () => {
-  let g = reset();
+await test("callback: conta só com Google (nova) não é barrada", async () => {
+  const g = reset();
   provisional(g);
   assert.equal((await cb()).redirect, `${O}/client/confirmar-whatsapp`);
-  g = reset();
+  assert.ok(!g.log.includes("unlink:google"));
+});
+
+await test("callback: Google ANTIGO não aprovado numa conta com senha é barrado a qualquer tempo", async () => {
+  const g = reset();
   const u = passwordAccountWithFreshGoogle(g);
   u.identities[1].created_at = ago(40 * 86400_000);
+  u.identities[1].last_sign_in_at = ago(3600_000);
+  assert.equal((await cb("code=abc&next=/client/agendar")).redirect, `${O}/client/login?error=email_ja_tem_conta`);
+  assert.deepEqual(u.identities.map((i) => i.provider), ["email"]);
+  assert.equal(g.session, null);
+});
+
+await test("callback: Google aprovado (google_linked) segue normal, mesmo antigo", async () => {
+  const g = reset();
+  const u = passwordAccountWithFreshGoogle(g);
+  u.identities[1].created_at = ago(40 * 86400_000);
+  u.app_metadata.google_linked = ["i-google"];
   assert.equal((await cb("code=abc&next=/client/agendar")).redirect, `${O}/client/agendar`);
   assert.ok(!g.log.includes("unlink:google"));
+});
+
+await test("callback: se o desfazer falhar, a pessoa sai e o próximo login continua barrado", async () => {
+  const g = reset({ unlinkFails: 1 });
+  const u = passwordAccountWithFreshGoogle(g);
+  assert.equal((await cb()).redirect, `${O}/client/login?error=email_ja_tem_conta`);
+  assert.equal(g.session, null);
+  assert.deepEqual(u.identities.map((i) => i.provider), ["email", "google"], "desfazer falhou");
+  // Uma hora depois a identidade já não é recém-criada; ainda assim é barrada e desfeita.
+  u.identities[1].created_at = ago(3600_000);
+  u.identities[1].last_sign_in_at = ago(3600_000);
+  g.session = u.id;
+  assert.equal((await cb()).redirect, `${O}/client/login?error=email_ja_tem_conta`);
+  assert.deepEqual(u.identities.map((i) => i.provider), ["email"]);
+});
+
+await test("callback: aprovação só vale para a identidade aprovada (outro google na mesma conta é barrado)", async () => {
+  const g = reset();
+  const u = passwordAccountWithFreshGoogle(g);
+  u.app_metadata.google_linked = ["outra-identidade"];
+  assert.equal((await cb()).redirect, `${O}/client/login?error=email_ja_tem_conta`);
 });
 
 // ---- Prova de posse ---------------------------------------------------------------------------------

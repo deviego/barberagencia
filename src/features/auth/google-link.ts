@@ -45,17 +45,37 @@ export async function setLinkIntent(admin: Admin, userId: string): Promise<boole
 
 /**
  * Consome a intenção: apaga o cookie e o resumo, e diz se ela valia para este usuário agora.
- * Sempre chamado no callback, com ou sem cookie.
+ * Sempre chamado no callback, com ou sem cookie. Valendo, grava como APROVADAS as identidades
+ * google da conta (app_metadata.google_linked): o callback só aceita google aprovado numa conta
+ * que também entra por senha, a qualquer tempo.
  */
 export async function consumeLinkIntent(
   admin: Admin,
-  user: { id: string; app_metadata?: Record<string, unknown> | null }
+  user: { id: string; app_metadata?: Record<string, unknown> | null },
+  googleIdentityIds: readonly string[]
 ): Promise<boolean> {
   const store = await cookies();
   const token = store.get(LINK_INTENT_COOKIE)?.value ?? "";
   if (token) store.delete(LINK_INTENT_COOKIE);
   const meta = (user.app_metadata?.link_intent ?? null) as IntentMeta | null;
-  if (meta) await writeIntentMeta(admin, user.id, null);
-  if (!token || !meta || typeof meta.h !== "string" || typeof meta.exp !== "number") return false;
-  return meta.exp > Date.now() && meta.h === sha256(token);
+  const valid =
+    !!token && !!meta && typeof meta.h === "string" && typeof meta.exp === "number" && meta.exp > Date.now() && meta.h === sha256(token);
+
+  if (meta || valid) {
+    const { data, error } = await admin.auth.admin.getUserById(user.id);
+    if (!error && data.user) {
+      const current = { ...(data.user.app_metadata ?? {}) } as Record<string, unknown>;
+      delete current.link_intent;
+      if (valid) {
+        const before = Array.isArray(current.google_linked) ? (current.google_linked as unknown[]).filter((x) => typeof x === "string") : [];
+        current.google_linked = [...new Set([...(before as string[]), ...googleIdentityIds.filter(Boolean)])];
+      }
+      const { error: uErr } = await admin.auth.admin.updateUserById(user.id, { app_metadata: current });
+      if (uErr && valid) return false; // sem gravar a aprovação, não aprova
+      if (valid && user.app_metadata) user.app_metadata.google_linked = current.google_linked;
+    } else if (valid) {
+      return false;
+    }
+  }
+  return valid;
 }
