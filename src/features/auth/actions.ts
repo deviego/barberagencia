@@ -73,8 +73,6 @@ export async function registerClientAccount(input: {
     const msg = (error?.message ?? "").toLowerCase();
     if (msg.includes("already") || msg.includes("registered") || msg.includes("exists"))
       return { ok: false, error: "Este telefone já tem conta. Faça login." };
-    if (msg.includes("database"))
-      return { ok: false, error: "Este telefone já tem cadastro nesta barbearia. Se você recebeu um convite, use o link dele." };
     return { ok: false, error: "Não foi possível criar a conta. Tente de novo." };
   }
 

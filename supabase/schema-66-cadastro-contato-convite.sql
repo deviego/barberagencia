@@ -165,7 +165,14 @@ begin
     v_contact := null;
   end if;
 
-  update public.profiles set contact_email = v_contact, contact_email_verified_at = null where id = p_user_id;
+  -- Contato novo: sem confirmação. Mesmo contato (ex.: aceite concluído depois): mantém a confirmação.
+  update public.profiles
+     set contact_email = v_contact,
+         contact_email_verified_at = case
+           when lower(contact_email) is not distinct from v_contact then contact_email_verified_at
+           else null
+         end
+   where id = p_user_id;
 
   if nullif(p_invite_token_hash, '') is null then
     update public.clients set email = v_contact where user_id = p_user_id;

@@ -236,6 +236,16 @@ await test("resolução: só contato CONFIRMADO; ambíguo (2 contas) não resolv
   assert.equal(await r(em), null, "dois confirmados: não resolve");
 });
 
+await test("finalização repetida: mesmo contato mantém a confirmação; contato diferente zera", async () => {
+  const em = mail("keep");
+  const u = await signup({ app: { contact_email: em }, user: { tenant_subdomain: A.slug } });
+  await pool.query(`update public.profiles set contact_email_verified_at = now() where id = $1`, [u.id]);
+  assert.equal((await one(`select public.finalize_client_signup($1, $2, null) r`, [u.id, em.toUpperCase()])).r, "OK");
+  assert.ok((await one(`select contact_email_verified_at v from public.profiles where id = $1`, [u.id])).v, "mesmo contato: segue confirmado");
+  assert.equal((await one(`select public.finalize_client_signup($1, $2, null) r`, [u.id, mail("outro")])).r, "OK");
+  assert.equal((await one(`select contact_email_verified_at v from public.profiles where id = $1`, [u.id])).v, null, "contato novo: zera");
+});
+
 await test("permissões: anon e authenticated não executam a resolução nem a finalização, nem leem as confirmações", async () => {
   for (const role of ["anon", "authenticated"]) {
     const c = await pool.connect();
