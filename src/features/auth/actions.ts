@@ -10,7 +10,10 @@ import { notifyWelcome } from "@/server/notifications/notify";
 import { VIEW_AS_CLIENT_COOKIE } from "@/lib/auth/preview";
 import { AREA_HEADER } from "@/lib/supabase/area";
 import { getRequestOrigin } from "@/lib/http";
+import { createHash } from "crypto";
 import { phoneDigits, syntheticEmail, isEmail } from "@/lib/auth/phone-identity";
+import { isTechnicalEmail, loginEmailFor } from "./account-lookup";
+import { sendContactConfirmation } from "./contact-email";
 
 /**
  * [Cliente] Cria a conta pelo telefone (e-mail opcional). Usa o service-role para
@@ -24,6 +27,8 @@ export async function registerClientAccount(input: {
   password: string;
   email?: string;
   tenantSubdomain?: string;
+  /** Aceite de convite: o token do link. O cadastro liga a ficha convidada só por ele. */
+  inviteToken?: string;
 }): Promise<{ ok: true; authEmail: string } | { ok: false; error: string }> {
   const name = input.name?.trim();
   const digits = phoneDigits(input.phone ?? "");
@@ -31,27 +36,54 @@ export async function registerClientAccount(input: {
   if (digits.length < 10) return { ok: false, error: "Informe um telefone válido com DDD." };
   if (!input.password || input.password.length < 8) return { ok: false, error: "A senha deve ter ao menos 8 caracteres." };
 
-  const realEmail = input.email && isEmail(input.email) ? input.email.trim().toLowerCase() : null;
-  const authEmail = realEmail ?? syntheticEmail(digits);
+  // E-mail de autenticação SEMPRE técnico (a partir do telefone); o e-mail real é só contato e só
+  // vale para entrar e recuperar a senha depois de confirmado (#177).
+  const contact = input.email && isEmail(input.email) ? input.email.trim().toLowerCase() : null;
+  if (contact && isTechnicalEmail(contact)) return { ok: false, error: "Confira o e-mail." };
+  const authEmail = syntheticEmail(digits);
   const admin = createSupabaseAdminClient();
+
+  // Convite: confere antes (mensagem clara); o banco confere de novo e usa o convite uma vez só.
+  let inviteHash: string | null = null;
+  if (input.inviteToken) {
+    const token = input.inviteToken.trim();
+    if (!/^[A-Za-z0-9_-]{8,200}$/.test(token)) return { ok: false, error: "Este convite não vale mais." };
+    const { data: inv } = await admin
+      .from("client_invites")
+      .select("status, expires_at")
+      .eq("token", token)
+      .maybeSingle();
+    if (!inv || inv.status !== "PENDING" || new Date(inv.expires_at as string).getTime() <= Date.now()) {
+      return { ok: false, error: "Este convite não vale mais." };
+    }
+    inviteHash = createHash("sha256").update(token).digest("hex");
+  }
 
   const { data, error } = await admin.auth.admin.createUser({
     email: authEmail,
     password: input.password,
     email_confirm: true,
-    user_metadata: { full_name: name, phone: input.phone, tenant_subdomain: input.tenantSubdomain },
+    // Com convite a barbearia vem do convite (finalize_client_signup), nunca do pedido.
+    user_metadata: { full_name: name, phone: input.phone, tenant_subdomain: inviteHash ? undefined : input.tenantSubdomain },
   });
   if (error || !data.user) {
     const msg = (error?.message ?? "").toLowerCase();
     if (msg.includes("already") || msg.includes("registered") || msg.includes("exists"))
-      return { ok: false, error: "Este telefone/e-mail já tem conta. Faça login." };
-    return { ok: false, error: error?.message ?? "Falha ao criar conta." };
+      return { ok: false, error: "Este telefone já tem conta. Faça login." };
+    return { ok: false, error: "Não foi possível criar a conta. Tente de novo." };
   }
 
-  // O trigger handle_new_user preenche clients.email com o e-mail de auth (técnico
-  // quando sem e-mail real) — normaliza para o e-mail real ou nulo.
-  await admin.from("clients").update({ email: realEmail }).eq("user_id", data.user.id);
-
+  // Contato (sem confirmar) e, com convite, o aceite de uso único: tudo no banco, pelo servidor.
+  const { data: fin, error: finError } = await admin.rpc("finalize_client_signup", {
+    p_user_id: data.user.id,
+    p_contact_email: contact,
+    p_invite_token_hash: inviteHash,
+  });
+  if (finError) {
+    console.error(`[auth] cadastro não finalizado (${finError.code ?? "sem código"})`);
+    return { ok: false, error: "Não foi possível criar a conta. Tente de novo." };
+  }
+  if (fin === "INVITE_INVALID") return { ok: false, error: "Este convite não vale mais." };
   return { ok: true, authEmail };
 }
 
@@ -76,19 +108,33 @@ export async function signInWithIdentifier(
   const id = (identifier ?? "").trim();
   if (!id || !password) return { ok: false, error: "Informe telefone/e-mail e senha." };
 
-  let email = id.toLowerCase();
-  if (!isEmail(id)) {
-    const digits = phoneDigits(id);
-    if (digits.length < 10) return { ok: false, error: "Informe um e-mail ou telefone válido (com DDD)." };
-    let resolved: string | null = null;
-    try {
-      const admin = createSupabaseAdminClient();
-      const { data } = await admin.rpc("auth_email_for_phone", { p_digits: digits });
-      resolved = (data as string | null) ?? null;
-    } catch {
-      /* usa o e-mail técnico abaixo */
-    }
-    email = (resolved ?? syntheticEmail(digits)).toLowerCase();
+  if (!isEmail(id) && phoneDigits(id).length < 10) {
+    return { ok: false, error: "Informe um e-mail ou telefone válido (com DDD)." };
+  }
+  // E-mail de contato CONFIRMADO ou telefone → e-mail de autenticação, no servidor.
+  const admin = createSupabaseAdminClient();
+  let email: string | null = null;
+  try {
+    email = await loginEmailFor(admin, id);
+  } catch {
+    email = null;
+  }
+  if (!email) email = isEmail(id) ? id.toLowerCase() : syntheticEmail(phoneDigits(id));
+
+  // Limite por identificador e por conta (o Auth só vê o IP do servidor). Mesma mensagem de senha
+  // errada, exista a conta ou não.
+  const LOGIN_LIMIT = { windowSeconds: 15 * 60, perId: 10, perAccount: 10 } as const;
+  for (const [scope, key, max] of [
+    ["login_identifier", createHash("sha256").update(id.toLowerCase()).digest("hex"), LOGIN_LIMIT.perId],
+    ["login_account", createHash("sha256").update(email).digest("hex"), LOGIN_LIMIT.perAccount],
+  ] as const) {
+    const { data: ok, error: limitError } = await admin.rpc("rate_limit_hit", {
+      p_scope: scope,
+      p_key: key,
+      p_window_seconds: LOGIN_LIMIT.windowSeconds,
+      p_limit: max,
+    });
+    if (!limitError && ok === false) return { ok: false, error: "Telefone/e-mail ou senha inválidos." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -103,14 +149,33 @@ export async function sendWelcomeEmail() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email) return { ok: false as const };
+  if (!user) return { ok: false as const };
+  // E-mail de CONTATO (o de autenticação pode ser técnico). Contato ainda não confirmado: a
+  // boas-vindas já leva o link de confirmação (mesmo canal, um e-mail só).
+  const admin = createSupabaseAdminClient();
+  const { data: p } = await admin
+    .from("profiles")
+    .select("contact_email, contact_email_verified_at")
+    .eq("id", user.id)
+    .maybeSingle();
+  const contact = (p?.contact_email as string | null) ?? (isTechnicalEmail(user.email) ? null : user.email ?? null);
+  if (!contact) return { ok: false as const };
   const name = (user.user_metadata?.full_name as string | undefined) ?? "";
+  if (p?.contact_email && !p.contact_email_verified_at) {
+    const tenantForEmail = await getCurrentTenant();
+    try {
+      await sendContactConfirmation(admin, { id: user.id, name }, contact, { welcome: true, tenantId: tenantForEmail.id });
+    } catch {
+      /* não bloqueia o cadastro */
+    }
+    return { ok: true as const };
+  }
   const phone = (user.user_metadata?.phone as string | undefined) ?? null;
   const tenant = await getCurrentTenant();
   try {
     const origin = await getRequestOrigin();
     const link = origin ? `${origin}/client` : null;
-    await notifyWelcome(user.email, name, tenant.name, { phone, link, tenantId: tenant.id });
+    await notifyWelcome(contact, name, tenant.name, { phone, link, tenantId: tenant.id });
   } catch {
     /* não bloqueia o cadastro se a boas-vindas falhar */
   }

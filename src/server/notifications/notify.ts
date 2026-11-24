@@ -468,6 +468,57 @@ export async function notifyInvite(input: {
 }
 
 /** E-mail (e WhatsApp) de boas-vindas ao novo cliente (após o cadastro). */
+/**
+ * Pede a confirmação do e-mail de CONTATO (#177). Mesmo canal do e-mail de boas-vindas.
+ * welcome = true junta a boas-vindas do cadastro e a confirmação num e-mail só.
+ */
+export async function notifyContactConfirmation(
+  email: string,
+  link: string,
+  opts: { name?: string; tenantId?: string | null; welcome?: boolean }
+) {
+  const brand = await brandFor(opts.tenantId);
+  const nome = (opts.name ?? "").split(" ")[0];
+  const title = opts.welcome ? `Bem-vindo${nome ? `, ${nome}` : ""}! ✂️` : "Confirme seu e-mail";
+  const intro = opts.welcome
+    ? `Que bom ter você na <strong>${brand.name}</strong>! Sua conta já está pronta.`
+    : `Confirme este e-mail na sua conta da <strong>${brand.name}</strong>.`;
+  const html = emailShell(
+    title,
+    `<p style="color:#4a453d;font-size:15px;line-height:1.6;">${intro}</p>
+     <p style="color:#4a453d;font-size:15px;line-height:1.6;">
+       Confirme seu e-mail para poder entrar com ele e recuperar a senha quando precisar.
+     </p>
+     <p style="margin:16px 0;"><a href="${link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Confirmar e-mail</a></p>
+     <p style="color:#7a7368;font-size:13px;line-height:1.6;">Se não foi você, ignore este e-mail.</p>`,
+    brand
+  );
+  return sendEmail({
+    to: email,
+    subject: opts.welcome ? `Bem-vindo à ${brand.name}` : `Confirme seu e-mail na ${brand.name}`,
+    html,
+    fromName: brand.name,
+  });
+}
+
+/**
+ * Link para criar uma nova senha, enviado ao e-mail de CONTATO da conta. O link é de uso único e
+ * abre /client/auth/confirm (confirmação no servidor).
+ */
+export async function notifyPasswordReset(email: string, link: string, tenantId: string | null) {
+  const brand = await brandFor(tenantId);
+  const html = emailShell(
+    "Nova senha",
+    `<p style="color:#4a453d;font-size:15px;line-height:1.6;">
+       Recebemos um pedido para criar uma nova senha na sua conta da <strong>${brand.name}</strong>.
+     </p>
+     <p style="margin:16px 0;"><a href="${link}" style="background:#c8a24b;color:#171412;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;display:inline-block;">Criar nova senha</a></p>
+     <p style="color:#7a7368;font-size:13px;line-height:1.6;">Se não foi você, ignore este e-mail: a sua senha continua a mesma.</p>`,
+    brand
+  );
+  return sendEmail({ to: email, subject: `Nova senha na ${brand.name}`, html, fromName: brand.name });
+}
+
 export async function notifyWelcome(
   email: string,
   name: string,

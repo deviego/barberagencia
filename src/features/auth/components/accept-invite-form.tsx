@@ -7,7 +7,6 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "./password-input";
 import { signInWithPassword } from "../services/auth-service";
 import { registerClientAccount, sendWelcomeEmail } from "@/features/auth/actions";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { maskPhoneBR } from "@/lib/masks";
 
 export function AcceptInviteForm({
@@ -44,14 +43,19 @@ export function AcceptInviteForm({
     }
     setLoading(true);
     try {
-      const res = await registerClientAccount({ name: fullName, phone: tel, password: pw, email: mail || undefined, tenantSubdomain });
+      const res = await registerClientAccount({
+        name: fullName,
+        phone: tel,
+        password: pw,
+        email: mail || undefined,
+        tenantSubdomain,
+        inviteToken: token,
+      });
       if (!res.ok) {
         setError(res.error);
         return;
       }
       await signInWithPassword(res.authEmail, pw);
-      const supabase = createSupabaseBrowserClient();
-      await supabase.rpc("accept_invite", { p_token: token });
       await sendWelcomeEmail().catch(() => {});
       router.push("/client");
     } catch (err) {
