@@ -49,8 +49,11 @@ Pontos que o código atual impõe:
    e-mail real fica só como contato (login por e-mail e "Esqueci minha senha" ajustados para isso).
 8. **Multi-barbearia**: mesmo comportamento das contas por senha hoje (a conta pertence à barbearia em que
    nasceu). Nada de dado de uma barbearia aparecer em outra; caso testado.
-9. **Liga e desliga**: o botão só aparece com `NEXT_PUBLIC_LOGIN_GOOGLE=on` (por ambiente). Na produção fica
-   desligado até o QA na staging e o ok do Diego.
+9. **Liga e desliga**: o botão só aparece com `NEXT_PUBLIC_LOGIN_GOOGLE=on` (por ambiente). A flag só
+   esconde o botão: com o provedor ligado no Supabase, o login pelo Google funciona mesmo sem ele. Por
+   isso o **provedor Google só é ligado na produção depois que o item 2 (`schema-65`), a barragem do
+   vínculo automático e o e-mail técnico do item 7 estiverem em produção**, com o OK do CTO e do Diego.
+   Na staging pode ligar antes, para teste.
 10. **Privacidade**: a página `/privacidade` passa a citar o login com Google (nome, e-mail e foto).
 11. **Configuração externa** (Google Cloud + Supabase Auth): só o Diego, pelo passo a passo
    `docs/setup/login-google.md`. Nenhum agente vê o secret.

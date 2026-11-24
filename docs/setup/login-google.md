@@ -1,8 +1,11 @@
 # Entrar com Google — configuração (Diego)
 
 Só o Diego faz estes passos. O secret do Google vai direto no painel do Supabase; não cole em chat, issue,
-PR ou arquivo do repositório. Faça primeiro na **staging**, teste, e depois repita na **produção**. Na produção, só depois do aviso do
-CTO de que o código e a migration do login com Google já estão lá.
+PR ou arquivo do repositório. Faça primeiro na **staging**, teste, e depois repita na **produção**.
+
+> **Produção só depois do OK do CTO.** Ligar o provedor Google no Supabase de produção libera o login
+> pelo Google mesmo com o botão escondido. Espere o CTO avisar que o código e a migration já estão em
+> produção.
 
 ## 1. Google Cloud (uma vez)
 1. console.cloud.google.com → crie (ou escolha) o projeto "Barber Agência".
