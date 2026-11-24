@@ -9,6 +9,7 @@ import {
   approvedGoogleIds,
   freshGoogleNextToPassword,
   identityKey,
+  newestGoogle,
   unapprovedGoogleNextToPassword,
 } from "@/features/auth/google-link-rules";
 import type { GoogleCallbackError } from "@/features/auth/google-types";
@@ -48,8 +49,9 @@ export async function GET(request: Request) {
   // (perfil ou prova de posse): o pedido válido aprova a identidade e a aprovação fica guardada.
   // Google não aprovado é desfeito a qualquer tempo, e a pessoa sai da sessão (#171).
   const identities = data.user.identities ?? [];
-  const googleIds = identities.filter((i) => i.provider === "google").map(identityKey);
-  await consumeLinkIntent(admin, data.user, googleIds);
+  // Um pedido aprova só a identidade google mais nova (a ligada neste fluxo).
+  const newest = newestGoogle(identities);
+  await consumeLinkIntent(admin, data.user, newest ? [identityKey(newest)] : []);
   const unapproved = unapprovedGoogleNextToPassword(identities, approvedGoogleIds(data.user.app_metadata));
   if (unapproved) {
     const recent = !!freshGoogleNextToPassword([unapproved, ...identities.filter((i) => i.provider === "email")], Date.now());

@@ -79,3 +79,18 @@ export function unapprovedGoogleNextToPassword<T extends IdentityLike>(
   if (!list.some((i) => i.provider === "email")) return null;
   return list.find((i) => i.provider === "google" && !approved.includes(identityKey(i))) ?? null;
 }
+
+/**
+ * A identidade google mais nova da conta (maior created_at): a que acabou de ser ligada neste
+ * fluxo. Só ela é aprovada por um pedido de vínculo; outras google não aprovadas continuam sendo
+ * desfeitas pelo callback.
+ */
+export function newestGoogle<T extends IdentityLike>(identities: readonly T[] | null | undefined): T | null {
+  const google = (identities ?? []).filter((i) => i.provider === "google");
+  if (!google.length) return null;
+  const at = (i: T) => {
+    const t = Date.parse(i.created_at ?? "");
+    return Number.isFinite(t) ? t : -Infinity;
+  };
+  return google.reduce((a, b) => (at(b) > at(a) ? b : a));
+}

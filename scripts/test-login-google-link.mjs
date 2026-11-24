@@ -112,7 +112,7 @@ registerHooks({
 
 const callback = await import(pathToFileURL(path.join(SRC, "app/client/auth/callback/route.ts")).href);
 const { proveAccountAndLink, startGoogleLink } = await import("@/features/auth/google-actions");
-const { freshGoogleNextToPassword, provisionalEligible } = await import("@/features/auth/google-link-rules");
+const { freshGoogleNextToPassword, newestGoogle, provisionalEligible } = await import("@/features/auth/google-link-rules");
 const { GOOGLE_LOGIN_MESSAGES: MSG } = await import("@/features/auth/google-types");
 
 const O = "https://www.example.test";
@@ -186,6 +186,16 @@ await test("regra: Google novo ao lado de senha é recém-ligado; só Google, ou
   assert.equal(freshGoogleNextToPassword([{ provider: "google", created_at: now(), last_sign_in_at: now() }], t), null);
   assert.equal(freshGoogleNextToPassword([email, { provider: "google", created_at: ago(30 * 86400_000), last_sign_in_at: now() }], t), null);
   assert.ok(freshGoogleNextToPassword([email, { provider: "google", created_at: null }], t), "sem data: trata como recém-criada");
+});
+
+await test("regra: google mais novo pelo created_at", () => {
+  const ids = [
+    { provider: "google", identity_id: "a", created_at: ago(9e6) },
+    { provider: "email", identity_id: "e", created_at: now() },
+    { provider: "google", identity_id: "b", created_at: ago(1000) },
+  ];
+  assert.equal(newestGoogle(ids).identity_id, "b");
+  assert.equal(newestGoogle([{ provider: "email" }]), null);
 });
 
 // ---- Callback: o caso obrigatório --------------------------------------------------------------
@@ -268,6 +278,18 @@ await test("callback: se o desfazer falhar, a pessoa sai e o próximo login cont
   g.session = u.id;
   assert.equal((await cb()).redirect, `${O}/client/login?error=email_ja_tem_conta`);
   assert.deepEqual(u.identities.map((i) => i.provider), ["email"]);
+});
+
+await test("callback: pedido válido aprova SÓ o google novo; google antigo não aprovado é desfeito", async () => {
+  const g = reset();
+  const u = passwordAccountWithFreshGoogle(g);
+  // Sobrou um google antigo não aprovado (ex.: desfazer falhou antes) e agora o dono liga o dele.
+  u.identities.splice(1, 0, { provider: "google", identity_id: "i-google-antigo", created_at: ago(3 * 86400_000), last_sign_in_at: ago(3 * 86400_000) });
+  u.app_metadata.link_intent = { h: sha("tok-ok"), exp: Date.now() + 60_000 };
+  g.cookies.set("bb_link_intent", { value: "tok-ok" });
+  assert.equal((await cb("code=abc&next=/client/perfil")).redirect, `${O}/client/login?error=email_ja_tem_conta`);
+  assert.deepEqual(u.app_metadata.google_linked, ["i-google"], "só o novo aprovado");
+  assert.deepEqual(u.identities.map((i) => i.identity_id), ["i-email", "i-google"], "o antigo foi desfeito");
 });
 
 await test("callback: aprovação só vale para a identidade aprovada (outro google na mesma conta é barrado)", async () => {

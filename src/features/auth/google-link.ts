@@ -46,8 +46,8 @@ export async function setLinkIntent(admin: Admin, userId: string): Promise<boole
 /**
  * Consome a intenção: apaga o cookie e o resumo, e diz se ela valia para este usuário agora.
  * Sempre chamado no callback, com ou sem cookie. Valendo, grava como APROVADAS as identidades
- * google da conta (app_metadata.google_linked): o callback só aceita google aprovado numa conta
- * que também entra por senha, a qualquer tempo.
+ * informadas (o callback passa só a google mais nova) em app_metadata.google_linked: o callback só
+ * aceita google aprovado numa conta que também entra por senha, a qualquer tempo.
  */
 export async function consumeLinkIntent(
   admin: Admin,
