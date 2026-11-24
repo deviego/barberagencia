@@ -5,6 +5,7 @@ import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { requestPasswordReset } from "../password-reset";
+import { CONTACT_SCREEN_COPY as COPY } from "../contact-screen-copy";
 
 /** Passo 1 da recuperação: informar o e-mail e receber o link. */
 export function ForgotForm() {
@@ -57,16 +58,22 @@ export function ForgotForm() {
       className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-7 shadow-lg"
     >
       <div className="flex flex-col gap-1.5">
-        <Label>E-mail cadastrado</Label>
+        <Label htmlFor="recuperar-id">{COPY.resetLabel}</Label>
         <Input
-          type="email"
+          id="recuperar-id"
+          type="text"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="william@email.com"
-          autoComplete="email"
+          placeholder="voce@email.com ou (11) 91234-5678"
+          autoComplete="username"
+          required
         />
       </div>
-      {error && <p className="text-caption text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-caption text-danger">
+          {error}
+        </p>
+      )}
       <Button type="submit" size="lg" loading={loading}>
         Enviar link
       </Button>

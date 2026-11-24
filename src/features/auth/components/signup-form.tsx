@@ -9,6 +9,7 @@ import { PasswordInput } from "./password-input";
 import { TermsModal } from "./terms-modal";
 import { signInWithPassword } from "../services/auth-service";
 import { registerClientAccount, sendWelcomeEmail } from "@/features/auth/actions";
+import { CONTACT_SCREEN_COPY } from "@/features/auth/contact-screen-copy";
 import { maskDate, maskPhoneBR } from "@/lib/masks";
 
 export function SignupForm({
@@ -46,7 +47,8 @@ export function SignupForm({
       // Conta já confirmada — entra direto (login pelo e-mail técnico ou real).
       await signInWithPassword(res.authEmail, form.password);
       await sendWelcomeEmail().catch(() => {});
-      router.push("/client");
+      // Com e-mail, o link de confirmação sai na boas-vindas: a home mostra o aviso (#177).
+      router.push(form.email.trim() ? "/client?contato=enviado" : "/client");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao criar conta");
     } finally {
@@ -104,6 +106,7 @@ export function SignupForm({
         <div className="flex flex-col gap-1.5">
           <Label>E-mail (opcional)</Label>
           <Input value={form.email} onChange={(e) => set("email", e.target.value)} type="email" placeholder="william@email.com" />
+          <p className="text-caption text-text-muted">{CONTACT_SCREEN_COPY.signupHint}</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
