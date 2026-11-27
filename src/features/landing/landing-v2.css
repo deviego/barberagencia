@@ -1,0 +1,301 @@
+/* =======================================================================
+   LANDING v2 — efeitos visuais da página principal (/).
+   Regras:
+   - Todo texto já vem no HTML do servidor; os efeitos são só visuais.
+   - Sem JS (ou com prefers-reduced-motion) tudo fica visível e parado.
+   - As animações só ligam com `.lv2-on` no root, posto pelo <LandingMotion />.
+   - 3D e scroll travado só em telas md+ (≥ 768px).
+   ======================================================================= */
+
+/* ---- Texto com gradiente (H1 e palavras-chave). Contraste AA nos dois temas. ---- */
+.lv2-grad {
+  color: var(--bb-accent);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .lv2-grad {
+    background-image: linear-gradient(100deg, var(--lv2-grad-a) 0%, var(--lv2-grad-b) 55%, var(--lv2-grad-a) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+}
+[data-theme="dark"] {
+  --lv2-grad-a: var(--bb-gold-300);
+  --lv2-grad-b: var(--bb-gold-500);
+}
+[data-theme="light"] {
+  --lv2-grad-a: var(--bb-gold-600);
+  --lv2-grad-b: var(--bb-gold-700);
+}
+
+/* ---- Grade de papel com máscara radial ---- */
+.lv2-grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--bb-text) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--bb-text) 7%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+}
+
+/* ---- Grão (ruído SVG, bem baixo) ---- */
+.lv2-grain {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.3;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+}
+
+/* ---- Luz radial dourada (cartões escuros) ---- */
+.lv2-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, color-mix(in srgb, var(--bb-gold-500) 18%, transparent), transparent 70%);
+}
+
+/* ---- Painel escuro arredondado ---- */
+.lv2-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 32px;
+  background: #0a0a09;
+  border: 1px solid color-mix(in srgb, var(--bb-gold-500) 16%, transparent);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 40px 90px -40px rgba(0, 0, 0, 0.7);
+}
+
+/* ---- Cartão escuro (dentro de painel ou solto) ---- */
+.lv2-card {
+  position: relative;
+  border-radius: 28px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bb-surface) 92%, var(--bb-gold-500)) 0%, var(--bb-surface) 60%);
+  border: 1px solid var(--bb-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  transition: border-color 0.2s ease-out, transform 0.2s ease-out;
+}
+.lv2-card:hover {
+  border-color: color-mix(in srgb, var(--bb-accent) 60%, transparent);
+}
+
+/* ---- Sombra profunda dos mocks flutuantes ---- */
+.lv2-float {
+  border-radius: 20px;
+  background: var(--bb-elevated);
+  border: 1px solid var(--bb-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 56px 112px -28px rgba(0, 0, 0, 0.85);
+}
+
+/* ---- Feixes de luz verticais ---- */
+.lv2-beams {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.lv2-beams > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bb-gold-400) 55%, transparent) 50%, transparent);
+  opacity: 0.35;
+}
+
+/* ---- Cursor piscando ---- */
+.lv2-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: var(--bb-accent);
+}
+
+/* ---- Logo gigante do rodapé ---- */
+.lv2-bigmark {
+  font-family: var(--bb-font-display);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 0.8;
+  letter-spacing: -0.01em;
+  font-size: clamp(56px, 15.5vw, 230px);
+  white-space: nowrap;
+  text-align: center;
+  background-image: linear-gradient(to bottom, color-mix(in srgb, var(--bb-gold-500) 55%, transparent), transparent 85%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  transform: translateY(var(--rise, 0));
+}
+
+/* ---- Jornada (scroll travado): sem JS ou < md = lista empilhada ---- */
+.lv2-journey-step + .lv2-journey-step {
+  margin-top: 28px;
+}
+.lv2-journey-visual > [data-visual] {
+  display: none;
+}
+.lv2-journey-visual > [data-visual="0"] {
+  display: block;
+}
+
+/* =======================================================================
+   ANIMAÇÕES — só com JS (.lv2-on) e sem reduced-motion
+   ======================================================================= */
+@media (prefers-reduced-motion: no-preference) {
+  /* Entrada (fade + subida). O H1 nunca leva data-reveal. */
+  .lv2-on [data-reveal]:not([data-in]) {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  .lv2-on [data-reveal] {
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: calc(var(--d, 0) * 80ms);
+  }
+
+  /* Feixes subindo e piscando */
+  .lv2-on .lv2-beams > i {
+    animation: lv2-beam 6s ease-in-out infinite;
+    animation-delay: calc(var(--d, 0) * -1.3s);
+  }
+
+  /* Cursor */
+  .lv2-on .lv2-caret {
+    animation: lv2-blink 1s steps(1) infinite;
+  }
+
+  /* "Digitando": o texto está no HTML; só a revelação é animada. */
+  .lv2-on [data-type] [data-type-line] {
+    clip-path: inset(0 100% 0 0);
+  }
+  .lv2-on [data-type][data-in] [data-type-line] {
+    animation: lv2-type 0.9s steps(28, end) forwards;
+    animation-delay: calc(var(--d, 0) * 0.55s + 0.2s);
+  }
+  .lv2-on [data-type] .lv2-caret {
+    opacity: 0;
+  }
+  .lv2-on [data-type][data-in] .lv2-caret {
+    animation: lv2-show 0s forwards, lv2-blink 1s steps(1) infinite;
+    animation-delay: calc(var(--n, 5) * 0.55s + 0.2s), calc(var(--n, 5) * 0.55s + 0.2s);
+  }
+
+  /* Rodapé: logo gigante sobe ao entrar */
+  .lv2-on .lv2-bigmark-wrap:not([data-in]) {
+    --rise: 40%;
+  }
+  .lv2-bigmark {
+    transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Cartões flutuantes do hero */
+  .lv2-on .lv2-bob {
+    animation: lv2-bob 7s ease-in-out infinite;
+    animation-delay: calc(var(--d, 0) * -2.3s);
+  }
+
+  @media (min-width: 768px) {
+    /* Hero: mock inclinado em perspectiva que endireita no scroll (--p: 0 → 1) */
+    .lv2-on .lv2-tilt {
+      perspective: 2400px;
+    }
+    .lv2-on .lv2-tilt > div {
+      transform-origin: 50% 0%;
+      transform: rotateX(calc((1 - var(--p, 1)) * 22deg)) scale(calc(0.94 + var(--p, 1) * 0.06));
+      will-change: transform;
+    }
+
+    /* Jornada: container alto + palco sticky; o passo ativo vem em data-step */
+    .lv2-on .lv2-journey {
+      height: calc(var(--steps, 3) * 80vh + 20vh);
+    }
+    .lv2-on .lv2-journey-stage {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+    }
+    .lv2-on .lv2-journey-step {
+      transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+    }
+    .lv2-on .lv2-journey-step + .lv2-journey-step {
+      margin-top: 0;
+    }
+    .lv2-on .lv2-journey-steps {
+      display: grid;
+    }
+    .lv2-on .lv2-journey-step {
+      grid-area: 1 / 1;
+      opacity: 0;
+      transform: translateY(16px);
+      pointer-events: none;
+    }
+    .lv2-on .lv2-journey[data-step="0"] .lv2-journey-step:nth-child(1),
+    .lv2-on .lv2-journey[data-step="1"] .lv2-journey-step:nth-child(2),
+    .lv2-on .lv2-journey[data-step="2"] .lv2-journey-step:nth-child(3),
+    .lv2-on .lv2-journey[data-step="3"] .lv2-journey-step:nth-child(4) {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+    .lv2-on .lv2-journey-visual {
+      display: grid;
+    }
+    .lv2-on .lv2-journey-visual > [data-visual] {
+      display: block;
+      grid-area: 1 / 1;
+      opacity: 0;
+      transform: scale(0.96) translateY(12px);
+      transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+    }
+    .lv2-on .lv2-journey[data-step="0"] [data-visual="0"],
+    .lv2-on .lv2-journey[data-step="1"] [data-visual="1"],
+    .lv2-on .lv2-journey[data-step="2"] [data-visual="2"],
+    .lv2-on .lv2-journey[data-step="3"] [data-visual="3"] {
+      opacity: 1;
+      transform: none;
+    }
+    .lv2-journey-dot {
+      transition: background 0.3s ease-out, width 0.3s ease-out;
+    }
+    .lv2-on .lv2-journey[data-step="0"] .lv2-journey-dot:nth-child(1),
+    .lv2-on .lv2-journey[data-step="1"] .lv2-journey-dot:nth-child(2),
+    .lv2-on .lv2-journey[data-step="2"] .lv2-journey-dot:nth-child(3),
+    .lv2-on .lv2-journey[data-step="3"] .lv2-journey-dot:nth-child(4) {
+      width: 28px;
+      background: var(--bb-accent);
+    }
+  }
+}
+
+@keyframes lv2-beam {
+  0% { transform: translateY(60%); opacity: 0; }
+  30% { opacity: 0.55; }
+  60% { opacity: 0.15; }
+  100% { transform: translateY(-60%); opacity: 0; }
+}
+@keyframes lv2-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+@keyframes lv2-show {
+  to { opacity: 1; }
+}
+@keyframes lv2-type {
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes lv2-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
