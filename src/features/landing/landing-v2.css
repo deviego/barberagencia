@@ -123,7 +123,8 @@
   font-family: var(--bb-font-display);
   font-weight: 900;
   text-transform: uppercase;
-  line-height: 0.8;
+  line-height: 0.9;
+  padding-top: 0.12em;
   letter-spacing: -0.01em;
   font-size: clamp(56px, 15.5vw, 230px);
   white-space: nowrap;
@@ -298,4 +299,20 @@
 @keyframes lv2-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
+}
+
+/* ---- Celular: efeitos leves (sem blend de ruído, sem feixes animados, entrada mais curta) ---- */
+@media (max-width: 767px) {
+  .lv2-grain {
+    display: none;
+  }
+  .lv2-on .lv2-beams > i {
+    animation: none;
+  }
+  .lv2-on [data-reveal]:not([data-in]) {
+    transform: translateY(12px);
+  }
+  .lv2-on [data-reveal] {
+    transition-duration: 0.45s;
+  }
 }
