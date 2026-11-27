@@ -19,9 +19,8 @@ export function LandingHeader({ anchorBase = "", ctaMessage = WA_MESSAGES.start 
   const [darkOver, setDarkOver] = useState(false);
 
   useEffect(() => {
-    let frame = 0;
+    // O navegador já entrega 1 evento de scroll por quadro; o React ignora set igual.
     const update = () => {
-      frame = 0;
       setScrolled(window.scrollY > 8);
       const probe = 40; // altura do meio da pílula
       const over = Array.from(document.querySelectorAll<HTMLElement>("[data-header-tone='dark']")).some((el) => {
@@ -30,16 +29,12 @@ export function LandingHeader({ anchorBase = "", ctaMessage = WA_MESSAGES.start 
       });
       setDarkOver(over);
     };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
     update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
     };
   }, []);
 
@@ -62,80 +57,80 @@ export function LandingHeader({ anchorBase = "", ctaMessage = WA_MESSAGES.start 
           WebkitBackdropFilter: glass ? "blur(14px) saturate(140%)" : undefined,
         }}
       >
-      <div className="flex flex-nowrap items-center justify-between gap-5 py-2 pl-3 pr-2.5 sm:pl-4">
-      {/* Marca */}
-        <a href={`${anchorBase}#produto`} className="flex shrink-0 items-center gap-3">
-          <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md bg-accent font-display text-[17px] font-black text-text-inverse">
-            B✦
-          </span>
-          <span className="whitespace-nowrap font-display text-[19px] font-extrabold uppercase tracking-[0.04em] text-text">
-            Barber Agência
-          </span>
-        </a>
-
-        {/* Nav central (some abaixo de 1180px) */}
-        <nav className="hidden gap-0.5 text-[14px] min-[1181px]:flex">
-          {links.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              className="whitespace-nowrap rounded-pill px-3.5 py-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
-            >
-              {l.label}
-            </a>
-          ))}
-        </nav>
-
-        {/* Ações (nunca cortadas) */}
-        <div className="flex shrink-0 items-center gap-2.5">
-          <ThemeToggle />
-          <a
-            href={salesWaLink(ctaMessage)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden whitespace-nowrap rounded-pill bg-accent px-[18px] py-2 text-[14px] font-bold text-text-inverse transition-colors hover:bg-accent-hover min-[1181px]:inline-flex"
-          >
-            Começar agora
+        <div className="flex flex-nowrap items-center justify-between gap-5 py-2 pl-3 pr-2.5 sm:pl-4">
+          {/* Marca */}
+          <a href={`${anchorBase}#produto`} className="flex shrink-0 items-center gap-3">
+            <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-md bg-accent font-display text-[17px] font-black text-text-inverse">
+              B✦
+            </span>
+            <span className="whitespace-nowrap font-display text-[19px] font-extrabold uppercase tracking-[0.04em] text-text">
+              Barber Agência
+            </span>
           </a>
-          {/* Hambúrguer (abaixo de 1180px) */}
-          <button
-            type="button"
-            aria-label="Abrir menu"
-            onClick={() => setOpen((o) => !o)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border text-text-2 transition-colors hover:border-accent hover:text-accent min-[1181px]:hidden"
-          >
-            {open ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </div>
-      </div>
 
-      {/* Menu mobile */}
-      {open && (
-        <div className="border-t border-border px-3 pb-3 pt-2 min-[1181px]:hidden">
-          <nav className="flex flex-col gap-1">
+          {/* Nav central (some abaixo de 1180px) */}
+          <nav className="hidden gap-0.5 text-[14px] min-[1181px]:flex">
             {links.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
-                onClick={() => setOpen(false)}
-                className="rounded-md px-3 py-2.5 text-[15px] text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
+                className="whitespace-nowrap rounded-pill px-3.5 py-2 text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
               >
                 {l.label}
               </a>
             ))}
-            <div className="mt-2 flex flex-col gap-2">
-              <a
-                href={salesWaLink(ctaMessage)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md bg-accent px-3 py-2.5 text-center text-[15px] font-bold text-text-inverse"
-              >
-                Começar agora
-              </a>
-            </div>
           </nav>
+
+          {/* Ações (nunca cortadas) */}
+          <div className="flex shrink-0 items-center gap-2.5">
+            <ThemeToggle />
+            <a
+              href={salesWaLink(ctaMessage)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden whitespace-nowrap rounded-pill bg-accent px-[18px] py-2 text-[14px] font-bold text-text-inverse transition-colors hover:bg-accent-hover min-[1181px]:inline-flex"
+            >
+              Começar agora
+            </a>
+            {/* Hambúrguer (abaixo de 1180px) */}
+            <button
+              type="button"
+              aria-label="Abrir menu"
+              onClick={() => setOpen((o) => !o)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border text-text-2 transition-colors hover:border-accent hover:text-accent min-[1181px]:hidden"
+            >
+              {open ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Menu mobile */}
+        {open && (
+          <div className="border-t border-border px-3 pb-3 pt-2 min-[1181px]:hidden">
+            <nav className="flex flex-col gap-1">
+              {links.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setOpen(false)}
+                  className="rounded-md px-3 py-2.5 text-[15px] text-text-2 transition-colors hover:bg-accent-wash hover:text-accent"
+                >
+                  {l.label}
+                </a>
+              ))}
+              <div className="mt-2 flex flex-col gap-2">
+                <a
+                  href={salesWaLink(ctaMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md bg-accent px-3 py-2.5 text-center text-[15px] font-bold text-text-inverse"
+                >
+                  Começar agora
+                </a>
+              </div>
+            </nav>
+          </div>
+        )}
       </div>
     </header>
   );

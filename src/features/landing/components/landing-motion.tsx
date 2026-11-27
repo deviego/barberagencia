@@ -36,12 +36,10 @@ export function LandingMotion({ rootId }: { rootId: string }) {
     );
     for (const el of revealables) if (!el.hasAttribute("data-in")) io.observe(el);
 
-    // 2) Scroll: hero (--p) e jornada (data-step), num rAF só.
+    // 2) Scroll: hero (--p) e jornada (data-step). O navegador já entrega 1 evento de scroll por quadro.
     const tilts = Array.from(root.querySelectorAll<HTMLElement>("[data-scroll]"));
     const journeys = Array.from(root.querySelectorAll<HTMLElement>(".lv2-journey"));
-    let frame = 0;
     const update = () => {
-      frame = 0;
       const h = vh();
       for (const el of tilts) {
         const top = el.getBoundingClientRect().top;
@@ -57,18 +55,14 @@ export function LandingMotion({ rootId }: { rootId: string }) {
         if (el.dataset.step !== step) el.dataset.step = step;
       }
     };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
     update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
 
     return () => {
       io.disconnect();
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
       root.classList.remove("lv2-on");
     };
   }, [rootId]);
