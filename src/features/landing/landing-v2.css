@@ -216,6 +216,10 @@
       will-change: transform;
     }
 
+  }
+
+  /* Scroll travado só em tela larga E alta: em tela baixa (notebook 1366x768) o palco de 100vh cortaria título e cartão. */
+  @media (min-width: 768px) and (min-height: 760px) {
     /* Jornada: container alto + palco sticky; o passo ativo vem em data-step */
     .lv2-on .lv2-journey {
       height: calc(var(--steps, 3) * 80vh + 20vh);

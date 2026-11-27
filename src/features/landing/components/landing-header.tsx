@@ -19,11 +19,13 @@ export function LandingHeader({ anchorBase = "", ctaMessage = WA_MESSAGES.start 
   const [darkOver, setDarkOver] = useState(false);
 
   useEffect(() => {
+    // Seções escuras lidas uma vez (a página não cria seção nova depois de montar).
+    const darkSections = Array.from(document.querySelectorAll<HTMLElement>("[data-header-tone='dark']"));
     // O navegador já entrega 1 evento de scroll por quadro; o React ignora set igual.
     const update = () => {
       setScrolled(window.scrollY > 8);
       const probe = 40; // altura do meio da pílula
-      const over = Array.from(document.querySelectorAll<HTMLElement>("[data-header-tone='dark']")).some((el) => {
+      const over = darkSections.some((el) => {
         const r = el.getBoundingClientRect();
         return r.top <= probe && r.bottom >= probe;
       });

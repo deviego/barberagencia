@@ -42,7 +42,7 @@ export function TurnMock({ className = "" }: { className?: string }) {
         <Bell size={13} className="text-accent" />
         Fila · Barbearia Teste
       </div>
-      <div className="mt-2 font-display text-[54px] font-black leading-none text-accent">A07</div>
+      <div className="mt-2 font-display text-[54px] font-black leading-none text-accent">#7</div>
       <div className="mt-1 text-[15px] font-bold text-text">É a sua vez!</div>
     </div>
   );
@@ -85,11 +85,11 @@ export function QueueVisual({ step }: { step: 0 | 1 | 2 }) {
       <div aria-hidden="true" className="lv2-float mx-auto flex w-full max-w-[340px] flex-col items-center gap-3 p-7 text-center">
         <Ticket size={26} className="text-accent" />
         <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-text-muted">Sua senha</div>
-        <div className="font-display text-[88px] font-black leading-none text-text">A07</div>
+        <div className="font-display text-[88px] font-black leading-none text-text">#7</div>
         <div className="text-[14px] text-text-2">3 pessoas na sua frente · Corte</div>
         <div className="mt-1 flex w-full justify-between rounded-xl border border-border-subtle bg-inset px-4 py-3 text-[13px]">
           <span className="text-text-muted">Barbeiro</span>
-          <span className="font-semibold text-text">Qualquer um</span>
+          <span className="font-semibold text-text">Sem preferência</span>
         </div>
       </div>
     );
@@ -102,11 +102,11 @@ export function QueueVisual({ step }: { step: 0 | 1 | 2 }) {
       </div>
       <div className="mt-4 rounded-2xl border border-accent bg-accent-wash p-5 text-center">
         <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-text-2">Chamando</div>
-        <div className="font-display text-[72px] font-black leading-none text-accent">A07</div>
+        <div className="font-display text-[72px] font-black leading-none text-accent">#7</div>
         <div className="mt-1 text-[16px] font-bold text-text">É a sua vez!</div>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        {["A08", "A09", "A10"].map((s) => (
+        {["#8", "#9", "#10"].map((s) => (
           <div key={s} className="rounded-xl border border-border-subtle bg-inset py-2.5">
             <div className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Próxima</div>
             <div className="font-display text-[26px] font-extrabold text-text">{s}</div>
