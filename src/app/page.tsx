@@ -288,7 +288,7 @@ export default function LandingPage() {
                     acompanha a vez dele, sem ficar perguntando no balcão.
                   </p>
                 </div>
-                <div aria-hidden="true" className="hidden gap-2 md:flex">
+                <div aria-hidden="true" className="lv2-journey-dots hidden gap-2">
                   {QUEUE_STEPS.map((q) => (
                     <span key={q.title} className="lv2-journey-dot h-1.5 w-3 rounded-full bg-border" />
                   ))}
