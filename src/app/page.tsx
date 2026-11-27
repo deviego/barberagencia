@@ -80,7 +80,9 @@ export default function LandingPage() {
                 Começar agora
               </a>
               <a
-                href="#contato"
+                href={salesWaLink(WA_MESSAGES.start)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-pill border border-border px-[26px] py-[15px] text-[15px] font-semibold text-text transition-colors hover:border-accent hover:text-accent"
               >
                 <Icon name="phone" size={16} />

@@ -7,6 +7,14 @@
    - 3D e scroll travado só em telas md+ (≥ 768px).
    ======================================================================= */
 
+/* ---- Âncoras do menu: o título da seção para abaixo do header flutuante (pílula ~72px + margem). ---- */
+html:has(#landing) {
+  scroll-padding-top: 112px;
+}
+#landing section[id] {
+  scroll-margin-top: 112px;
+}
+
 /* ---- Texto com gradiente (H1 e palavras-chave). Contraste AA nos dois temas. ---- */
 .lv2-grad {
   color: var(--bb-accent);
